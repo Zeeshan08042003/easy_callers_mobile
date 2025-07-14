@@ -45,7 +45,7 @@ class CallController extends GetxController {
     }
   }
 
-  Future<void> makeCall() async {
+  Future<void> makeCall({String? phoneNumber}) async {
     final number = numberController.text.trim();
     if (number.isEmpty) {
       Get.snackbar('Error', 'Please enter a number');
@@ -54,7 +54,7 @@ class CallController extends GetxController {
 
     try {
       // Await call log result after call ends
-      final String? log = await _platform.invokeMethod('startCall', {'number': number});
+      final String? log = await _platform.invokeMethod('startCall', {'number': phoneNumber ?? number});
       callLog.value = log ?? 'No call log received';
     } on PlatformException catch (e) {
       Get.snackbar('Error', 'Failed to start call: ${e.message}');
