@@ -4,6 +4,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import '../../constants/utils.dart';
 import '../dashboard/dashboard_screen.dart';
+import 'controller/login_controller.dart';
 import 'custom_buttons.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -53,6 +54,20 @@ class LoginScreen extends StatelessWidget {
                 labelTextColor: CustomColors.black,
                 cursorColor: CustomColors.black,
                 onChanged: (txt) => controller.password(txt),
+              ),
+              Obx(()=>
+                Visibility(
+                  visible: controller.errorMsg.isNotEmpty,
+                  child: Column(
+                    children: [
+                      SizedBox(height: 5,),
+                      Text(controller.errorMsg.value,style: TextStyle(
+                        color: Colors.red
+                      )),
+                      SizedBox(height: 5,)
+                    ],
+                  ),
+                ),
               ),
               SizedBox(
                 height: 10,
@@ -105,40 +120,3 @@ class LoginScreen extends StatelessWidget {
 }
 
 
-class LoginController extends GetxController{
-  RxString email = "".obs;
-  RxString password = "".obs;
-  RxString emailError = "".obs;
-  RxString passwordError = "".obs;
-  RxBool enableButton = false.obs;
-
-
-  verify(){
-    bool isValid = true;
-    RegExp regExp = RegExp(Constants.EMAIL_REGEX);
-    RegExp regExp1 = RegExp(Constants.PASS_REGEX1);
-
-    if (email.value.length == 0) {
-      emailError('Please enter email');
-      isValid = false;
-    } else if (!regExp.hasMatch(email.value)) {
-      emailError('Please enter valid email');
-      isValid = false;
-    } else {
-      emailError('');
-    }
-
-    if (password.value.length == 0) {
-      passwordError('Please enter password');
-      isValid = false;
-    } else if (!regExp1.hasMatch(password.value)) {
-      passwordError('Please enter valid password');
-      isValid = false;
-    } else {
-      passwordError('');
-    }
-
-    enableButton(isValid);
-    print("button val : ${enableButton.value}");
-  }
-}
