@@ -90,7 +90,7 @@ class LoginScreen extends StatelessWidget {
                       };
                       print(val);
                       // await controller.login(email: controller.email.value, password: controller.password.value);
-                      Get.to(() => Dashboard());
+                      Get.to(() => DashboardScreen());
                     },
                   ),
                 ),

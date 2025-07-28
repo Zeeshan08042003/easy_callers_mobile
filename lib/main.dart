@@ -32,15 +32,14 @@ class CallController extends GetxController {
   final numberController = TextEditingController();
   final callLog = ''.obs;
 
-
-  static const MethodChannel platform =
+  static const MethodChannel _platform =
   MethodChannel('com.easy_callers/call');
 
 
   makeCallForIos(String number) async {
-    await platform.invokeMethod('startCall', number);
+    await _platform.invokeMethod('startCall', number);
 
-    platform.setMethodCallHandler((call) async {
+    _platform.setMethodCallHandler((call) async {
       if (call.method == 'callEnded') {
         String duration = call.arguments;
         print("⏱️ Call duration: $duration");
@@ -51,7 +50,7 @@ class CallController extends GetxController {
 
   launchWhatsAppChatForIos(String number, {String message = "Hello Zeeshan Ahmed"}) async {
     try {
-      await platform.invokeMethod('whatsappChat', {
+      await _platform.invokeMethod('whatsappChat', {
         'number': number,
         'message': message,
       });
@@ -60,7 +59,7 @@ class CallController extends GetxController {
     }
   }
 
-  Future<void> makeCall() async {
+  Future<void> makeCall({String? phoneNumber}) async {
     final number = numberController.text.trim();
     if (number.isEmpty) {
       Get.snackbar('Error', 'Please enter a number');
@@ -69,7 +68,7 @@ class CallController extends GetxController {
 
     try {
       // Await call log result after call ends
-      final String? log = await platform.invokeMethod('startCall', {'number': number});
+      final String? log = await _platform.invokeMethod('startCall', {'number': phoneNumber ?? number});
       callLog.value = log ?? 'No call log received';
     } on PlatformException catch (e) {
       Get.snackbar('Error', 'Failed to start call: ${e.message}');
@@ -78,7 +77,7 @@ class CallController extends GetxController {
 
   Future<void> sendWhatsAppMessage(List<String> numbers, String message) async {
     try {
-      await platform.invokeMethod('sendBulkWhatsAppMessages', {
+      await _platform.invokeMethod('sendBulkWhatsAppMessages', {
         'numbers': numbers,
         'message': message,
       });
@@ -89,7 +88,7 @@ class CallController extends GetxController {
 
   static Future<void> sendSMS(String number, String message) async {
     try {
-      await platform.invokeMethod('sendSMS', {
+      await _platform.invokeMethod('sendSMS', {
         'number': number,
         'message': message,
       });
@@ -97,9 +96,6 @@ class CallController extends GetxController {
       print("Failed to send SMS: ${e.message}");
     }
   }
-
-
-
 
   @override
   void onClose() {
