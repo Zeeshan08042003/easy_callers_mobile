@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:easy_callers_mobile/auth/custom_buttons.dart';
 import 'package:easy_callers_mobile/constants/utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../main.dart';
@@ -107,7 +110,11 @@ class LeadsChip extends StatelessWidget {
                   titleSize: 14,
                   radius: 10,
                   onTap: () async {
-                    controller.sendWhatsAppMessage(["9920111031"],"Hello");
+                    if(Platform.isIOS){
+                      await controller.launchWhatsAppChatForIos("7666611031");
+                    }else{
+                      await controller.sendWhatsAppMessage(["9920111031"],"Hello");
+                    }
                     // controller.sendBulkWhatsAppMessages(["9920111031"],"Hello from easy callers");
                   },
                 ),
@@ -123,7 +130,14 @@ class LeadsChip extends StatelessWidget {
                   textColor: CustomColors.white,
                   titleSize: 14,
                   radius: 10,
-                  onTap: () async {},
+                  onTap: () async {
+                    if(Platform.isIOS){
+                      // await controller.makeCallForIos("9029695116");
+                      await controller.makeCallForIos("7666611031");
+                    }else{
+                      await controller.makeCall();
+                    }
+                  },
                 ),
               ),
 
