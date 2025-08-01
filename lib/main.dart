@@ -57,10 +57,10 @@ class CallController extends GetxController {
   MethodChannel('com.easy_callers/call');
 
 
-  Future<String?> makeCallForIos(String number) async {
+    makeCallForIos({required String phoneNumber, Leads? lead,bool? fromFeedbackScreen}) async {
     try {
       // Initiate the iOS call
-      await _platform.invokeMethod('startCall', number);
+      await _platform.invokeMethod('startCall', phoneNumber);
 
       // Wait for callEnded callback with duration
       final completer = Completer<String?>();

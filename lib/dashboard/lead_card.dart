@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -55,7 +57,13 @@ class LeadCard extends StatelessWidget {
                   onTap: () async {
                     print(lead.phone);
                     var controller = Get.find<CallController>();
-                    await controller.makeCall(phoneNumber: lead.phone??'',lead: lead);
+                    if(Platform.isIOS){
+                      await controller.makeCallForIos(phoneNumber:lead.phone??'',lead: lead);
+                    }else{
+                      await controller.makeCall(
+                          phoneNumber: lead.phone, lead: lead);
+                    }
+                    // await controller.makeCall(phoneNumber: lead.phone??'',lead: lead);
                   },
                 )
                 // Text(item["time"], style: TextStyle(color: Colors.grey,fontSize: 10))

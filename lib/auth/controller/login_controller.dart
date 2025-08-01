@@ -64,6 +64,8 @@ class LoginController extends GetxController {
         await prefs.setString("userId", user?.id ?? '');
         await prefs.setString("companyId", user?.companyId ?? '');
         await prefs.setString("token", response.payload?.token ?? '');
+        await prefs.setString("name", "${response.payload?.data?.user?.firstName} ${response.payload?.data?.user?.lastName}");
+        await prefs.setString("email", response.payload?.data?.user?.email??'');
         Get.offAll(() => DashboardScreen());
       } else if (response.payload?.success == false) {
         print('else');

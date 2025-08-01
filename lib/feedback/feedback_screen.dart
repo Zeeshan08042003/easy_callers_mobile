@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:easy_callers_mobile/feedback/custom_dropdown.dart';
@@ -428,7 +429,14 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                   titleSize: 14,
                   radius: 10,
                   onTap: () async {
-                    await controller.makeCall(phoneNumber: controller.callLog.value?.number,lead: widget.lead,fromFeedbackScreen: true);
+                    // await controller.makeCall(phoneNumber: controller.callLog.value?.number,lead: widget.lead,fromFeedbackScreen: true);
+                    if(Platform.isIOS){
+                      await controller.makeCallForIos(phoneNumber:controller.callLog.value?.number??'',lead: widget.lead,fromFeedbackScreen: true);
+                    }else{
+                      await controller.makeCall(
+                          phoneNumber: controller.callLog.value?.number, lead: widget.lead,fromFeedbackScreen: true);
+                    }
+
                     print(controller.callLog.value?.number);
                     print(controller.callLog.value?.time);
                     print(controller.callLog.value?.duration);

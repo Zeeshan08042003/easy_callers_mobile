@@ -13,9 +13,6 @@ class LeadList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (Get.isRegistered<LeadPaginationController>()) {
-      Get.delete<LeadPaginationController>(); // Clean old one
-    }
     var controller = Get.put(LeadPaginationController(status: status));
 
     return Scaffold(
@@ -24,8 +21,13 @@ class LeadList extends StatelessWidget {
         titleSpacing: 2,
         backgroundColor: Colors.grey.shade100,
         elevation: 2,
-        leading: Icon(Icons.arrow_back),
+        leading: GestureDetector(
+            onTap: (){
+              Get.back();
+            },
+            child: Icon(Icons.arrow_back)),
         title: Text(title),
+
       ),
       body: RefreshIndicator(
         onRefresh: () async {

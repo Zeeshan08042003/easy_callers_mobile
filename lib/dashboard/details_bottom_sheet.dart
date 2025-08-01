@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:easy_callers_mobile/constants/utils.dart';
 import 'package:easy_callers_mobile/main.dart';
 import 'package:easy_callers_mobile/webservices/model/leadModel.dart';
@@ -119,7 +121,13 @@ class DetailsBottomSheet {
                           titleSize: 14,
                           radius: 10,
                           onTap: () async {
-                            await controller.makeCall(lead: leads,phoneNumber: phoneNumber);
+                            if(Platform.isIOS){
+                              await controller.makeCallForIos(phoneNumber:phoneNumber??'',lead: leads);
+                            }else{
+                              await controller.makeCall(
+                                  phoneNumber: phoneNumber, lead: leads);
+                            }
+                            // await controller.makeCall(lead: leads,phoneNumber: phoneNumber);
                             // Get.to(() => FeedbackScreen());
                           },
                         ),

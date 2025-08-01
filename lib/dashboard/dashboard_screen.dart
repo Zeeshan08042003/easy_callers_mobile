@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:easy_callers_mobile/constants/utils.dart';
 import 'package:easy_callers_mobile/dashboard/dashboard_controller.dart';
 import 'package:easy_callers_mobile/dashboard/total_leads.dart';
@@ -29,7 +31,17 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(
         elevation: 2,
         automaticallyImplyLeading: false,
-        title: Text("Easy Callers"),
+        title: Align(alignment:Alignment.centerLeft,child: Text("Easy Callers")),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: GestureDetector(
+                onTap: (){
+                  Get.to(() => ProfileScreen());
+                },
+                child: Icon(Icons.account_circle_outlined,size: 30,)),
+          )
+        ],
         backgroundColor: Colors.grey.shade100,
       ),
       body: Stack(
@@ -167,8 +179,12 @@ class CallTrackerHomePage extends StatelessWidget {
                                         onTap: () async {
                                           var controller =
                                               Get.find<CallController>();
-                                          await controller.makeCall(
-                                              phoneNumber: item.phone, lead: item);
+                                          if(Platform.isIOS){
+                                            await controller.makeCallForIos(phoneNumber:item.phone??'',lead: item);
+                                          }else{
+                                            await controller.makeCall(
+                                                phoneNumber: item.phone, lead: item);
+                                          }
                                           // var pref = await SharedPreferences.getInstance();
                                           // pref.clear();
                                           // controller.makeCall(phoneNumber: item['number']);
