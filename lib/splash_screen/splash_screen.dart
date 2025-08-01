@@ -49,7 +49,7 @@ class SplashController extends GetxController{
 
 
 
-  final controller = Get.lazyPut(() => CallController());
+  final controller = Get.put(CallController());
 
   @override
   void onInit() {
@@ -61,11 +61,11 @@ class SplashController extends GetxController{
 
   checkingScreen() async {
     var pref = await SharedPreferences.getInstance();
-    var email = pref.getString("userId");
-    if (email == null) {
+    var userId = pref.getString("userId");
+    if (userId == null) {
       return Get.offAll(() => LoginScreen());
     } else{
-      return Get.offAll(()=> Dashboard());
+      return Get.offAll(()=> DashboardScreen());
     }
   }
 }

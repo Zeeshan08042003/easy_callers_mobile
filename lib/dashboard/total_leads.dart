@@ -1,179 +1,81 @@
-import 'dart:io';
-
-import 'package:easy_callers_mobile/auth/custom_buttons.dart';
-import 'package:easy_callers_mobile/constants/utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
-import '../main.dart';
+import '../webservices/model/leadModel.dart';
+import 'LeadsPagination.dart';
+import 'lead_card.dart';
 
-class TotalLeads extends StatelessWidget {
-  const TotalLeads({super.key});
+class LeadList extends StatelessWidget {
+  const LeadList({super.key, required this.status, required this.title});
+  final String status;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
+    if (Get.isRegistered<LeadPaginationController>()) {
+      Get.delete<LeadPaginationController>(); // Clean old one
+    }
+    var controller = Get.put(LeadPaginationController(status: status));
+
     return Scaffold(
-      backgroundColor: CustomColors.white,
+      backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        backgroundColor: CustomColors.black,
         titleSpacing: 2,
-        leading: Icon(Icons.arrow_back,color: Color(0xffFFFFFF),),
-        title: Text(
-          "Total Leads",
-          style: TextStyle(color: CustomColors.white),
-        ),
+        backgroundColor: Colors.grey.shade100,
+        elevation: 2,
+        leading: Icon(Icons.arrow_back),
+        title: Text(title),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          children: [
-            LeadsChip(),
-            LeadsChip(),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          controller.pagingController.refresh();
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+            PagedSliverList<int, Leads>(
+              pagingController: controller.pagingController,
+              builderDelegate: PagedChildBuilderDelegate<Leads>(
+                itemBuilder: (context, item, index) {
+                  try {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: LeadCard(lead: item, key: ValueKey(item.id)),
+                    );
+                  } catch (e, st) {
+                    print("❌ Error in itemBuilder: $e\n$st");
+                    return ListTile(
+                      title: Text('⚠️ Failed to render item'),
+                    );
+                  }
+                },
+
+                // ✅ FIXED: Return normal widgets (not slivers)
+                noItemsFoundIndicatorBuilder: (_) => Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.search_off, size: 50),
+                      SizedBox(height: 10),
+                      Text("No leads found"),
+                      SizedBox(height: 10),
+                      Text("Status: $status", style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+                firstPageErrorIndicatorBuilder: (_) => Center(
+                  child: Text("Something went wrong"),
+                ),
+                firstPageProgressIndicatorBuilder: (_) => Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
-  }
-}
-
-class LeadsChip extends StatelessWidget {
-  LeadsChip({super.key,this.name,this.number,this.email});
-  String? name;
-  String? email;
-  String? number;
-
-  @override
-  Widget build(BuildContext context) {
-    var controller = Get.find<CallController>();
-    return Container(
-      width: double.infinity,
-      margin: EdgeInsets.only(top: 30),
-      padding: EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              width: 2,
-              color: CustomColors.black
-          )
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            // decoration: BoxDecoration(
-            //     color: CustomColors.black,
-            //     border: Border.all(color: CustomColors.black),
-            //     borderRadius: BorderRadius.vertical(top: Radius.circular(8))
-            // ),
-            padding:EdgeInsets.symmetric(vertical: 10),
-            child: Text("Mrs Joginder",
-              style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  color: CustomColors.black
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Icon(Icons.phone,color: CustomColors.black,),
-              SizedBox(width: 3,),
-              Text("9820111083",style: TextStyle(
-                fontSize: 16,fontWeight: FontWeight.w500
-              ),)
-            ],
-          ),
-          SizedBox(height: 5,),
-          Row(
-            children: [
-              Icon(Icons.mail,color: CustomColors.black,),
-              SizedBox(width: 3,),
-              Text("joginder@gmail.com",style: TextStyle(
-                fontSize: 16,fontWeight: FontWeight.w500
-              ),)
-            ],
-          ),
-          SizedBox(height: 20,),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Expanded(
-                child: ATButtonV3(
-                  title: "WhatsApp",
-                  padding: EdgeInsets.symmetric(horizontal: 8,vertical: 5),
-                  height: 35,
-                  containerWidth: 95,
-                  color: Color(0xff2D201C),
-                  textColor: CustomColors.white,
-                  titleSize: 14,
-                  radius: 10,
-                  onTap: () async {
-                    if(Platform.isIOS){
-                      await controller.launchWhatsAppChatForIos("7666611031");
-                    }else{
-                      await controller.sendWhatsAppMessage(["9920111031"],"Hello");
-                    }
-                    // controller.sendBulkWhatsAppMessages(["9920111031"],"Hello from easy callers");
-                  },
-                ),
-              ),
-              SizedBox(width: 10,),
-              Expanded(
-                child: ATButtonV3(
-                  title: "Call",
-                  padding: EdgeInsets.symmetric(horizontal: 8,vertical: 5),
-                  height: 35,
-                  containerWidth: 95,
-                  color: Color(0xff2D201C),
-                  textColor: CustomColors.white,
-                  titleSize: 14,
-                  radius: 10,
-                  onTap: () async {
-                    if(Platform.isIOS){
-                      // await controller.makeCallForIos("9029695116");
-                      await controller.makeCallForIos("7666611031");
-                    }else{
-                      await controller.makeCall();
-                    }
-                  },
-                ),
-              ),
-
-              // ATButtonV3(
-              //   title: "SMS",
-              //   padding: EdgeInsets.symmetric(horizontal: 8,vertical: 5),
-              //   height: 35,
-              //   containerWidth: 95,
-              //   color: Color(0xff2D201C),
-              //   textColor: CustomColors.white,
-              //   titleSize: 14,
-              //   radius: 10,
-              //   onTap: () async {
-              //
-              //   },
-              // ),
-            ],
-          ),
-          SizedBox(height: 20,)
-        ],
-      ),
-    );
-  }
-}
-
-
-class LeadController extends GetxController{
-  static const String numberRegx = "(?:(?:\+|00)\d{1,3})?[\s.-]?\(?\d{1,4}\)?([\s.-]?\d{1,4}){1,4}";
-
-  getNumberValidate(String? number){
-    if (number == null) return;
-
-    final regExp = RegExp(numberRegx);
-
-    if(regExp.hasMatch(number)){
-      print("number is valid $number");
-    }
   }
 }

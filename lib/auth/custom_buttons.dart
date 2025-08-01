@@ -15,7 +15,7 @@ class ATButtonV3 extends StatelessWidget {
         this.width,
         this.enabled = true,
         this.titleSize,
-        this.containerWidth, this.isLoading = false, this.loaderColor, this.padding});
+        this.containerWidth, this.isLoading = false, this.loaderColor, this.padding, this.loaderHeight, this.loaderWidth});
 
   final double? width;
   final double? titleSize;
@@ -34,7 +34,10 @@ class ATButtonV3 extends StatelessWidget {
   final double? radius;
   final bool enabled;
   final double? containerWidth;
+  final double? loaderHeight;
+  final double? loaderWidth;
   final EdgeInsets? padding;
+
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +77,10 @@ class ATButtonV3 extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: textColor ?? Color.fromRGBO(109, 109, 109, 1),
                   ),
-                ) : Center(child: CircularProgressIndicator(color: loaderColor ?? Color(0xffFFFFFFF),),),
+                ) : Center(child: SizedBox(
+                    height: loaderHeight,
+                    width: loaderWidth,
+                    child: CircularProgressIndicator(color: loaderColor ?? Color(0xffFFFFFFF),)),),
               ),
               if (icon != null) icon!,
             ],

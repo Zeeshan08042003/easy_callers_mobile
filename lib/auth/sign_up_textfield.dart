@@ -14,9 +14,10 @@ class Sign_Up_TextField extends StatefulWidget {
         this.suffixIcon,
         required this.errorMessage,
         this.onChanged,
-        this.prefixIcon, this.hintText, this.hintLabelStyle, this.keyBoardType});
+        this.prefixIcon, this.hintText, this.hintLabelStyle, this.keyBoardType, this.radius, this.maxLines, this.minLines, this.expands, this.textInputAction, this.initialValue});
   final Color? labelTextColor;
   final String errorMessage;
+  final String? initialValue;
   final String? hintText;
   final TextInputType? keyBoardType;
   final TextStyle? hintLabelStyle;
@@ -28,7 +29,12 @@ class Sign_Up_TextField extends StatefulWidget {
   final String? Function(String? txt)? validationLogic;
   final void Function(String)? onChanged;
   final bool? suffixIcon;
+  final BorderRadius? radius;
   final Widget? prefixIcon;
+  final int? maxLines;
+  final int? minLines;
+  final bool? expands;
+  final TextInputAction? textInputAction;
 
   @override
   State<Sign_Up_TextField> createState() => _Sign_Up_TextFieldState();
@@ -40,8 +46,13 @@ class _Sign_Up_TextFieldState extends State<Sign_Up_TextField> {
   Widget build(BuildContext context) {
     // final registrationController = Get.put(RegistrationController());
     return TextFormField(
+      initialValue: widget.initialValue,
       controller: widget.controller,
       cursorColor: widget.cursorColor,
+      maxLines: widget.suffixIcon == true ? 1 : widget.maxLines,
+      minLines: widget.suffixIcon == true ? 1 : widget.minLines,
+      expands: widget.suffixIcon == true ? false : (widget.expands ?? false),
+      textInputAction: widget.textInputAction,
       validator: (value) {
         if (widget.validationLogic != null) {
           // focusNode.requestFocus();
@@ -65,7 +76,7 @@ class _Sign_Up_TextFieldState extends State<Sign_Up_TextField> {
                 fontWeight: FontWeight.w400),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: widget.radius ?? BorderRadius.circular(30),
             borderSide: BorderSide(
                 color: widget.focusedBorderColor ?? CustomColors.black),
           ),
@@ -87,9 +98,9 @@ class _Sign_Up_TextFieldState extends State<Sign_Up_TextField> {
               color: widget.cursorColor,
             ),
           )
-              : SizedBox(),
+              : null,
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: widget.radius ?? BorderRadius.circular(30),
             borderSide: BorderSide(
                 color: widget.enableBorderColor ?? CustomColors.black),
           ),

@@ -33,27 +33,36 @@ class LoginScreen extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 50.0),
-                child: Sign_Up_TextField(
-                  errorMessage: controller.emailError.value,
-                  labelText: "Email",
+                child: Obx(
+                  ()=> Sign_Up_TextField(
+                    errorMessage: controller.emailError.value,
+                    labelText: "Email",
+                    enableBorderColor: Color(0xffD6D6D6),
+                    focusedBorderColor: CustomColors.black,
+                    labelTextColor: CustomColors.black,
+                    cursorColor: CustomColors.black,
+                    onChanged: (txt) {
+                      controller.email(txt);
+                    },
+                  ),
+                ),
+              ),
+              Obx(()=>
+                 Visibility(
+                    visible: controller.emailError.isNotEmpty,
+                    child: SizedBox(height: 10)),
+              ),
+              Obx(
+                ()=> Sign_Up_TextField(
+                  errorMessage: controller.passwordError.value,
+                  suffixIcon: true,
+                  labelText: "Password",
                   enableBorderColor: Color(0xffD6D6D6),
                   focusedBorderColor: CustomColors.black,
                   labelTextColor: CustomColors.black,
                   cursorColor: CustomColors.black,
-                  onChanged: (txt) {
-                    controller.email(txt);
-                  },
+                  onChanged: (txt) => controller.password(txt),
                 ),
-              ),
-              Sign_Up_TextField(
-                errorMessage: controller.passwordError.value,
-                suffixIcon: true,
-                labelText: "Password",
-                enableBorderColor: Color(0xffD6D6D6),
-                focusedBorderColor: CustomColors.black,
-                labelTextColor: CustomColors.black,
-                cursorColor: CustomColors.black,
-                onChanged: (txt) => controller.password(txt),
               ),
               Obx(()=>
                 Visibility(
@@ -62,7 +71,7 @@ class LoginScreen extends StatelessWidget {
                     children: [
                       SizedBox(height: 5,),
                       Text(controller.errorMsg.value,style: TextStyle(
-                        color: Colors.red
+                        color: Colors.red,fontSize: 16
                       )),
                       SizedBox(height: 5,)
                     ],
@@ -90,23 +99,26 @@ class LoginScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 30),
                 child: Center(
-                  child: ATButtonV3(
-                    title: "LOGIN",
-                    containerWidth: 147,
-                    height: 50,
-                    color: Color(0xff2D201C),
-                    textColor: CustomColors.white,
-                    radius: 25,
-                    onTap: () async {
-                      controller.verify();
-                      var val = {
-                        "email": controller.email.value,
-                        "password": controller.password.value
-                      };
-                      print(val);
-                      // await controller.login(email: controller.email.value, password: controller.password.value);
-                      Get.to(() => Dashboard());
-                    },
+                  child: Obx(()=>
+                    ATButtonV3(
+                      title: "LOGIN",
+                      containerWidth: 147,
+                      isLoading: controller.isLoading.value,
+                      height: 50,
+                      color: Color(0xff2D201C),
+                      textColor: CustomColors.white,
+                      radius: 25,
+                      loaderHeight: 20,
+                      loaderWidth: 20,
+                      onTap: () async {
+                        var val = await controller.verify();
+                        // var val = {
+                        //   "email": controller.email.value,
+                        //   "password": controller.password.value
+                        // };
+                        print(val);
+                      },
+                    ),
                   ),
                 ),
               ),

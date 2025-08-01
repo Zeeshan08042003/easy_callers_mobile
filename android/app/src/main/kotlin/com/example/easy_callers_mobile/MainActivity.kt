@@ -213,6 +213,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.json.JSONObject
 
 class MainActivity : FlutterActivity() {
 
@@ -357,18 +358,18 @@ class MainActivity : FlutterActivity() {
                     CallLog.Calls.REJECTED_TYPE -> "Rejected"
                     else -> "Unknown"
                 }
-                val status = if (type == CallLog.Calls.OUTGOING_TYPE && duration == 0L) "Declined or Failed" else "Completed"
+                val status = if (type == CallLog.Calls.OUTGOING_TYPE && duration == 0L) "Declined or Failed" else "Connected"
 
-                val callDetails = """
-                    📞 Last Call Info:
-                    • Number: $number
-                    • Type: $typeLabel
-                    • Status: $status
-                    • Time: $formattedDate
-                    • Duration: ${formatDuration(duration)}
-                """.trimIndent()
+                val callDetails = mapOf(
+                    "number" to number,
+                    "type" to typeLabel,
+                    "status" to status,
+                    "time" to formattedDate,
+                    "duration" to formatDuration(duration)
+                )
 
-                result.success(callDetails)
+                val jsonString = JSONObject(callDetails).toString()
+                result.success(jsonString)
             } else {
                 result.success("No call log found")
             }

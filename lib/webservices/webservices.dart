@@ -1,5 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:easy_callers_mobile/webservices/model/leadModel.dart';
+import 'package:easy_callers_mobile/webservices/model/submit_call_logs_model.dart';
+import 'package:easy_callers_mobile/webservices/model/submit_call_logs_model.dart';
+import 'package:easy_callers_mobile/webservices/model/submit_call_logs_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -10,47 +15,61 @@ import 'model/login_model.dart';
 
 
 part 'login_api.dart';
+part 'lead_api.dart';
+part 'sumbit_call_logs_api.dart';
 
 class WebService {
   late Response response;
   GetConnect connect = Get.find<GetConnect>();
 
-  var testUrl = "https://dcee11d7ae76.ngrok-free.app";
+  var testUrl = "https://209c389d89da.ngrok-free.app";
   // var baseUrl = "https://ckfood.swypeuat.co.uk";
   var baseUrl = "https://solutionwise.swypeuat.co.uk";
   // var baseUrl = "https://b7e2-2401-4900-8815-97cf-f193-16cb-3b42-3ecd.ngrok-free.app";
-
-  Future<ApiResponse> callApi({required HTTP_METHODS method,
+  Future<ApiResponse> callApi({
+    required HTTP_METHODS method,
     Map<String, dynamic>? params,
     Map<String, dynamic>? body,
     required List<String> path,
-    dynamic logParams = ""}) async {
+    bool? isLeads,
+    dynamic logParams = "",
+  }) async {
     String pathStr = path.join("/");
     if (pathStr.isEmpty) pathStr = "callApi";
-    // try {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String token = prefs.getString('accessToken') ?? '';
-    // print("token ::::::: $token");
+
+    var prefs = await SharedPreferences.getInstance();
+    var token = prefs.getString('token');
     String user_id = prefs.getString('user_id') ?? '';
 
     Uri requestUrl;
     if (testUrl.isNotEmpty) {
-      requestUrl = Uri.parse(baseUrl)
-          .replace(pathSegments: ['api',...path], queryParameters: params);
+      requestUrl = Uri.parse(testUrl).replace(
+        pathSegments: ['api', ...path],
+        queryParameters: params,
+      );
     } else {
-      requestUrl = Uri.parse(baseUrl)
-          .replace(pathSegments: ['backend','api',...path], queryParameters: params);
+      requestUrl = Uri.parse(baseUrl).replace(
+        pathSegments: ['backend', 'api', ...path],
+        queryParameters: params,
+      );
     }
+
+    String platform = Platform.isAndroid ? "Android" : "iOS";
 
     var headers = {
       'Authorization': 'Bearer ${path.contains("login") ? "" : token}',
       'Content-Type': 'application/json',
       'ngrok-skip-browser-warning': 'true',
-      'Accept': 'application/json'
+      'Accept': 'application/json',
     };
 
-    print("headers : $headers");
+    if (isLeads == true) {
+      headers['X-App-Agent'] = platform;
+    }
 
+    print("header : $headers");
+
+    // Perform the request
     if (method == HTTP_METHODS.GET) {
       response = await connect.get(requestUrl.toString(), headers: headers);
     } else if (method == HTTP_METHODS.POST) {
@@ -61,31 +80,35 @@ class WebService {
       print("API LOGS ${requestUrl.toString()}");
       print("body : $body");
       print("response.body : ${response.body}");
-      // print("response.body : ${response.statusCode}");
-      print("response.body : ${response.status.code}");
+      print("response.body : ${response}");
+      print("response.status.code : ${response.status.code}");
     }
+
+
 
     if (response.statusCode == 401) {
       return ApiResponse(
-          status: API_STATUS.FAIL,
-          stringData: jsonEncode(response.body),
-          error_message: "API FAIL 401");
-    } else if (response.statusCode == 200) {
-      print("response.statusCode == 200");
+        status: API_STATUS.FAIL,
+        stringData: jsonEncode(response.body),
+        error_message: "API FAIL 401",
+      );
+    } else if (response.statusCode == 200 || response.statusCode == 201) {
       return ApiResponse(
-          status: API_STATUS.SUCCESS, stringData: jsonEncode((response.body)));
-      print("response.statusCode == 200");
-    } else if(response.statusCode == 500) {
+        status: API_STATUS.SUCCESS,
+        stringData: jsonEncode((response.body)),
+      );
+    } else if (response.statusCode == 500) {
       return ApiResponse(status: API_STATUS.ERROR);
     } else {
-      print("response.statusCode == fail");
       return ApiResponse(
-          status: API_STATUS.FAIL,
-          stringData: response.body,
-          error_message: "SOMETHING_WENT_WRONG",
-          exception_message: "${response.statusCode.toString()}");
+        status: API_STATUS.FAIL,
+        stringData: jsonEncode((response.body)),
+        error_message: "SOMETHING_WENT_WRONG",
+        exception_message: "${response.statusCode.toString()}",
+      );
     }
   }
+
 
   Future<ApiResponse> callApiMultiPart({
     Map<String, dynamic>? params,
@@ -97,8 +120,8 @@ class WebService {
     String pathStr = path.join("/");
     if (pathStr.isEmpty) pathStr = "callApi";
 
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String token = prefs.getString('accessToken') ?? '';
+    var pref = await SharedPreferences.getInstance();
+    var token = pref.getString('token');
     print("token for image: $token");
 
     var headers = {
@@ -110,7 +133,7 @@ class WebService {
 
     Uri requestUrl;
     if (testUrl.isNotEmpty) {
-      requestUrl = Uri.parse(baseUrl)
+      requestUrl = Uri.parse(testUrl)
           .replace(pathSegments: ['api',...path], queryParameters: params);
     } else {
       requestUrl = Uri.parse(baseUrl)
@@ -134,9 +157,9 @@ class WebService {
       request.files.addAll(multiPartFiles);
     }
 
-    print("Headers: ${request.headers}");
-    print("Fields: ${request.fields}");
-    print("Files: ${request.files}");
+    // print("Headers: ${request.headers}");
+    // print("Fields: ${request.fields}");
+    // print("Files: ${request.files}");
 
     try {
       var resp = await request.send().timeout(Duration(seconds: 60));

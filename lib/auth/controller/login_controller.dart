@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/utils.dart';
 import '../../webservices/model/login_model.dart';
 
-class LoginController extends GetxController{
+class LoginController extends GetxController {
   RxString email = "".obs;
   RxString password = "".obs;
   RxString emailError = "".obs;
@@ -16,11 +16,9 @@ class LoginController extends GetxController{
   Rx<User?> userData = Rx<User?>(null);
   Rx<Company?> companyData = Rx<Company?>(null);
   var errorMsg = "".obs;
+  var isLoading = false.obs;
 
-
-
-
-  verify(){
+  verify() async {
     bool isValid = true;
     RegExp regExp = RegExp(Constants.EMAIL_REGEX);
     RegExp regExp1 = RegExp(Constants.PASS_REGEX1);
@@ -45,28 +43,37 @@ class LoginController extends GetxController{
       passwordError('');
     }
     enableButton(isValid);
-    getUserLogin();
+    if (enableButton.value == true) {
+        await getUserLogin(
+            email.value,password.value);
+    }
     print("button val : ${enableButton.value}");
   }
 
-
-  getUserLogin() async {
-    var response = await webservice.getLogin("email", "password");
+  getUserLogin(String email,String password) async {
+    isLoading(true);
+    var response = await webservice.getLogin(email, password);
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    if(response.apiResponse.status == API_STATUS.SUCCESS){
-      if(response.payload?.success == true){
+    if (response.apiResponse.status == API_STATUS.SUCCESS) {
+      if (response.payload?.success == true) {
+        print("if");
         var user = response.payload?.data?.user;
         var company = response.payload?.data?.company;
         userData(user);
         companyData(company);
-        await prefs.setString("userId", user?.id??'');
-        await prefs.setString("companyId", user?.companyId??'');
-        Get.offAll(() => Dashboard());
+        await prefs.setString("userId", user?.id ?? '');
+        await prefs.setString("companyId", user?.companyId ?? '');
+        await prefs.setString("token", response.payload?.token ?? '');
+        Get.offAll(() => DashboardScreen());
+      } else if (response.payload?.success == false) {
+        print('else');
+        String msg = response.payload?.message ?? 'Something went wrong';
+        errorMsg(msg);
+        print(msg); // ✅ this will print the actual error message
       }else{
-        errorMsg(response.payload?.message??'');
+        print('else 2');
       }
     }
+    isLoading(false);
   }
-
-
 }
