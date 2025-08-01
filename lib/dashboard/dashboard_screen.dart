@@ -31,7 +31,9 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(
         elevation: 2,
         automaticallyImplyLeading: false,
-        title: Align(alignment:Alignment.centerLeft,child: Text("Easy Callers")),
+        title: Align(alignment:Alignment.centerLeft,child: Text("Easy Callers",
+        style: TextStyle(fontWeight: FontWeight.w600),
+        )),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 20),
@@ -201,41 +203,44 @@ class CallTrackerHomePage extends StatelessWidget {
                     }),
               ],
             ),
-            Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: onViewAll,
-                  child: Container(
-                    margin: EdgeInsets.only(top: 15),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Color(0xff2D201C),
-                      border: Border.all(color: Color(0xffffffff)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "View All Leads",
-                            style: TextStyle(
-                                color: CustomColors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(
-                            width: 10,
-                          ),
-                          Icon(Icons.arrow_forward_sharp,
-                              size: 20, color: CustomColors.white)
-                        ],
+            Visibility(
+              visible: true,
+              child: Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: onViewAll,
+                    child: Container(
+                      margin: EdgeInsets.only(top: 15),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Color(0xff2D201C),
+                        border: Border.all(color: Color(0xffffffff)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "View All Leads",
+                              style: TextStyle(
+                                  color: CustomColors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(
+                              width: 10,
+                            ),
+                            Icon(Icons.arrow_forward_sharp,
+                                size: 20, color: CustomColors.white)
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                )),
+                  )),
+            ),
           ],
         ),
       ),
@@ -253,7 +258,7 @@ class CallTrackerHomePage extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 16),
           child:
-              Text("Today's Activity Overview", style: TextStyle(fontSize: 16)),
+              Text("Today's Activity Overview", style: TextStyle(fontSize: 18,fontWeight: FontWeight.bold)),
         ),
         Obx(
           () => buildCard(
