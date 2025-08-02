@@ -1,3 +1,4 @@
+import 'package:easy_callers_mobile/profile/call_logs_screen.dart';
 import 'package:easy_callers_mobile/profile/script_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -32,7 +33,7 @@ class ProfileScreen extends StatelessWidget {
                   UserDetail(),
                   SizedBox(height: 24,),
                   InnerText(icon: Icons.description_outlined,title: "Script",onTap: (){Get.to(() => ScriptScreen());},),
-                  InnerText(icon: Icons.call_made_outlined,title: "Call Logs",),
+                  InnerText(icon: Icons.call_made_outlined,title: "Call Logs",onTap: (){Get.to(()=> CallLogsScreen());},),
                 ],
               ),
             ),
