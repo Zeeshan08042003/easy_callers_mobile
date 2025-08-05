@@ -61,7 +61,10 @@ class SplashController extends GetxController{
 
   checkingScreen() async {
     var pref = await SharedPreferences.getInstance();
+    var token = pref.getString("token");
+    print("token : $token");
     var userId = pref.getString("userId");
+    print("token : $userId");
     if (userId == null) {
       return Get.offAll(() => LoginScreen());
     } else{
