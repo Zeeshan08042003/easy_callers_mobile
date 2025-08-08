@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:easy_callers_mobile/webservices/model/add_script_model.dart';
 import 'package:easy_callers_mobile/webservices/model/leadModel.dart';
 import 'package:easy_callers_mobile/webservices/model/submit_call_logs_model.dart';
 import 'package:easy_callers_mobile/webservices/model/submit_call_logs_model.dart';
@@ -13,12 +14,15 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/utils.dart';
+import 'model/delete_script_model.dart';
+import 'model/getScriptModel.dart';
 import 'model/login_model.dart';
 
 
 part 'login_api.dart';
 part 'lead_api.dart';
 part 'sumbit_call_logs_api.dart';
+part 'script_apis.dart';
 
 class WebService {
   late Response response;

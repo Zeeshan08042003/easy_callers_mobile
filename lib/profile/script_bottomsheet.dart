@@ -7,7 +7,7 @@ import '../auth/custom_buttons.dart';
 import '../constants/utils.dart';
 
 class ScriptBottomSheet {
-  static void show({String? title,String? script,bool? createEditScript}) {
+  static void show({String? title,String? script,String? scriptId,bool? createEditScript,bool? editScript}) {
     var errorStyle = TextStyle(fontWeight: FontWeight.w400, fontSize: 12);
     var controller = Get.find<ScriptController>();
 
@@ -25,7 +25,7 @@ class ScriptBottomSheet {
                       borderRadius: BorderRadius.circular(20
                       )
                   ),
-                  child: createOrEditScript(title: title,script: script))
+                  child: createOrEditScript(title: title,script: script,scriptId: scriptId,editScript: editScript))
             else
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16,vertical: 20),
@@ -67,7 +67,7 @@ class ScriptBottomSheet {
   }
 
 
- static Widget createOrEditScript({String? title,String? script}){
+ static Widget createOrEditScript({String? title,String? script,String? scriptId,bool? editScript}){
     var controller = Get.find<ScriptController>();
     TextEditingController titleController = TextEditingController(text: title);
     TextEditingController scriptController = TextEditingController(text: script);
@@ -75,7 +75,7 @@ class ScriptBottomSheet {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(height: 10,),
-        Text("New Script",style: TextStyle(
+        Text(editScript == true ? "Update Script" :"New Script",style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600
         ),),
@@ -87,9 +87,9 @@ class ScriptBottomSheet {
         // Obx(()=>
             feedbackTextField(title: "Script",isFeedback: true,textEditingController: scriptController,initialValue:script),
    // ),
-   //      Obx(()=>
+        Obx(()=>
           ATButtonV3(
-            title: "Create",
+            title: editScript == true ? "Update" : "Create",
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
             color: const Color(0xff2D201C),
             textColor: CustomColors.white,
@@ -100,10 +100,14 @@ class ScriptBottomSheet {
             radius: 8,
             onTap: () async {
               print("hello");
-              await controller.createNewScript(titleController.text, scriptController.text);
+              if(editScript == true){
+                await controller.updateData(title: titleController.text,script: scriptController.text,scriptId: scriptId);
+              }else{
+                await controller.addNewScript(titleController.text, scriptController.text);
+              }
             }
           ),
-        // ),
+        ),
       ],
     );
   }

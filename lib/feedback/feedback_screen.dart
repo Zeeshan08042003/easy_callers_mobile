@@ -406,7 +406,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                                             ?.toString() ??
                                         '')
                                     .toString(),
-                                notes: feedbackController.text, callStatus: callStatus,
+                                notes: feedbackController.text,
+                                callStatus: callStatus == "Connected" ? "connected" : "not_connected",
                                 date: selectedData,
                               time: selectedTime??TimeOfDay(hour: 0, minute: 0)
                             );

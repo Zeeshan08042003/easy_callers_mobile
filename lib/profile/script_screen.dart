@@ -23,8 +23,8 @@ class ScriptScreen extends StatelessWidget {
           child: FloatingActionButton(
             elevation: 0,
             backgroundColor: Color(0xff2D201C),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
             onPressed: () {
               ScriptBottomSheet.show(createEditScript: true);
             },
@@ -57,62 +57,93 @@ class ScriptScreen extends StatelessWidget {
         backgroundColor: Colors.grey.shade100,
         elevation: 2,
         leading: GestureDetector(
-            onTap: (){
+            onTap: () {
               Get.back();
             },
             child: Icon(Icons.arrow_back)),
         title: Text("Script"),
         actions: [
           GestureDetector(
-              onTap: (){
-                controller.deleteSelectedScripts();
+              onTap: () async {
+                final ids = controller.selectedIndices
+                    .map((i) => controller.allScript[i].id)
+                    .toList();
+                await controller.deleteSelectedScripts(ids);
               },
               child: Obx(
-                ()=>Visibility(
+                () => Visibility(
                   visible: controller.selectedIndices.isNotEmpty,
                   child: Padding(
                     padding: const EdgeInsets.only(right: 16),
-                    child: Icon(Icons.delete,color: Colors.red,),
+                    child: Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                    ),
                   ),
                 ),
               ))
         ],
-
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16,vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Column(
             children: [
-              feedbackTextField(title: "Search"),
-              SizedBox(height: 14,),
-              Column(
+              feedbackTextField(
+                  title: "Search",
+                  textEditingController: TextEditingController(),
+                  onChanged: (value){
+                    controller.setSearchQuery(value);
+              }),
+              SizedBox(
+                height: 14,
+              ),
+              Stack(
                 children: [
-                  Obx(()=>
-                     ListView.builder(
-                        shrinkWrap: true,
-                        primary: false,
-                        reverse: true,
-                        itemCount: controller.scripts.length,
-                        itemBuilder: (context,index){
-                          var item = controller.scripts[index];
-                      return Column(
-                        children: [
-                          scriptCard(
-                              title: item.title,
-                              script: item.script, index: index,
-                              onTap: () {
-                                if (controller.isInSelectionMode) {
-                                  controller.toggleSelection(index);
-                                } else{
-                                  ScriptBottomSheet.show(title: item.title,script: item.script,createEditScript: true);
-                                }
-                              }
+                  Obx(() => Visibility(
+                        visible: controller.isLoading.isFalse,
+                        child: ListView.builder(
+                            shrinkWrap: true,
+                            primary: false,
+                            itemCount: controller.filteredScripts.length,
+                            itemBuilder: (context, index) {
+                              var item = controller.filteredScripts[index];
+                              return Column(
+                                children: [
+                                  scriptCard(
+                                      title: item.title,
+                                      script: item.script,
+                                      index: index,
+                                      onTap: () {
+                                        if (controller.isInSelectionMode) {
+                                          controller.toggleSelection(index);
+                                        } else {
+                                          ScriptBottomSheet.show(
+                                              title: item.title,
+                                              script: item.script,
+                                              createEditScript: true,
+                                              scriptId: item.id,
+                                              editScript: true);
+                                        }
+                                      }),
+                                  SizedBox(
+                                    height: 14,
+                                  )
+                                ],
+                              );
+                            }),
+                      )),
+                  Obx(
+                    () => Visibility(
+                        visible: controller.isLoading.isTrue,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 150),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xff000000),
+                            ),
                           ),
-                          SizedBox(height: 14,)
-                        ],
-                      );
-                    }),
+                        )),
                   )
                 ],
               )
@@ -123,12 +154,12 @@ class ScriptScreen extends StatelessWidget {
     );
   }
 
-
   Widget feedbackTextField(
       {required String title,
-        bool isFeedback = false,
-        String? initialValue,
-        TextEditingController? textEditingController}) {
+      bool isFeedback = false,
+      String? initialValue,
+      ValueChanged<String>? onChanged ,
+      TextEditingController? textEditingController}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -137,22 +168,26 @@ class ScriptScreen extends StatelessWidget {
         const SizedBox(height: 5),
         TextFormField(
           cursorColor: Colors.black,
+          onChanged: onChanged,
           decoration: InputDecoration(
             hintText: title,
             hintStyle: TextStyle(
               fontSize: 16,
               color: Colors.black.withOpacity(0.4),
             ),
-
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5),  borderSide: BorderSide(
-                color: CustomColors.black),),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(5),
+              borderSide: BorderSide(color: CustomColors.black),
+            ),
           ),
           controller: textEditingController,
           minLines: isFeedback ? 1 : 1,
           maxLines: isFeedback ? 4 : 1,
-          keyboardType: isFeedback ? TextInputType.multiline : TextInputType.text,
-          textInputAction: isFeedback ? TextInputAction.newline : TextInputAction.done,
+          keyboardType:
+              isFeedback ? TextInputType.multiline : TextInputType.text,
+          textInputAction:
+              isFeedback ? TextInputAction.newline : TextInputAction.done,
         )
       ],
     );
@@ -179,9 +214,12 @@ class ScriptScreen extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           width: double.infinity,
           decoration: BoxDecoration(
-            color: isSelected ? Colors.grey.withOpacity(.3) : Colors.transparent,
+            color:
+                isSelected ? Colors.grey.withOpacity(.3) : Colors.transparent,
             border: Border.all(
-              color: isSelected ? Colors.black : Color(0xff000000).withOpacity(0.1),
+              color: isSelected
+                  ? Colors.black
+                  : Color(0xff000000).withOpacity(0.1),
             ),
             borderRadius: BorderRadius.circular(10),
           ),
@@ -197,10 +235,9 @@ class ScriptScreen extends StatelessWidget {
                         Text(
                           title ?? '',
                           overflow: TextOverflow.ellipsis,
-                          maxLines:1,
+                          maxLines: 1,
                           style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16
-                          ),
+                              fontWeight: FontWeight.w600, fontSize: 16),
                         ),
                         // if (isSelected)
                         //   Icon(Icons.cir, color: Colors.red),
@@ -215,13 +252,10 @@ class ScriptScreen extends StatelessWidget {
                   ],
                 ),
               ),
-
             ],
           ),
         );
       }),
     );
   }
-
-
 }
