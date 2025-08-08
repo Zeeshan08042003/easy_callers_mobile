@@ -57,12 +57,34 @@ class CallController extends GetxController {
   MethodChannel('com.easy_callers/call');
 
 
-    makeCallForIos({required String phoneNumber, Leads? lead,bool? fromFeedbackScreen}) async {
-    try {
-      // Initiate the iOS call
-      await _platform.invokeMethod('startCall', phoneNumber);
+  Future<CallLogModel?> makeCallForIos({
+    required String phoneNumber,
+    required Leads lead,
+    bool? fromFeedbackScreen,
+  }) async {
 
-      // Wait for callEnded callback with duration
+    // Close any existing dialogs before opening a new one
+    if (Get.isDialogOpen == true) {
+      Get.back();
+    }
+
+    // Show loading dialog
+    if (isLoading.value == true) {
+      Get.dialog(
+        Center(
+          child: CircularProgressIndicator(color: Color(0xff000000)),
+        ),
+        barrierDismissible: false,
+      );
+    }
+
+    callLog(null);
+
+    try {
+      // Start the iOS call
+      await _platform.invokeMethod('startCall', phoneNumber);
+      isLoading(true);
+
       final completer = Completer<String?>();
 
       _platform.setMethodCallHandler((call) async {
@@ -73,20 +95,52 @@ class CallController extends GetxController {
         }
       });
 
-      // Return when duration is received or timeout after 60s
-      return completer.future.timeout(
+      final duration = await completer.future.timeout(
         const Duration(seconds: 60),
         onTimeout: () {
           print("⏳ Timeout waiting for callEnded");
           return null;
         },
       );
+
+      isLoading(false);
+      if (Get.isDialogOpen == true) {
+        Get.back(); // 👈 close the loading dialog
+      }
+
+      if (duration != null) {
+        // Convert duration string into CallLogModel if needed
+        final model = CallLogModel(
+          number: phoneNumber,
+          duration: duration,
+          status: 'completed', // or derive this from logic if needed
+        );
+        callLog(model);
+        print("📞 iOS call completed with duration: ${model.duration}");
+
+        if (fromFeedbackScreen == true) {
+          await Get.off(() => FeedbackScreen(lead: lead));
+        } else {
+          await Get.to(() => FeedbackScreen(lead: lead));
+        }
+
+        return model;
+      } else {
+        print("⚠️ No call duration received");
+      }
     } on PlatformException catch (e) {
       print("❌ iOS call failed: ${e.message}");
       Get.snackbar('Error', 'Failed to start iOS call: ${e.message}');
-      return null;
     }
+
+    isLoading(false);
+    if (Get.isDialogOpen == true) {
+      Get.back(); // Ensure dialog is closed on error too
+    }
+
+    return null;
   }
+
 
 
   launchWhatsAppChatForIos(String number, {String message = "Hello Zeeshan Ahmed"}) async {
@@ -104,7 +158,8 @@ class CallController extends GetxController {
     String? phoneNumber,
     bool? fromFeedbackScreen,
     required Leads lead,
-  }) async {
+  }) async
+  {
     isLoading(true);
     if(Get.isDialogOpen == true){
       Get.back();
@@ -190,12 +245,18 @@ class CallController extends GetxController {
    required String leadId,
    required String callDuration,
    required String notes,
+   required String callStatus,
+   required String date,
+   required TimeOfDay time,
   }) async {
     isSubmittingData(true);
     var response = await WebService().submitCallLog(
         status: status,
         leadId: leadId,
         callDuration: callDuration,
+        callStatus: callStatus,
+        date: date,
+        time: time,
         notes: notes);
     if(response.apiResponse.status == API_STATUS.SUCCESS){
       if(response.payload?.success == true){

@@ -13,7 +13,7 @@ class CustomDropDown extends StatelessWidget {
     this.onSaved,
     this.onChanged,
     this.items,
-    this.validator, this.bgColor,
+    this.validator, this.bgColor, this.isAutoFocus,
   });
 
   String? selectedValue;
@@ -23,6 +23,7 @@ class CustomDropDown extends StatelessWidget {
   final void Function(String?)? onSaved;
   final void Function(String?)? onChanged;
   final String? Function(String?)? validator;
+  final bool? isAutoFocus;
   final List<DropdownMenuItem<String>>? items;
 
   @override
@@ -39,6 +40,7 @@ class CustomDropDown extends StatelessWidget {
         const SizedBox(height: 5),
         DropdownButtonFormField2<String>(
           isExpanded: true,
+          autofocus: isAutoFocus ?? false,
           iconStyleData: IconStyleData(
             icon: Padding(
               padding: const EdgeInsets.only(right: 12),

@@ -31,15 +31,19 @@ class FeedbackScreen extends StatefulWidget {
 
 class _FeedbackScreenState extends State<FeedbackScreen> {
   List<String> leadStatusList = ["dropped", "followup", "visiting"];
+  List<String> callStatusList = ["Connected", "Decline or Failed"];
 
   final controller = Get.find<CallController>();
+  String callStatus = "";
+  var isCallStatusUpdated = false;
 
-  var selectedLeadStatus = "";
+  var leadStatus = "";
   var selectedData = "Select Date";
   TimeOfDay? selectedTime;
   TextEditingController feedbackController = TextEditingController();
 
   getStatusColor(String status) {
+    print(status);
     if (status == "Connected") {
       return Colors.green.withOpacity(.2);
     } else if (status == "") {
@@ -49,8 +53,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     }
   }
 
-  getStatusTextColor() {
-    if (controller.callLog.value?.status == "Connected") {
+  getStatusTextColor(String? status) {
+    if (status == "Connected") {
       return Color(0xff2E8B57);
     } else {
       return Colors.red;
@@ -145,7 +149,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
     if (time != null) {
       setState(() {
+
         selectedTime = time;
+        print(selectedTime);
       });
     }
   }
@@ -158,7 +164,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   }
 
   bool checkData() {
-    if (selectedLeadStatus.isEmpty) {
+    if (leadStatus.isEmpty) {
       showAnimatedTopToast(
         context,
         title: "Select lead status",
@@ -168,7 +174,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     }
 
     // Skip other checks if status is dropped
-    if (selectedLeadStatus == "dropped") {
+    if (leadStatus == "dropped") {
       return true;
     }
 
@@ -224,24 +230,90 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                           const SizedBox(height: 20),
                           _buildLeadInfoCard(),
                           const SizedBox(height: 20),
-                          Obx(
-                            () => styledDisplayField(
-                                title: 'Call Status',
-                                color: getStatusColor(
-                                    controller.callLog.value?.status ?? ''),
-                                textColor: getStatusTextColor(),
-                                text: controller.callLog.value?.status ?? ''),
+                          Stack(
+                            children: [
+                              if (Platform.isIOS && !isCallStatusUpdated)
+                                CustomDropDown(
+                            title: "Call Status",
+                            isAutoFocus: true,
+                            bgColor: callStatus.isNotEmpty == true
+                                ? getStatusColor(callStatus ?? "")
+                                : Colors.white,
+                            items: callStatusList
+                                .map((item) => DropdownMenuItem<String>(
+                              value: item,
+                              child: Text(
+                                item.toString().capitalizeFirst ?? '',
+                                style: TextStyle(
+                                  color: getStatusTextColor(item),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ))
+                                .toList(),
+                            text: "",
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Please select category';
+                              }
+                              return null;
+                            },
+                            onChanged: (value) {
+                              setState(() {
+                                callStatus = value ?? '';
+                                isCallStatusUpdated = true;
+                              });
+                            },
+                          ) else GestureDetector(
+                                onTap: (){
+                                  showAnimatedTopToast(context, title: "Call Status Updated", subtitle: "You can only update call status once.");
+                                },
+                            child: styledDisplayField(
+                                    title: 'Call Status',
+                                    color: getStatusColor(callStatus ??''),
+                                    textColor: getStatusTextColor(callStatus),
+                                    text: callStatus ??''),
                           ),
-                          Obx(
-                            () => styledDisplayField(
-                                title: "Call Duration",
-                                text: controller.callLog.value?.duration?.toString() ??
-                                    ''),
+                              Visibility(
+                                visible: Platform.isAndroid,
+                                child: Obx(
+                                      () => styledDisplayField(
+                                      title: 'Call Status',
+                                      color: getStatusColor(
+                                          controller.callLog.value?.status ?? ''),
+                                      textColor: getStatusTextColor(controller.callLog.value?.status ?? ''),
+                                      text: controller.callLog.value?.status ?? ''),
+                                ),
+                              ),
+                            ],
                           ),
+
+                          Stack(
+                            children: [
+                              if (Platform.isIOS)
+                                styledDisplayField(
+                                  title: "Call Duration",
+                                  text: callStatus.isEmpty
+                                      ? ''
+                                      : callStatus == "Connected"
+                                      ? controller.callLog.value?.duration?.toString() ?? ''
+                                      : "00:00:00",
+                                )
+                              else
+                                Obx(
+                                      () => styledDisplayField(
+                                    title: "Call Duration",
+                                    text: controller.callLog.value?.duration?.toString() ?? '',
+                                  ),
+                                ),
+                            ],
+                          ),
+
                           CustomDropDown(
                             title: "Lead Status",
-                            bgColor: selectedLeadStatus.isNotEmpty
-                                ? getLeadStatusColor(selectedLeadStatus)
+                            bgColor: leadStatus.isNotEmpty
+                                ? getLeadStatusColor(leadStatus)
                                 : Colors.white,
                             items: leadStatusList
                                 .map((item) => DropdownMenuItem<String>(
@@ -255,7 +327,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                                       ),
                                     ))
                                 .toList(),
-                            text: "",
                             validator: (value) {
                               if (value == null) {
                                 return 'Please select category';
@@ -264,7 +335,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                             },
                             onChanged: (value) {
                               setState(() {
-                                selectedLeadStatus = value ?? '';
+                                leadStatus = value ?? '';
                               });
                               // controller.selectedCategory.value = value.toString();
                               // // Find the selected item and set its id to categoryId
@@ -275,15 +346,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                             },
                           ),
                           Visibility(
-                            visible: selectedLeadStatus == "visiting" ||
-                                selectedLeadStatus == "followup",
+                            visible: leadStatus == "visiting" ||
+                                leadStatus == "followup",
                             child: Column(
                               children: [
                                 SizedBox(
                                   height: 5,
                                 ),
                                 styledDisplayField(
-                                    title: "${selectedLeadStatus.capitalizeFirst} Date",
+                                    title: "${leadStatus.capitalizeFirst} Date",
                                     text: selectedData.isEmpty
                                         ? "Select Date"
                                         : selectedData,
@@ -291,7 +362,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                                       selectDate(context);
                                     }),
                                 styledDisplayField(
-                                    title: "${selectedLeadStatus.capitalizeFirst} Time",
+                                    title: "${leadStatus.capitalizeFirst} Time",
                                     text: selectedTime != null
                                         ? formatToSimpleTime(selectedTime!)
                                         : "Select Time",
@@ -327,7 +398,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                           var status = await checkData();
                           if (status == true) {
                             await controller.submitData(
-                                status: selectedLeadStatus,
+                                status: leadStatus,
                                 leadId: widget.lead?.id ?? '',
                                 callDuration: controller
                                     .convertDurationToSeconds(controller
@@ -335,7 +406,11 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                                             ?.toString() ??
                                         '')
                                     .toString(),
-                                notes: feedbackController.text);
+                                notes: feedbackController.text,
+                                callStatus: callStatus == "Connected" ? "connected" : "not_connected",
+                                date: selectedData,
+                              time: selectedTime??TimeOfDay(hour: 0, minute: 0)
+                            );
                           }
                         },
                       ),
@@ -431,6 +506,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                   onTap: () async {
                     // await controller.makeCall(phoneNumber: controller.callLog.value?.number,lead: widget.lead,fromFeedbackScreen: true);
                     if(Platform.isIOS){
+                      setState(() {
+                        callStatus = "";
+                        isCallStatusUpdated = false;
+                      });
+
+                      print(isCallStatusUpdated);
+                      print(callStatus);
                       await controller.makeCallForIos(phoneNumber:controller.callLog.value?.number??'',lead: widget.lead,fromFeedbackScreen: true);
                     }else{
                       await controller.makeCall(

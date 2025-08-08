@@ -1,8 +1,11 @@
+import 'package:easy_callers_mobile/auth/custom_buttons.dart';
 import 'package:easy_callers_mobile/profile/call_logs_screen.dart';
 import 'package:easy_callers_mobile/profile/script_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -41,28 +44,15 @@ class ProfileScreen extends StatelessWidget {
 
           Padding(
             padding: const EdgeInsets.only(bottom: 30,top: 20),
-            child: InnerText(icon: Icons.logout,title: "Logout",isLast: true,),
+            child: InnerText(icon: Icons.logout,title: "Logout",isLast: true,
+            onTap: (){
+              Get.dialog(Padding(
+                padding: const EdgeInsets.all(20),
+                child: LogoutPrompt(),
+              ));
+            },
+            ),
           )
-
-          // Container(
-          //   margin: EdgeInsets.symmetric(horizontal: 16),
-          //   width: double.infinity,
-          //   decoration: BoxDecoration(
-          //     borderRadius: BorderRadius.circular(10),
-          //     border: Border.all(color: Color(0xff000000))
-          //   ),
-          //   child: Column(
-          //     crossAxisAlignment: CrossAxisAlignment.start,
-          //     children: [
-          //       InnerText(icon: Icons.description_outlined,title: "Script",),
-          //       InnerText(icon: Icons.description_outlined,title: "Script",),
-          //       InnerText(icon: Icons.description_outlined,title: "Script",),
-          //       InnerText(icon: Icons.description_outlined,title: "Script",),
-          //       InnerText(icon: Icons.description_outlined,title: "Script",),
-          //       InnerText(icon: Icons.description_outlined,title: "Script",isLast: true,),
-          //     ],
-          //   ),
-          // )
         ],
       ),
     );
@@ -211,6 +201,121 @@ class UserDetail extends StatelessWidget {
           );
         }
       },
+    );
+  }
+}
+
+
+
+
+class LogoutPrompt extends StatefulWidget {
+  @override
+  State<LogoutPrompt> createState() => _LogoutPromptState();
+}
+
+class _LogoutPromptState extends State<LogoutPrompt> {
+  bool isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Center(
+            child: Container(
+                constraints: BoxConstraints(
+                  minWidth: 300,
+                  maxWidth: 500,
+                ), // Width is constrained, height will be according to content
+                padding:
+                EdgeInsets.all(16), // Add padding for a better appearance
+                decoration: BoxDecoration(
+                  color: Colors.white, // Background color for the dialog
+                  borderRadius: BorderRadius.circular(8), // Rounded corners
+                ),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Attention!',
+                            style: TextStyle(
+                              fontSize: 27.0,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          GestureDetector(
+                            child: Icon(Icons.close, color: Colors.grey),
+                            onTap: () {
+                              Get.back();
+                            },
+                          ),
+                        ],
+                      ),
+                      SizedBox(
+                        height: 16,
+                      ),
+                      Text(
+                        'Do you want to log out?',
+                        style: TextStyle(
+                          fontSize: 15.0,
+                          color: Color(0xFF9D9FA6),
+                        ),
+                      ),
+                      SizedBox(
+                        height: 32.0,
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: ATButtonV3(
+                              title: "Cancel",
+                              color: Color(0xfffafafa),
+                              defaultPadding: true,
+                              height: 40,
+                              textColor: Color(0xff000000),
+                              onTap: () async {
+                                Get.back();
+                              },
+                            ),
+                          ),
+                          SizedBox(
+                            width: 24.0,
+                          ),
+                          Expanded(
+                            child: ATButtonV3(
+                              title: "logout",
+                              color: Colors.red,
+                              isLoading: isLoading,
+                              defaultPadding: true,
+                              radius: 5,
+                              height: 40,
+                              textColor: Color(0xffffffff),
+                              onTap: () async {
+                                setState(() {
+                                  isLoading = true;
+                                });
+                                SharedPreferences prefs =
+                                await SharedPreferences.getInstance();
+                                await prefs.clear();
+                                Get.offAll(() => LoginScreen());
+                                setState(() {
+                                  isLoading = false;
+                                });
+                              },
+                            ),
+                          )
+                        ],
+                      )
+                    ],
+                  ),
+                ))),
+      ],
     );
   }
 }
