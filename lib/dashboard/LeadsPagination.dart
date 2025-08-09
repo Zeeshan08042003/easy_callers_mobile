@@ -15,10 +15,14 @@ class LeadPaginationController extends GetxController {
 
   @override
   void onInit() {
+    init();
+    super.onInit();
+  }
+
+  init(){
     pagingController.addPageRequestListener((pageKey) async {
       await fetchLeads(pageKey);
     });
-    super.onInit();
   }
 
   Future<void> fetchLeads(int page) async {

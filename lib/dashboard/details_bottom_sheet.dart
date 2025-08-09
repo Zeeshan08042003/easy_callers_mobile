@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:easy_callers_mobile/constants/utils.dart';
+import 'package:easy_callers_mobile/dashboard/dashboard_controller.dart';
 import 'package:easy_callers_mobile/main.dart';
 import 'package:easy_callers_mobile/webservices/model/leadModel.dart';
 import 'package:flutter/cupertino.dart';
@@ -11,14 +12,12 @@ import 'package:get/get.dart';
 import '../auth/custom_buttons.dart';
 
 class DetailsBottomSheet {
-  static show(
-      String name,
-      String phoneNumber,
-      String email,
-      Leads leads,
+  static show(String name, String phoneNumber, String email, Leads leads,
       {STATUS? status}) {
     var controller = Get.find<CallController>();
-   return Get.bottomSheet(
+    var dashController = Get.find<DashBoardController>();
+    var item = leads.callLogs?.last;
+    return Get.bottomSheet(
         backgroundColor: Colors.white,
         enableDrag: true,
         isScrollControlled: true,
@@ -31,7 +30,7 @@ class DetailsBottomSheet {
         Wrap(
           children: [
             Visibility(
-              visible:  leads.status == 'assigned',
+              visible: leads.status == 'assigned',
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                 width: double.infinity,
@@ -45,30 +44,41 @@ class DetailsBottomSheet {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Lead Details",style: TextStyle(fontSize: 18),),
-                    SizedBox(height: 20,),
+                    Text(
+                      "Lead Details",
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    SizedBox(
+                      height: 20,
+                    ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Color(0xff000000)),
-                        borderRadius: BorderRadius.circular(10)
-                      ),
+                          border: Border.all(color: Color(0xff000000)),
+                          borderRadius: BorderRadius.circular(10)),
                       child: Column(
                         children: [
                           Row(
                             children: [
-                              SvgPicture.asset(AssetUtils.singleLead,height: 20,width: 20,),
+                              SvgPicture.asset(
+                                AssetUtils.singleLead,
+                                height: 20,
+                                width: 20,
+                              ),
                               SizedBox(width: 5),
-                              Text(name,style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500
-                              ),)
+                              Text(
+                                name,
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w500),
+                              )
                             ],
                           ),
                           SizedBox(height: 12),
                           Row(
                             children: [
-                              SvgPicture.asset(AssetUtils.phone,height: 20,width: 20),
+                              SvgPicture.asset(AssetUtils.phone,
+                                  height: 20, width: 20),
                               SizedBox(width: 5),
                               Text(phoneNumber),
                             ],
@@ -78,27 +88,32 @@ class DetailsBottomSheet {
                             visible: email.isNotEmpty,
                             child: Row(
                               children: [
-                                SvgPicture.asset(AssetUtils.email,height: 20,width: 20),
+                                SvgPicture.asset(AssetUtils.email,
+                                    height: 20, width: 20),
                                 SizedBox(width: 5),
-                                Text(email,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  overflow: TextOverflow.ellipsis
-                                ),),
+                                Text(
+                                  email,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      overflow: TextOverflow.ellipsis),
+                                ),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: 20,),
+                    SizedBox(
+                      height: 20,
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         Expanded(
                           child: ATButtonV3(
                             title: "WhatsApp",
-                            padding: EdgeInsets.symmetric(horizontal: 8,vertical: 5),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 5),
                             height: 35,
                             containerWidth: 95,
                             color: Color(0xff2D201C),
@@ -111,11 +126,15 @@ class DetailsBottomSheet {
                             },
                           ),
                         ),
-                        SizedBox(width: 10,),
+                        SizedBox(
+                          width: 10,
+                        ),
                         Expanded(
                           child: ATButtonV3(
-                            title: status == STATUS.lead ? "Call" : "Call again" ,
-                            padding: EdgeInsets.symmetric(horizontal: 8,vertical: 5),
+                            title:
+                                status == STATUS.lead ? "Call" : "Call again",
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 5),
                             height: 35,
                             containerWidth: 95,
                             color: Color(0xff2D201C),
@@ -123,9 +142,11 @@ class DetailsBottomSheet {
                             titleSize: 14,
                             radius: 10,
                             onTap: () async {
-                              if(Platform.isIOS){
-                                await controller.makeCallForIos(phoneNumber:phoneNumber??'',lead: leads);
-                              }else{
+                              if (Platform.isIOS) {
+                                await controller.makeCallForIos(
+                                    phoneNumber: phoneNumber ?? '',
+                                    lead: leads);
+                              } else {
                                 await controller.makeCall(
                                     phoneNumber: phoneNumber, lead: leads);
                               }
@@ -154,7 +175,6 @@ class DetailsBottomSheet {
                 ),
               ),
             ),
-
             Visibility(
               visible: leads.status != 'assigned',
               child: Container(
@@ -170,11 +190,15 @@ class DetailsBottomSheet {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Lead Details",style: TextStyle(fontSize: 18),),
+                    Text(
+                      "Lead Details",
+                      style: TextStyle(fontSize: 18),
+                    ),
                     SizedBox(height: 10),
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.symmetric(vertical: 10,horizontal: 10),
+                      padding:
+                          EdgeInsets.symmetric(vertical: 10, horizontal: 10),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         border: Border.all(
@@ -191,34 +215,155 @@ class DetailsBottomSheet {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(Icons.account_circle),
-                                  SizedBox(width: 5,),
+                                  SizedBox(
+                                    width: 5,
+                                  ),
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.start,
                                     children: [
-                                      Text("Rajesh Kumar"),
-                                      Text(leads.phone??'')
+                                      Text(leads.name ?? '',style: TextStyle(fontSize: 14),),
+                                      Text(leads.phone ?? '',style: TextStyle(fontSize: 14),)
                                     ],
                                   ),
-
                                 ],
                               ),
                               Container(
                                 height: 30,
                                 width: 70,
                                 decoration: BoxDecoration(
-                                  color: leads.status == "followup" ? Colors.orange.withOpacity(.1) : Colors.green.withOpacity(.1),
-                                  borderRadius: BorderRadius.circular(5),
-                                  border: Border.all(color: leads.status == "followup" ? Colors.orange : Colors.green)
-                                ),
-                                child: Center(child: Text(leads.status?.capitalizeFirst??'',style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: leads.status == "followup" ? Colors.orange : Colors.green),
+                                    color: leads.status == "followup"
+                                        ? Colors.orange.withOpacity(.1)
+                                        : Colors.green.withOpacity(.1),
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(
+                                        color: leads.status == "followup"
+                                            ? Colors.orange
+                                            : Colors.green)),
+                                child: Center(
+                                    child: Text(
+                                  leads.status?.capitalizeFirst ?? '',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: leads.status == "followup"
+                                          ? Colors.orange
+                                          : Colors.green),
                                 )),
                               )
                             ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: double.infinity,
+                      margin: EdgeInsets.symmetric(vertical: 10),
+                      padding:
+                          EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        border: Border.all(
+                          color: Color(0xff000000).withOpacity(0.1),
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item?.notes ?? '',style: TextStyle(fontSize: 16),),
+                          SizedBox(height: 5),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Last Updated : ${dashController.formattedDateTime(item?.updatedAt ?? '')}",
+                                style: TextStyle(fontSize: 11),
+                              ),
+                              Text(
+                                "${leads.status?.capitalizeFirst} : ${dashController.formattedDateTime(leads.meetDatetime ?? '')}",
+                                style: TextStyle(fontSize: 11,fontWeight: FontWeight.w600, color:  leads.status == "followup"
+                                    ? Colors.orange
+                                    : Colors.green),
+                              ),
+                            ],
                           )
+                          // ListView.builder(
+                          //   shrinkWrap: true,
+                          //     itemCount:leads.callLogs?.length,
+                          //     itemBuilder: (context,index){
+                          //       var item = leads.callLogs?[index];
+                          //
+                          //       return Container(
+                          //         width: double.infinity,
+                          //         margin: EdgeInsets.only(top: 5),
+                          //         padding: EdgeInsets.symmetric(vertical: 10,horizontal: 10),
+                          //         decoration: BoxDecoration(
+                          //           color: Colors.transparent,
+                          //           border: Border.all(
+                          //             color: Color(0xff000000).withOpacity(0.1),
+                          //           ),
+                          //           borderRadius: BorderRadius.circular(10),
+                          //         ),
+                          //         child: Column(
+                          //           crossAxisAlignment: CrossAxisAlignment.start,
+                          //           children: [
+                          //             Row(
+                          //               children: [
+                          //                 // Text(item.)
+                          //                 Text(
+                          //                   item?.notes??''),
+                          //               ],
+                          //             ),
+                          //             SizedBox(height: 5,),
+                          //             Row(
+                          //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          //               children: [
+                          //                 Column(
+                          //                   crossAxisAlignment: CrossAxisAlignment.start,
+                          //                   children: [
+                          //                     Text("Last Updated : ${dashController.formattedDateTime(item?.createdAt??'')}",
+                          //                       style: TextStyle(fontSize: 10),),
+                          //                     Text("Last Updated : ${dashController.formattedDateTime(item?.createdAt??'')}",
+                          //                       style: TextStyle(fontSize: 10),),
+                          //                   ],
+                          //                 )
+                          //                 // Container(
+                          //                 //   height: 20,
+                          //                 //   width: 50,
+                          //                 //   decoration: BoxDecoration(
+                          //                 //       color: leads.status == "followup" ? Colors.orange.withOpacity(.1) : Colors.green.withOpacity(.1),
+                          //                 //       borderRadius: BorderRadius.circular(2),
+                          //                 //       border: Border.all(color: leads.status == "followup" ? Colors.orange : Colors.green)
+                          //                 //   ),
+                          //                 //   child: Center(child: Text(dashController.formatDate(item?.updatedAt.toString()??''),style: TextStyle(
+                          //                 //       fontSize: 10,
+                          //                 //       fontWeight: FontWeight.w600,
+                          //                 //       color: leads.status == "followup" ? Colors.orange : Colors.green),
+                          //                 //   )),
+                          //                 // ),
+                          //                 // SizedBox(width: 3),
+                          //                 // Container(
+                          //                 //   height: 20,
+                          //                 //   width: 50,
+                          //                 //   decoration: BoxDecoration(
+                          //                 //       color: leads.status == "followup" ? Colors.orange.withOpacity(.1) : Colors.green.withOpacity(.1),
+                          //                 //       borderRadius: BorderRadius.circular(2),
+                          //                 //       border: Border.all(color: leads.status == "followup" ? Colors.orange : Colors.green)
+                          //                 //   ),
+                          //                 //   child: Center(child: Text(dashController.formatTime(item?.updatedAt.toString()??''),style: TextStyle(
+                          //                 //       fontSize: 10,
+                          //                 //       fontWeight: FontWeight.w600,
+                          //                 //       color: leads.status == "followup" ? Colors.orange : Colors.green),
+                          //                 //   )),
+                          //                 // )
+                          //               ],
+                          //             )
+                          //           ],
+                          //         ),
+                          //       );
+                          // }),
                         ],
                       ),
                     )
@@ -226,12 +371,9 @@ class DetailsBottomSheet {
                 ),
               ),
             )
-
           ],
         ));
   }
 }
 
-enum STATUS{
-  connected,notConnected,flowUp,lead
-}
+enum STATUS { connected, notConnected, flowUp, lead }

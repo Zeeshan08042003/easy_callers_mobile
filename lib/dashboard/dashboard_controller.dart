@@ -53,4 +53,36 @@ class DashBoardController extends GetxController{
         dailyFollowUp(hits);
       }
   }
+
+
+  String formatDate(String isoString) {
+    DateTime dateTime = DateTime.parse(isoString).toLocal();
+    return "${dateTime.day} ${_monthAbbreviation(dateTime.month)}";
+  }
+
+  String formatTime(String isoString) {
+    DateTime dateTime = DateTime.parse(isoString).toLocal();
+
+    int hour = dateTime.hour;
+    String period = hour >= 12 ? "PM" : "AM";
+
+    // Convert 24-hour to 12-hour format
+    hour = hour % 12;
+    if (hour == 0) hour = 12;
+
+    String minute = dateTime.minute.toString().padLeft(2, '0');
+    return "$hour:$minute $period";
+  }
+
+  String _monthAbbreviation(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return months[month - 1];
+  }
+
+  formattedDateTime(String string){
+    return "${formatDate(string)}, ${formatTime(string)}";
+  }
 }

@@ -535,6 +535,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       ),
     );
   }
+  final focusNode = FocusNode();
 
   Widget feedbackTextField(
       {required String title,
@@ -551,6 +552,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           initialValue:
               textEditingController == null ? (initialValue ?? "") : null,
           errorMessage: "",
+          fillColor: focusNode.hasFocus == true ? Colors.white : Colors.transparent,
           controller: textEditingController,
           radius: BorderRadius.circular(5),
           enableBorderColor: const Color(0xffD6D6D6),

@@ -14,7 +14,7 @@ class Sign_Up_TextField extends StatefulWidget {
         this.suffixIcon,
         required this.errorMessage,
         this.onChanged,
-        this.prefixIcon, this.hintText, this.hintLabelStyle, this.keyBoardType, this.radius, this.maxLines, this.minLines, this.expands, this.textInputAction, this.initialValue});
+        this.prefixIcon, this.hintText, this.hintLabelStyle, this.keyBoardType, this.radius, this.maxLines, this.minLines, this.expands, this.textInputAction, this.initialValue, this.fillColor, this.filled});
   final Color? labelTextColor;
   final String errorMessage;
   final String? initialValue;
@@ -23,12 +23,14 @@ class Sign_Up_TextField extends StatefulWidget {
   final TextStyle? hintLabelStyle;
   final Color? enableBorderColor;
   final Color? cursorColor;
+  final Color? fillColor;
   final Color? focusedBorderColor;
   final String? labelText;
   final TextEditingController? controller;
   final String? Function(String? txt)? validationLogic;
   final void Function(String)? onChanged;
   final bool? suffixIcon;
+  final bool? filled;
   final BorderRadius? radius;
   final Widget? prefixIcon;
   final int? maxLines;
@@ -65,6 +67,8 @@ class _Sign_Up_TextFieldState extends State<Sign_Up_TextField> {
       obscureText: widget.suffixIcon == true ? !isPasswordVisible : false,
       decoration: InputDecoration(
           isDense: true,
+          filled: widget.filled,
+          fillColor: widget.fillColor,
           hintText: widget.hintText ?? "",
           hintStyle: widget.hintLabelStyle ?? TextStyle(),
           // labelText: "Enter Your Name",

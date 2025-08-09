@@ -17,27 +17,14 @@ import '../webservices/model/leadModel.dart';
 import 'count_widget.dart';
 import 'details_bottom_sheet.dart';
 
-class DashboardScreen extends StatefulWidget {
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-
-  @override
-  void initState() {
-    // TODO: implement initState
-    Get.put(DashBoardController());
-    super.initState();
-  }
-
+class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ❗ Recreate controller every time this screen is built
     // if (Get.isRegistered<DashBoardController>()) {
     //   Get.delete<DashBoardController>(); // Clean old one
     // }
-    final controller = Get.find<DashBoardController>(); // Fresh one
+     final controller = Get.put(DashBoardController());
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,

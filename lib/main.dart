@@ -261,17 +261,19 @@ class CallController extends GetxController {
     if(response.apiResponse.status == API_STATUS.SUCCESS){
       if(response.payload?.success == true){
         print("Data ${response.payload?.data}");
-        Get.back();
         if (Get.isRegistered<DashBoardController>()) {
-          Get.delete<DashBoardController>(); // Clean old one
-        }else  if (Get.isRegistered<LeadPaginationController>()) {
-          Get.delete<LeadPaginationController>(); // Clean old one
-        }
+          final controller = Get.find<DashBoardController>();
+          await controller.init();
+          // Get.delete<DashBoardController>(); /// Clean old one
+        Get.back();
+          final controllers = Get.reload<LeadPaginationController>(force: true);
+
         print("data");
       }
     }
     isSubmittingData(false);
   }
+}
 
 
   checkPermission(){

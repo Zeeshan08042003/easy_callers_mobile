@@ -13,6 +13,9 @@ class LeadList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Get.isRegistered<LeadPaginationController>()) {
+      Get.delete<LeadPaginationController>(); // Clean old one
+    }
     var controller = Get.put(LeadPaginationController(status: status));
 
     return Scaffold(
