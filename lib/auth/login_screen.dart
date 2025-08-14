@@ -1,3 +1,4 @@
+import 'package:easy_callers_mobile/auth/reset_password.dart';
 import 'package:easy_callers_mobile/auth/sign_up_textfield.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -84,7 +85,8 @@ class LoginScreen extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: () async {
+                    // Get.to(() => ResetPasswordScreen(isActive: true));
                   },
                   child: Text(
                     "Resend Password",
@@ -130,5 +132,8 @@ class LoginScreen extends StatelessWidget {
     );
   }
 }
+
+
+
 
 

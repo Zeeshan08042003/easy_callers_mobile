@@ -133,12 +133,6 @@ class CallTrackerHomePage extends StatelessWidget {
                     itemCount: data.length,
                     itemBuilder: (context, index) {
                       var item = data[index];
-                      getAllowedStatuses() {
-                        return STATUS.values
-                            .where((e) => e != STATUS.connected)
-                            .toList();
-                      }
-
                       return GestureDetector(
                         onTap: () {
                           isLead == true

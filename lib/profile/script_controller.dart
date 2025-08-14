@@ -205,7 +205,7 @@ class ScriptModel{
 }
 
 class DeleteConformation extends StatelessWidget {
-  const DeleteConformation({super.key,  this.padding,  this.title,  this.subtitle,  this.btnText, this.isLoading, this.onTap, this.onCancel, this.loaderHeight, this.loaderWidth});
+  const DeleteConformation({super.key,  this.padding,  this.title,  this.subtitle,  this.btnText, this.isLoading, this.onTap, this.onCancel, this.loaderHeight, this.loaderWidth, this.bgColor, this.textColor});
   final EdgeInsets? padding;
   final String? title;
   final String? subtitle;
@@ -215,6 +215,8 @@ class DeleteConformation extends StatelessWidget {
   final VoidCallback? onCancel;
   final double? loaderHeight;
   final double? loaderWidth;
+  final Color? bgColor;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -281,14 +283,14 @@ class DeleteConformation extends StatelessWidget {
                   Expanded(
                     child: ATButtonV3(
                       title: btnText??'',
-                      color: Colors.red,
+                      color: bgColor ?? Colors.red,
                       loaderHeight: loaderHeight,
                       loaderWidth: loaderWidth,
                       isLoading: isLoading,
                       defaultPadding: true,
                       radius: 5,
                       height: 40,
-                      textColor: Color(0xffffffff),
+                      textColor: textColor ?? Color(0xffffffff),
                       onTap: onTap
                     ),
                   )

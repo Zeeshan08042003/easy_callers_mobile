@@ -23,6 +23,7 @@ part 'login_api.dart';
 part 'lead_api.dart';
 part 'sumbit_call_logs_api.dart';
 part 'script_apis.dart';
+part 'reset_first_password.dart';
 
 class WebService {
   late Response response;

@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:easy_callers_mobile/dashboard/total_leads.dart';
 import 'package:easy_callers_mobile/feedback/custom_dropdown.dart';
+import 'package:easy_callers_mobile/profile/script_controller.dart';
 import 'package:easy_callers_mobile/webservices/model/leadModel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -212,231 +214,253 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Obx(
-        ()=> Visibility(
-            visible: controller.isLoading.isFalse,
-            child: Scaffold(
-              backgroundColor: Colors.grey.shade100,
-              appBar: AppBar(
-                titleSpacing: 2,
+    return WillPopScope(
+       onWillPop: () async {
+         Get.dialog(
+           DeleteConformation(
+             title: "Are you sure you want to go back?",
+             subtitle: "Getting back you will loose your lead data.",
+             onCancel: (){
+               Get.back();
+             },
+             onTap: (){
+               Get.off(()=>LeadList(status: widget.lead.status??''));
+             },
+             loaderHeight: 20,
+             loaderWidth: 20,
+             bgColor: Colors.black,
+             textColor: Colors.white,
+           )
+         );
+         return true;
+       },
+    child: Stack(
+        children: [
+          Obx(
+          ()=> Visibility(
+              visible: controller.isLoading.isFalse,
+              child: Scaffold(
                 backgroundColor: Colors.grey.shade100,
-                elevation: 2,
-                leading: BackButton(),
-                title: const Text("Feedback"),
-              ),
-              body: SafeArea(
-                  child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 20),
-                          _buildLeadInfoCard(),
-                          const SizedBox(height: 20),
-                          Stack(
-                            children: [
-                              if (Platform.isIOS && !isCallStatusUpdated)
-                                CustomDropDown(
-                            title: "Call Status",
-                            isAutoFocus: true,
-                            bgColor: callStatus.isNotEmpty == true
-                                ? getStatusColor(callStatus ?? "")
-                                : Colors.white,
-                            items: callStatusList
-                                .map((item) => DropdownMenuItem<String>(
-                              value: item,
-                              child: Text(
-                                item.toString().capitalizeFirst ?? '',
-                                style: TextStyle(
-                                  color: getStatusTextColor(item),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ))
-                                .toList(),
-                            text: "",
-                            validator: (value) {
-                              if (value == null) {
-                                return 'Please select category';
-                              }
-                              return null;
-                            },
-                            onChanged: (value) {
-                              setState(() {
-                                callStatus = value ?? '';
-                                isCallStatusUpdated = true;
-                              });
-                            },
-                          ) else GestureDetector(
-                                onTap: (){
-                                  showAnimatedTopToast(context, title: "Call Status Updated", subtitle: "You can only update call status once.");
-                                },
-                            child: styledDisplayField(
-                                    title: 'Call Status',
-                                    color: getStatusColor(callStatus ??''),
-                                    textColor: getStatusTextColor(callStatus),
-                                    text: callStatus ??''),
-                          ),
-                              Visibility(
-                                visible: Platform.isAndroid,
-                                child: Obx(
-                                      () => styledDisplayField(
-                                      title: 'Call Status',
-                                      color: getStatusColor(
-                                          controller.callLog.value?.status ?? ''),
-                                      textColor: getStatusTextColor(controller.callLog.value?.status ?? ''),
-                                      text: controller.callLog.value?.status ?? ''),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          Stack(
-                            children: [
-                              if (Platform.isIOS)
-                                styledDisplayField(
-                                  title: "Call Duration",
-                                  text: callStatus.isEmpty
-                                      ? ''
-                                      : callStatus == "Connected"
-                                      ? controller.callLog.value?.duration?.toString() ?? ''
-                                      : "00:00:00",
-                                )
-                              else
-                                Obx(
-                                      () => styledDisplayField(
-                                    title: "Call Duration",
-                                    text: controller.callLog.value?.duration?.toString() ?? '',
+                appBar: AppBar(
+                  titleSpacing: 2,
+                  backgroundColor: Colors.grey.shade100,
+                  elevation: 2,
+                  leading: BackButton(),
+                  title: const Text("Feedback"),
+                ),
+                body: SafeArea(
+                    child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 20),
+                            _buildLeadInfoCard(),
+                            const SizedBox(height: 20),
+                            Stack(
+                              children: [
+                                if (Platform.isIOS && !isCallStatusUpdated)
+                                  CustomDropDown(
+                              title: "Call Status",
+                              isAutoFocus: true,
+                              bgColor: callStatus.isNotEmpty == true
+                                  ? getStatusColor(callStatus ?? "")
+                                  : Colors.white,
+                              items: callStatusList
+                                  .map((item) => DropdownMenuItem<String>(
+                                value: item,
+                                child: Text(
+                                  item.toString().capitalizeFirst ?? '',
+                                  style: TextStyle(
+                                    color: getStatusTextColor(item),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                            ],
-                          ),
-
-                          CustomDropDown(
-                            title: "Lead Status",
-                            bgColor: leadStatus.isNotEmpty
-                                ? getLeadStatusColor(leadStatus)
-                                : Colors.white,
-                            items: leadStatusList
-                                .map((item) => DropdownMenuItem<String>(
-                                      value: item,
-                                      child: Text(
-                                        item.toString().capitalizeFirst ?? '',
-                                        style: TextStyle(
-                                            color: getLeadStatusTextColor(item),
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600),
-                                      ),
-                                    ))
-                                .toList(),
-                            validator: (value) {
-                              if (value == null) {
-                                return 'Please select category';
-                              }
-                              return null;
-                            },
-                            onChanged: (value) {
-                              setState(() {
-                                leadStatus = value ?? '';
-                              });
-                              // controller.selectedCategory.value = value.toString();
-                              // // Find the selected item and set its id to categoryId
-                              // final selectedItem = controller.category.firstWhere(
-                              //       (item) => item.name == value,
-                              // );
-                              // controller.categoryId.value = selectedItem.id ?? 0;
-                            },
-                          ),
-                          Visibility(
-                            visible: leadStatus == "visiting" ||
-                                leadStatus == "followup",
-                            child: Column(
-                              children: [
-                                SizedBox(
-                                  height: 5,
+                              ))
+                                  .toList(),
+                              text: "",
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'Please select category';
+                                }
+                                return null;
+                              },
+                              onChanged: (value) {
+                                setState(() {
+                                  callStatus = value ?? '';
+                                  isCallStatusUpdated = true;
+                                });
+                              },
+                            ) else GestureDetector(
+                                  onTap: (){
+                                    showAnimatedTopToast(context, title: "Call Status Updated", subtitle: "You can only update call status once.");
+                                  },
+                              child: styledDisplayField(
+                                      title: 'Call Status',
+                                      color: getStatusColor(callStatus ??''),
+                                      textColor: getStatusTextColor(callStatus),
+                                      text: callStatus ??''),
+                            ),
+                                Visibility(
+                                  visible: Platform.isAndroid,
+                                  child: Obx(
+                                        () => styledDisplayField(
+                                        title: 'Call Status',
+                                        color: getStatusColor(
+                                            controller.callLog.value?.status ?? ''),
+                                        textColor: getStatusTextColor(controller.callLog.value?.status ?? ''),
+                                        text: controller.callLog.value?.status ?? ''),
+                                  ),
                                 ),
-                                styledDisplayField(
-                                    title: "${leadStatus.capitalizeFirst} Date",
-                                    text: selectedData.isEmpty
-                                        ? "Select Date"
-                                        : selectedData,
-                                    onTap: () {
-                                      selectDate(context);
-                                    }),
-                                styledDisplayField(
-                                    title: "${leadStatus.capitalizeFirst} Time",
-                                    text: selectedTime != null
-                                        ? formatToSimpleTime(selectedTime!)
-                                        : "Select Time",
-                                    onTap: () {
-                                      pickTime(context);
-                                    }),
                               ],
                             ),
-                          ),
-                          feedbackTextField(
-                              title: "Feedback",
-                              isFeedback: true,
-                              textEditingController: feedbackController),
-                        ],
+
+                            Stack(
+                              children: [
+                                if (Platform.isIOS)
+                                  styledDisplayField(
+                                    title: "Call Duration",
+                                    text: callStatus.isEmpty
+                                        ? ''
+                                        : callStatus == "Connected"
+                                        ? controller.callLog.value?.duration?.toString() ?? ''
+                                        : "00:00:00",
+                                  )
+                                else
+                                  Obx(
+                                        () => styledDisplayField(
+                                      title: "Call Duration",
+                                      text: controller.callLog.value?.duration?.toString() ?? '',
+                                    ),
+                                  ),
+                              ],
+                            ),
+
+                            CustomDropDown(
+                              title: "Lead Status",
+                              bgColor: leadStatus.isNotEmpty
+                                  ? getLeadStatusColor(leadStatus)
+                                  : Colors.white,
+                              items: leadStatusList
+                                  .map((item) => DropdownMenuItem<String>(
+                                        value: item,
+                                        child: Text(
+                                          item.toString().capitalizeFirst ?? '',
+                                          style: TextStyle(
+                                              color: getLeadStatusTextColor(item),
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600),
+                                        ),
+                                      ))
+                                  .toList(),
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'Please select category';
+                                }
+                                return null;
+                              },
+                              onChanged: (value) {
+                                setState(() {
+                                  leadStatus = value ?? '';
+                                });
+                                // controller.selectedCategory.value = value.toString();
+                                // // Find the selected item and set its id to categoryId
+                                // final selectedItem = controller.category.firstWhere(
+                                //       (item) => item.name == value,
+                                // );
+                                // controller.categoryId.value = selectedItem.id ?? 0;
+                              },
+                            ),
+                            Visibility(
+                              visible: leadStatus == "visiting" ||
+                                  leadStatus == "followup",
+                              child: Column(
+                                children: [
+                                  SizedBox(
+                                    height: 5,
+                                  ),
+                                  styledDisplayField(
+                                      title: "${leadStatus.capitalizeFirst} Date",
+                                      text: selectedData.isEmpty
+                                          ? "Select Date"
+                                          : selectedData,
+                                      onTap: () {
+                                        selectDate(context);
+                                      }),
+                                  styledDisplayField(
+                                      title: "${leadStatus.capitalizeFirst} Time",
+                                      text: selectedTime != null
+                                          ? formatToSimpleTime(selectedTime!)
+                                          : "Select Time",
+                                      onTap: () {
+                                        pickTime(context);
+                                      }),
+                                ],
+                              ),
+                            ),
+                            feedbackTextField(
+                                title: "Feedback",
+                                isFeedback: true,
+                                textEditingController: feedbackController),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: Obx(
-                      () => ATButtonV3(
-                        title: "Submit",
-                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                        color: const Color(0xff2D201C),
-                        textColor: CustomColors.white,
-                        titleSize: 16,
-                        isLoading: controller.isSubmittingData.value,
-                        loaderWidth: 20,
-                        loaderHeight: 20,
-                        radius: 8,
-                        onTap: () async {
-                          print(controller.callLog.value?.duration ?? '');
-                          var status = await checkData();
-                          if (status == true) {
-                            await controller.submitData(
-                                status: leadStatus,
-                                leadId: widget.lead?.id ?? '',
-                                callDuration: controller
-                                    .convertDurationToSeconds(controller
-                                            .callLog.value?.duration
-                                            ?.toString() ??
-                                        '')
-                                    .toString(),
-                                notes: feedbackController.text,
-                                callStatus: callStatus == "Connected" ? "connected" : "not_connected",
-                                date: selectedData,
-                              time: selectedTime??TimeOfDay(hour: 0, minute: 0)
-                            );
-                          }
-                        },
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      child: Obx(
+                        () => ATButtonV3(
+                          title: "Submit",
+                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                          color: const Color(0xff2D201C),
+                          textColor: CustomColors.white,
+                          titleSize: 16,
+                          isLoading: controller.isSubmittingData.value,
+                          loaderWidth: 20,
+                          loaderHeight: 20,
+                          radius: 8,
+                          onTap: () async {
+                            print(controller.callLog.value?.duration ?? '');
+                            var status = await checkData();
+                            if (status == true) {
+                              await controller.submitData(
+                                  leadStatus: leadStatus,
+                                  status: widget.lead.status??'',
+                                  leadId: widget.lead?.id ?? '',
+                                  callDuration: controller
+                                      .convertDurationToSeconds(controller
+                                              .callLog.value?.duration
+                                              ?.toString() ??
+                                          '')
+                                      .toString(),
+                                  notes: feedbackController.text,
+                                  callStatus: callStatus == "Connected" ? "connected" : "not_connected",
+                                  date: selectedData,
+                                time: selectedTime??TimeOfDay(hour: 0, minute: 0)
+                              );
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                  )
-                ],
-              )),
+                    )
+                  ],
+                )),
+              ),
             ),
           ),
-        ),
-        Obx(
-              () => Visibility(
-              visible: controller.isLoading.isTrue,
-              child: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xff000000),
-                  ))),
-        )
-      ],
+          Obx(
+                () => Visibility(
+                visible: controller.isLoading.isTrue,
+                child: Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xff000000),
+                    ))),
+          )
+        ],
+      ),
     );
   }
 

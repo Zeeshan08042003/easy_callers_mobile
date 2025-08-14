@@ -14,6 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'dashboard/dashboard_controller.dart';
+import 'dashboard/total_leads.dart';
 import 'webservices/model/call_logs_model.dart';
 
 void main() {
@@ -175,7 +176,7 @@ class CallController extends GetxController {
 
     callLog(null);
     try {
-      final result = await _platform.invokeMethod('startCall', {'number': phoneNumber});
+      final result = await _platform.invokeMethod('startCall', {'number': '7666611031'});
       print("results are : $result");
 
       if (result != null) {
@@ -241,6 +242,7 @@ class CallController extends GetxController {
 
 
   submitData({
+   required String leadStatus,
    required String status,
    required String leadId,
    required String callDuration,
@@ -251,7 +253,7 @@ class CallController extends GetxController {
   }) async {
     isSubmittingData(true);
     var response = await WebService().submitCallLog(
-        status: status,
+        status: leadStatus,
         leadId: leadId,
         callDuration: callDuration,
         callStatus: callStatus,
@@ -264,9 +266,16 @@ class CallController extends GetxController {
         if (Get.isRegistered<DashBoardController>()) {
           final controller = Get.find<DashBoardController>();
           await controller.init();
-          // Get.delete<DashBoardController>(); /// Clean old one
-        Get.back();
-          final controllers = Get.reload<LeadPaginationController>(force: true);
+          Get.back();
+
+
+        print("data");
+      }
+        if (Get.isRegistered<LeadPaginationController>()) {
+          final cont = Get.find<LeadPaginationController>();
+          await cont.init(status);
+          Get.back();
+
 
         print("data");
       }

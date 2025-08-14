@@ -7,15 +7,15 @@ import 'LeadsPagination.dart';
 import 'lead_card.dart';
 
 class LeadList extends StatelessWidget {
-  const LeadList({super.key, required this.status, required this.title});
+  const LeadList({super.key, required this.status, this.title});
   final String status;
-  final String title;
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
-    if (Get.isRegistered<LeadPaginationController>()) {
-      Get.delete<LeadPaginationController>(); // Clean old one
-    }
+    // if (Get.isRegistered<LeadPaginationController>()) {
+    //   Get.delete<LeadPaginationController>(); // Clean old one
+    // }
     var controller = Get.put(LeadPaginationController(status: status));
 
     return Scaffold(
@@ -29,7 +29,7 @@ class LeadList extends StatelessWidget {
               Get.back();
             },
             child: Icon(Icons.arrow_back)),
-        title: Text(title),
+        title: Text(title??''),
 
       ),
       body: RefreshIndicator(
