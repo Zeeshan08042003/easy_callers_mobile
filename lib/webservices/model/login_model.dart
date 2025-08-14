@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 class LoginModel {
   bool? success;
   String? token;
@@ -54,7 +56,7 @@ class User {
   String? email;
   String? phone;
   dynamic? emailVerifiedAt;
-  int? isActive;
+  bool? isActive;
   dynamic? lastLoginAt;
   String? role;
   String? createdAt;
@@ -133,7 +135,7 @@ class Company {
   dynamic? phone;
   dynamic? email;
   dynamic? address;
-  int? isActive;
+  bool? isActive;
   String? createdAt;
   String? updatedAt;
   String? createdBy;

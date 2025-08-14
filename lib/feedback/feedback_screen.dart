@@ -53,6 +53,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     }
   }
 
+  @override
+  void initState() {
+    setState(() {
+      leadStatus = widget.lead.status??'';
+    });
+  }
+
   getStatusTextColor(String? status) {
     if (status == "Connected") {
       return Color(0xff2E8B57);
