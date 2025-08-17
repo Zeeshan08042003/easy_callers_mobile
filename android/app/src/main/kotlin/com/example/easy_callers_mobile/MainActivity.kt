@@ -1,4 +1,4 @@
-package com.example.easy_callers_mobile
+package com.easy_callers.easy_callers
 
 import android.Manifest
 import android.content.ActivityNotFoundException

@@ -5,10 +5,12 @@ import '../webservices/webservices.dart';
 
 class DashBoardController extends GetxController{
 
-  RxList<Leads> visitor = <Leads>[].obs;
-  RxList<Leads> totalLead = <Leads>[].obs;
+  // RxList<Leads> visitor = <Leads>[].obs;
+  // RxList<Leads> totalLead = <Leads>[].obs;
   Rx<LeadData?> leadModel = Rx<LeadData?>(null);
-  RxList<Leads> dailyFollowUp = <Leads>[].obs;
+  Rx<LeadData?> visitorModel = Rx<LeadData?>(null);
+  Rx<LeadData?> followupModel = Rx<LeadData?>(null);
+  // RxList<Leads> dailyFollowUp = <Leads>[].obs;
   RxBool isLoading = false.obs;
 
 
@@ -22,7 +24,7 @@ class DashBoardController extends GetxController{
     isLoading(true);
     await getTotalLeads(status: 'visiting');
     await getTotalLeads(status: 'followup');
-    if(visitor.isEmpty && dailyFollowUp.isEmpty){
+    if(visitorModel.value?.leads?.isEmpty == true && followupModel.value?.leads?.isEmpty == true){
       double screenHeight = Get.mediaQuery.size.height;
       int estimatedItemHeight = 110; // Adjust based on your actual layout
       int perPage = (screenHeight / estimatedItemHeight).ceil();
@@ -44,13 +46,15 @@ class DashBoardController extends GetxController{
       final hits = resp.payload?.data?.leads?.toList() ?? [];
       final hit = resp.payload?.data;
       if(status == "assigned"){
-        totalLead(hits);
+        // totalLead(hits);
         leadModel(hit);
         print("total leads : ${leadModel.value?.total}");
       }else if(status == "visiting"){
-        visitor(hits);
+        // visitor(hits);
+        visitorModel(hit);
       }else if(status == "followup"){
-        dailyFollowUp(hits);
+        // dailyFollowUp(hits);
+        followupModel(hit);
       }
   }
 

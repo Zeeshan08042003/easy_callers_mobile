@@ -1,22 +1,15 @@
 import 'dart:io';
-import 'dart:math';
-
-import 'package:easy_callers_mobile/dashboard/total_leads.dart';
 import 'package:easy_callers_mobile/feedback/custom_dropdown.dart';
 import 'package:easy_callers_mobile/profile/script_controller.dart';
 import 'package:easy_callers_mobile/webservices/model/leadModel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../auth/custom_buttons.dart';
 import '../auth/sign_up_textfield.dart';
 import '../constants/utils.dart';
-import '../main.dart';
-import '../webservices/model/call_logs_model.dart';
+import '../controller/call_controller.dart';
 import '../widget/toast_widget.dart';
 
 class FeedbackScreen extends StatefulWidget {
@@ -57,9 +50,43 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   @override
   void initState() {
-    setState(() {
-      leadStatus = widget.lead.status??'';
-    });
+    super.initState();
+    updateDateTime();
+    final status = widget.lead.status ?? '';
+    if (status != 'assigned') {
+      leadStatus = status;
+    } else {
+      leadStatus = ''; // keep it empty
+    }
+
+
+  }
+
+  updateDateTime() {
+    final updatedAtStr = widget.lead.meetDatetime;
+
+    // ✅ Check if callLogs is not null AND not empty before accessing elements
+    final hasCallLogs = widget.lead.callLogs != null && widget.lead.callLogs!.isNotEmpty;
+
+    if (updatedAtStr != null && updatedAtStr.isNotEmpty) {
+      try {
+        final parsedDate = DateTime.parse(updatedAtStr).toLocal();
+
+        setState(() {
+          selectedData = formatDate(parsedDate);
+          selectedTime = TimeOfDay(hour: parsedDate.hour, minute: parsedDate.minute);
+
+          if (hasCallLogs) {
+            final existingFeedback = widget.lead.callLogs!.last.notes;
+            if (existingFeedback != null && existingFeedback.isNotEmpty) {
+              feedbackController.text = existingFeedback;
+            }
+          }
+        });
+      } catch (e) {
+        print("Invalid updatedAt format: $updatedAtStr");
+      }
+    }
   }
 
   getStatusTextColor(String? status) {
@@ -70,13 +97,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     }
   }
 
-  getLeadStatusColor(String status) {
+  Color getLeadStatusColor(String? status) {
     if (status == "visiting") {
       return Colors.green.withOpacity(.2);
     } else if (status == "followup") {
       return Colors.orange.withOpacity(.2);
-    } else {
+    } else if (status == "dropped"){
       return Colors.red.withOpacity(.2);
+    }else{
+      return Colors.white;
     }
   }
 
@@ -219,17 +248,22 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
          Get.dialog(
            DeleteConformation(
              title: "Are you sure you want to go back?",
+             titleFontSize: 20,
              subtitle: "Getting back you will loose your lead data.",
              onCancel: (){
                Get.back();
              },
              onTap: (){
-               Get.off(()=>LeadList(status: widget.lead.status??''));
+              Get.back();
+              Get.back();
              },
              loaderHeight: 20,
              loaderWidth: 20,
              bgColor: Colors.black,
+             isLoading: false,
              textColor: Colors.white,
+             btnText: "Yes",
+             padding: EdgeInsets.symmetric(vertical: 20,horizontal: 16),
            )
          );
          return true;
@@ -341,23 +375,23 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
                             CustomDropDown(
                               title: "Lead Status",
-                              bgColor: leadStatus.isNotEmpty
-                                  ? getLeadStatusColor(leadStatus)
-                                  : Colors.white,
+                              bgColor: getLeadStatusColor(leadStatus),
+                              selectedValue: leadStatus.isNotEmpty ? leadStatus : null, // ✅ null means no selection
                               items: leadStatusList
                                   .map((item) => DropdownMenuItem<String>(
-                                        value: item,
-                                        child: Text(
-                                          item.toString().capitalizeFirst ?? '',
-                                          style: TextStyle(
-                                              color: getLeadStatusTextColor(item),
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600),
-                                        ),
-                                      ))
+                                value: item,
+                                child: Text(
+                                  item.capitalizeFirst ?? '',
+                                  style: TextStyle(
+                                    color: getLeadStatusTextColor(item),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ))
                                   .toList(),
                               validator: (value) {
-                                if (value == null) {
+                                if (value == null || value.isEmpty) {
                                   return 'Please select category';
                                 }
                                 return null;
@@ -366,12 +400,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                                 setState(() {
                                   leadStatus = value ?? '';
                                 });
-                                // controller.selectedCategory.value = value.toString();
-                                // // Find the selected item and set its id to categoryId
-                                // final selectedItem = controller.category.firstWhere(
-                                //       (item) => item.name == value,
-                                // );
-                                // controller.categoryId.value = selectedItem.id ?? 0;
                               },
                             ),
                             Visibility(
@@ -404,7 +432,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                             feedbackTextField(
                                 title: "Feedback",
                                 isFeedback: true,
-                                textEditingController: feedbackController),
+                                initialValue: feedbackController.text,
+                                textEditingController: feedbackController
+                            ),
                           ],
                         ),
                       ),
@@ -549,14 +579,11 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                       await controller.makeCall(
                           phoneNumber: controller.callLog.value?.number, lead: widget.lead,fromFeedbackScreen: true);
                     }
-
                     print(controller.callLog.value?.number);
                     print(controller.callLog.value?.time);
                     print(controller.callLog.value?.duration);
                     print(controller.callLog.value?.type);
                     print(controller.callLog.value?.status);
-                    // await controller.makeCall(phoneNumber: log?.number ?? "");
-                    // No need to navigate — data is reactive and will update UI
                   },
                 ),
               ),
@@ -648,5 +675,115 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         )
       ],
     );
+  }
+}
+
+
+
+class FeedbackController extends GetxController {
+  // Dependencies
+  final callController = Get.find<CallController>();
+
+  // Dropdown lists
+  final leadStatusList = ["dropped", "followup", "visiting"];
+  final callStatusList = ["Connected", "Decline or Failed"];
+
+  // Reactive variables
+  var callStatus = "".obs;
+  var isCallStatusUpdated = false.obs;
+  var leadStatus = "".obs;
+  var selectedDate = "Select Date".obs;
+  var selectedTime = Rxn<TimeOfDay>();
+  var feedbackText = "".obs;
+
+  // Colors & helpers
+  Color getStatusColor(String status) {
+    if (status == "Connected") {
+      return Colors.green.withOpacity(.2);
+    } else if (status == "") {
+      return Colors.white;
+    } else {
+      return Colors.red.withOpacity(.2);
+    }
+  }
+
+  Color getStatusTextColor(String? status) {
+    if (status == "Connected") {
+      return const Color(0xff2E8B57);
+    } else {
+      return Colors.red;
+    }
+  }
+
+  Color getLeadStatusColor(String status) {
+    if (status == "visiting") {
+      return Colors.green.withOpacity(.2);
+    } else if (status == "followup") {
+      return Colors.orange.withOpacity(.2);
+    } else {
+      return Colors.red.withOpacity(.2);
+    }
+  }
+
+  Color getLeadStatusTextColor(String status) {
+    if (status == "visiting") {
+      return const Color(0xff2E8B57);
+    } else if (status == "followup") {
+      return Colors.orange;
+    } else {
+      return Colors.red;
+    }
+  }
+
+  String formatDate(DateTime date) {
+    return DateFormat('d MMMM y').format(date);
+  }
+
+  String formatToSimpleTime(TimeOfDay time) {
+    final now = DateTime.now();
+    final dateTime =
+    DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    return DateFormat('h:mm a').format(dateTime);
+  }
+
+  Future<void> pickDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      selectedDate.value = formatDate(picked);
+    }
+  }
+
+  Future<void> pickTime(BuildContext context) async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: selectedTime.value ?? TimeOfDay.now(),
+    );
+
+    if (time != null) {
+      selectedTime.value = time;
+    }
+  }
+
+  bool validateData(BuildContext context) {
+    if (leadStatus.value.isEmpty) {
+      showAnimatedTopToast(context, title: "Select lead status", textColor: Colors.red);
+      return false;
+    }
+    if (leadStatus.value == "dropped") return true;
+    if (selectedDate.value.isEmpty || selectedTime.value == null) {
+      showAnimatedTopToast(context, title: "Select date and time", textColor: Colors.red);
+      return false;
+    }
+    if (feedbackText.value.isEmpty) {
+      showAnimatedTopToast(context, title: "Enter feedback", textColor: Colors.red);
+      return false;
+    }
+    return true;
   }
 }

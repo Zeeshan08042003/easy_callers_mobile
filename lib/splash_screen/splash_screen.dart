@@ -1,10 +1,10 @@
 import 'package:easy_callers_mobile/dashboard/dashboard_screen.dart';
-import 'package:easy_callers_mobile/main.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth/login_screen.dart';
+import '../controller/call_controller.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});

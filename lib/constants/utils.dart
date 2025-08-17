@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 class CustomColors{
   static const Color black = Colors.black;
@@ -113,3 +114,20 @@ void showCustomToast(BuildContext context, {required String title, required Stri
     overlayEntry.remove();
   });
 }
+
+
+String formatDate(String dateTime) {
+  var date =  DateTime.parse(dateTime).toLocal();
+  return DateFormat('d').format(date);
+}
+
+String formatMonth(String dateTime){
+  var date = DateTime.parse(dateTime).toLocal();
+  return DateFormat('MMM').format(date);
+}
+
+String formatDateTimeMonth(String dateTime){
+  var date = DateTime.parse(dateTime).toLocal();
+  return DateFormat('d MMM yyyy').format(date);
+}
+

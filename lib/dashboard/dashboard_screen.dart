@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:easy_callers_mobile/constants/utils.dart';
 import 'package:easy_callers_mobile/dashboard/dashboard_controller.dart';
-import 'package:easy_callers_mobile/dashboard/total_leads.dart';
+import 'package:easy_callers_mobile/dashboard/lead_list.dart';
 import 'package:easy_callers_mobile/feedback/feedback_screen.dart';
 import 'package:easy_callers_mobile/profile/profile_screen.dart';
 import 'package:easy_callers_mobile/webservices/model/call_logs_model.dart';
@@ -12,6 +12,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth/custom_buttons.dart';
+import '../controller/call_controller.dart';
 import '../main.dart';
 import '../webservices/model/leadModel.dart';
 import 'count_widget.dart';
@@ -24,24 +25,30 @@ class DashboardScreen extends StatelessWidget {
     // if (Get.isRegistered<DashBoardController>()) {
     //   Get.delete<DashBoardController>(); // Clean old one
     // }
-     final controller = Get.put(DashBoardController());
+    final controller = Get.put(DashBoardController());
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         elevation: 2,
         automaticallyImplyLeading: false,
-        title: Align(alignment:Alignment.centerLeft,child: Text("Easy Callers",
-        style: TextStyle(fontWeight: FontWeight.w600),
-        )),
+        title: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              "Easy Callers",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            )),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 20),
             child: GestureDetector(
-                onTap: (){
+                onTap: () {
                   Get.to(() => ProfileScreen());
                 },
-                child: Icon(Icons.account_circle_outlined,size: 30,)),
+                child: Icon(
+                  Icons.account_circle_outlined,
+                  size: 30,
+                )),
           )
         ],
         backgroundColor: Colors.grey.shade100,
@@ -94,20 +101,45 @@ class CallTrackerHomePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                widget ?? Icon(icon, color: iconColor),
-                SizedBox(width: 8),
-                Text(title ?? '',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Spacer(),
+                Row(
+                  children: [
+                    widget ?? Icon(icon, color: iconColor),
+                    SizedBox(width: 8),
+                    Text(title ?? '',
+                        style:
+                            TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
                 Visibility(
                   visible: count != null,
-                  child: CircleAvatar(
-                    backgroundColor: iconColor?.withOpacity(0.1),
-                    child: Text('$count', style: TextStyle(color: iconColor)),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: count.toString().length == 1 ? 8 : 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: iconColor?.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    constraints: BoxConstraints(
+                      minWidth: count.toString().length == 1 ? 28 : 24, // bigger for single digit
+                      minHeight: 28,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        color: iconColor,
+                        fontSize: count.toString().length == 1 ? 16 : 14, // bigger text for single digit
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
+                )
+
               ],
             ),
             SizedBox(height: 12),
@@ -122,7 +154,8 @@ class CallTrackerHomePage extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         "Lead not assigned yet",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),
@@ -137,10 +170,10 @@ class CallTrackerHomePage extends StatelessWidget {
                         onTap: () {
                           isLead == true
                               ? DetailsBottomSheet.show(item.name ?? '',
-                                  item.phone ?? '', item.email ?? '',item,
+                                  item.phone ?? '', item.email ?? '', item,
                                   status: STATUS.lead)
                               : DetailsBottomSheet.show(item.name ?? '',
-                                  item.phone ?? '', item.email ?? '',item,
+                                  item.phone ?? '', item.email ?? '', item,
                                   status: status);
                         },
                         child: Container(
@@ -175,20 +208,41 @@ class CallTrackerHomePage extends StatelessWidget {
                                         onTap: () async {
                                           var controller =
                                               Get.find<CallController>();
-                                          if(Platform.isIOS){
-                                            await controller.makeCallForIos(phoneNumber:item.phone??'',lead: item);
-                                          }else{
+                                          if (Platform.isIOS) {
+                                            await controller.makeCallForIos(
+                                                phoneNumber: item.phone ?? '',
+                                                lead: item);
+                                          } else {
                                             await controller.makeCall(
-                                                phoneNumber: item.phone, lead: item);
+                                                phoneNumber: item.phone,
+                                                lead: item);
                                           }
                                           // var pref = await SharedPreferences.getInstance();
                                           // pref.clear();
                                           // controller.makeCall(phoneNumber: item['number']);
                                         },
                                       )
-                                    : Text(item.attendedAt??'',
-                                        style: TextStyle(
-                                            color: Colors.grey, fontSize: 10))
+                                    : Column(
+                                        children: [
+                                          Text(
+                                              "${item.status?.capitalizeFirst} at",
+                                              style: TextStyle(
+                                                  // color:
+                                                  //     item.status == "visiting"
+                                                  //         ? Colors.orange
+                                                  //         : Colors.green,
+                                                  fontSize: 10,fontWeight: FontWeight.w600)),
+                                          Text(
+                                              formatDateTimeMonth(
+                                                  item.meetDatetime ?? ''),
+                                              style: TextStyle(
+                                                  color:
+                                                      item.status == "visiting"
+                                                          ? Colors.green
+                                                          : Colors.orange,
+                                                  fontSize: 10,fontWeight: FontWeight.w600)),
+                                        ],
+                                      )
                               ],
                             ),
                           ),
@@ -251,8 +305,8 @@ class CallTrackerHomePage extends StatelessWidget {
         SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.only(left: 16),
-          child:
-              Text("Today's Activity Overview", style: TextStyle(fontSize: 18,fontWeight: FontWeight.bold)),
+          child: Text("Today's Activity Overview",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
         Obx(
           () => buildCard(
@@ -260,33 +314,33 @@ class CallTrackerHomePage extends StatelessWidget {
               widget: SvgPicture.asset(AssetUtils.leads),
               iconColor: Color(0xffb3a1ff),
               count: controller.leadModel.value?.total,
-              data: controller.totalLead,
-              buttonText: 'View All (${controller.totalLead.length})',
+              data: controller.leadModel.value?.leads??[],
+              buttonText: 'View All',
               isLead: true,
               status: STATUS.lead,
               onViewAll: () async {
                 await Get.to(() => LeadList(
-                    status: 'assigned',
-                    title: 'Total Leads',
-                ));
+                      status: 'assigned',
+                      title: 'Total Leads',
+                    ));
               }),
         ),
         Obx(
           () => Visibility(
-            visible: controller.visitor.isNotEmpty,
+            visible: controller.visitorModel.value?.leads?.isNotEmpty == true,
             child: buildCard(
                 title: 'Visitors',
                 icon: Icons.call,
                 iconColor: Colors.green,
-                count: controller.visitor.length,
-                data: controller.visitor,
-                buttonText: 'View All (${controller.visitor.length})',
+                count: controller.visitorModel.value?.total,
+                data: controller.visitorModel.value?.leads??[],
+                buttonText: '',
                 status: STATUS.connected,
                 onViewAll: () async {
                   await Get.to(() => LeadList(
-                      status: 'visiting',
-                      title: 'Visitors',
-                  ));
+                        status: 'visiting',
+                        title: 'Visitors',
+                      ));
                 }),
           ),
         ),
@@ -301,20 +355,20 @@ class CallTrackerHomePage extends StatelessWidget {
         // ),
         Obx(
           () => Visibility(
-            visible: controller.dailyFollowUp.isNotEmpty,
+            visible: controller.followupModel.value?.leads?.isNotEmpty == true,
             child: buildCard(
                 title: 'Daily Follow-ups',
                 icon: Icons.access_time,
                 iconColor: Colors.orange,
-                count: controller.dailyFollowUp.length,
-                data: controller.dailyFollowUp,
-                buttonText: 'View All (${controller.dailyFollowUp.length})',
+                count: controller.followupModel.value?.total,
+                data: controller.followupModel.value?.leads??[],
+                buttonText: '',
                 status: STATUS.flowUp,
                 onViewAll: () async {
                   await Get.to(() => LeadList(
-                      status: 'followup',
-                      title: 'Follow Ups',
-                  ));
+                        status: 'followup',
+                        title: 'Follow Ups',
+                      ));
                 }),
           ),
         ),

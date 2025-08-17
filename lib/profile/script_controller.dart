@@ -205,7 +205,7 @@ class ScriptModel{
 }
 
 class DeleteConformation extends StatelessWidget {
-  const DeleteConformation({super.key,  this.padding,  this.title,  this.subtitle,  this.btnText, this.isLoading, this.onTap, this.onCancel, this.loaderHeight, this.loaderWidth, this.bgColor, this.textColor});
+  const DeleteConformation({super.key,  this.padding,  this.title,  this.subtitle,  this.btnText, this.isLoading, this.onTap, this.onCancel, this.loaderHeight, this.loaderWidth, this.bgColor, this.textColor, this.titleFontSize, this.titleTextColor});
   final EdgeInsets? padding;
   final String? title;
   final String? subtitle;
@@ -215,7 +215,9 @@ class DeleteConformation extends StatelessWidget {
   final VoidCallback? onCancel;
   final double? loaderHeight;
   final double? loaderWidth;
+  final double? titleFontSize;
   final Color? bgColor;
+  final Color? titleTextColor;
   final Color? textColor;
 
   @override
@@ -227,6 +229,7 @@ class DeleteConformation extends StatelessWidget {
           maxWidth: 350,
         ),
         padding: padding,
+        margin: EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -235,25 +238,15 @@ class DeleteConformation extends StatelessWidget {
           type: MaterialType.transparency,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            // crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    title ?? '',
-                    style: TextStyle(
-                      fontSize: 27.0,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  GestureDetector(
-                    child: Icon(Icons.close, color: Colors.grey),
-                    onTap: () {
-                      Get.back();
-                    },
-                  ),
-                ],
+              Text(
+                title ?? '',
+                style: TextStyle(
+                  color: titleTextColor ?? Color(0xff000000),
+                  fontSize: titleFontSize ?? 27.0,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               SizedBox(height: 16),
               Text(

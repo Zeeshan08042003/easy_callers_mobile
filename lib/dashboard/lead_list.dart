@@ -29,7 +29,7 @@ class LeadList extends StatelessWidget {
               Get.back();
             },
             child: Icon(Icons.arrow_back)),
-        title: Text(title??''),
+        title: Text(controller.status == "assigned" ? "Total Leads"  : controller.status.capitalizeFirst??''),
 
       ),
       body: RefreshIndicator(

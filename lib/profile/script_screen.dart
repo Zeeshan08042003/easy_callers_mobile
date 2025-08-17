@@ -1,5 +1,6 @@
 import 'dart:ffi';
 
+import 'package:easy_callers_mobile/auth/custom_buttons.dart';
 import 'package:easy_callers_mobile/profile/script_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -9,13 +10,13 @@ import '../constants/utils.dart';
 import 'script_bottomsheet.dart';
 
 class ScriptScreen extends StatelessWidget {
-  const ScriptScreen({super.key});
-
+  const ScriptScreen({super.key, this.isWhatsappDialog});
+  final bool? isWhatsappDialog;
   @override
   Widget build(BuildContext context) {
     var controller = Get.put(ScriptController());
     return Scaffold(
-      floatingActionButton: Container(
+      floatingActionButton: isWhatsappDialog == true ? null : Container(
           margin: EdgeInsets.only(bottom: 20),
           width: 115,
           height: 48,
@@ -52,7 +53,7 @@ class ScriptScreen extends StatelessWidget {
             ),
           )),
       backgroundColor: Colors.white,
-      appBar: AppBar(
+      appBar: isWhatsappDialog == true ? null :AppBar(
         titleSpacing: 2,
         backgroundColor: Colors.grey.shade100,
         elevation: 2,
@@ -89,7 +90,28 @@ class ScriptScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Column(
             children: [
-              feedbackTextField(
+              isWhatsappDialog == true ?
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Script",style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 24
+                        ),),
+                        ATButtonV3(
+                          title: "Create New",
+                          color:Colors.black,
+                          height: 40,
+                          textColor: Colors.white,
+                          titleSize: 14,
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                        )
+                      ],
+                    ),
+                  )
+                  : feedbackTextField(
                   title: "Search",
                   textEditingController: TextEditingController(),
                   onChanged: (value){

@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../auth/custom_buttons.dart';
 import '../constants/utils.dart';
+import '../controller/call_controller.dart';
 import '../main.dart';
 import '../webservices/model/leadModel.dart';
 import 'details_bottom_sheet.dart';
@@ -34,39 +35,60 @@ class LeadCard extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10,horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(lead.name.toString().capitalizeFirst??''),
-                    SizedBox(height: 5,),
-                    Text(lead.phone.toString().capitalizeFirst??''),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(lead.name.toString().capitalizeFirst??''),
+                        SizedBox(height: 5,),
+                        Text(lead.phone.toString().capitalizeFirst??''),
+                      ],
+                    ),
+                    ATButtonV3(
+                      title: "Call",
+                      padding: EdgeInsets.symmetric(horizontal: 2,vertical: 2),
+                      height: 30,
+                      containerWidth: 80,
+                      color: Color(0xff2D201C),
+                      textColor: CustomColors.white,
+                      titleSize: 12,
+                      radius: 8,
+                      onTap: () async {
+                        print(lead.phone);
+                        var controller = Get.find<CallController>();
+                        if(Platform.isIOS){
+                          await controller.makeCallForIos(phoneNumber:lead.phone??'',lead: lead);
+                        }else{
+                          await controller.makeCall(
+                              phoneNumber: lead.phone, lead: lead);
+                        }
+                        // await controller.makeCall(phoneNumber: lead.phone??'',lead: lead);
+                      },
+                    )
+                    // Text(item["time"], style: TextStyle(color: Colors.grey,fontSize: 10))
                   ],
                 ),
-                ATButtonV3(
-                  title: "Call",
-                  padding: EdgeInsets.symmetric(horizontal: 2,vertical: 2),
-                  height: 30,
-                  containerWidth: 80,
-                  color: Color(0xff2D201C),
-                  textColor: CustomColors.white,
-                  titleSize: 12,
-                  radius: 8,
-                  onTap: () async {
-                    print(lead.phone);
-                    var controller = Get.find<CallController>();
-                    if(Platform.isIOS){
-                      await controller.makeCallForIos(phoneNumber:lead.phone??'',lead: lead);
-                    }else{
-                      await controller.makeCall(
-                          phoneNumber: lead.phone, lead: lead);
-                    }
-                    // await controller.makeCall(phoneNumber: lead.phone??'',lead: lead);
-                  },
-                )
-                // Text(item["time"], style: TextStyle(color: Colors.grey,fontSize: 10))
+                Visibility(
+                    visible: lead.status == "visiting",
+                    child:  Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: ATButtonV3(
+                        title: "Visited",
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                        color: Colors.green.withOpacity(.2),
+                        textColor: Colors.green,
+                        borderColor: Colors.green,
+                        titleSize: 16,
+                        height: 40,
+                        loaderWidth: 20,
+                        loaderHeight: 20,
+                        radius: 8,
+                      ),
+                    ),)
               ],
             ),
           ),

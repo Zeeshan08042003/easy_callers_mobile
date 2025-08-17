@@ -10,6 +10,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../auth/custom_buttons.dart';
+import '../controller/call_controller.dart';
+import 'call_logs_details.dart';
 
 class DetailsBottomSheet {
   static show(String name, String phoneNumber, String email, Leads leads,
@@ -55,7 +57,7 @@ class DetailsBottomSheet {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Color(0xff000000)),
+                      border: Border.all(color:  Color(0xff000000).withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
@@ -120,6 +122,192 @@ class DetailsBottomSheet {
                           titleSize: 14,
                           radius: 10,
                           onTap: () async {
+                           await controller.sendWhatsAppMessage(['7021135299'], "msg");
+                            // Future WhatsApp integration
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: ATButtonV3(
+                          title:
+                          status == STATUS.lead ? "Call" : "Call again",
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 5),
+                          height: 35,
+                          containerWidth: 95,
+                          color: Color(0xff2D201C),
+                          textColor: CustomColors.white,
+                          titleSize: 14,
+                          radius: 10,
+                          onTap: () async {
+                            if (Platform.isIOS) {
+                              await controller.makeCallForIos(
+                                  phoneNumber: phoneNumber,
+                                  lead: leads);
+                            } else {
+                              await controller.makeCall(
+                                  phoneNumber: phoneNumber, lead: leads);
+                              Get.back();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // When status != assigned
+          Visibility(
+            visible: leads.status != 'assigned',
+            child: Column(
+              children: [
+                Container(
+                  padding: EdgeInsets.only(left: 16,right: 16,top: 20),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment:  MainAxisAlignment.spaceBetween,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Text("Lead Details", style: TextStyle(fontSize: 18)),
+                          ),
+                          GestureDetector(
+                              onTap: (){
+                                Get.to(() => CallLogsDetails(lead: leads,));
+                              },
+                              child: Text('View All',style: TextStyle(fontSize: 12,decoration: TextDecoration.underline))),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          border: Border.all(
+                            color: Color(0xff000000).withOpacity(0.1),
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.account_circle),
+                                SizedBox(width: 5),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(leads.name ?? '',
+                                        style: TextStyle(fontSize: 14)),
+                                    Text(leads.phone ?? '',
+                                        style: TextStyle(fontSize: 14)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Container(
+                              height: 30,
+                              width: 70,
+                              decoration: BoxDecoration(
+                                color: leads.status == "followup"
+                                    ? Colors.orange.withOpacity(.1)
+                                    : Colors.green.withOpacity(.1),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: leads.status == "followup"
+                                      ? Colors.orange
+                                      : Colors.green,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  leads.status?.capitalizeFirst ?? '',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: leads.status == "followup"
+                                        ? Colors.orange
+                                        : Colors.green,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: double.infinity,
+                        margin: EdgeInsets.symmetric(vertical: 10),
+                        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          border: Border.all(
+                            color: Color(0xff000000).withOpacity(0.1),
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item?.notes ?? '',
+                                style: TextStyle(fontSize: 16)),
+                            SizedBox(height: 15),
+                            Text(
+                              "Last Updated at: ${item?.updatedAt != null && item!.updatedAt.toString().trim().isNotEmpty ? dashController.formattedDateTime(item.updatedAt??'') : ''}",
+                              style: TextStyle(fontSize: 11),
+                            ),
+                            Text(
+                              "${leads.status?.capitalizeFirst ?? ''} at : ${leads.meetDatetime != null && leads.meetDatetime.toString().trim().isNotEmpty ? dashController.formattedDateTime(leads.meetDatetime??'') : ''}",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: leads.status == "followup"
+                                    ? Colors.orange
+                                    : Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // SizedBox(height: 10,),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16,vertical: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: ATButtonV3(
+                          title: "WhatsApp",
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 5),
+                          height: 35,
+                          containerWidth: 95,
+                          color: Color(0xff2D201C),
+                          textColor: CustomColors.white,
+                          titleSize: 14,
+                          radius: 10,
+                          onTap: () async {
+                            await controller.sendWhatsAppMessage(['7021135299'], "msg");
                             // Future WhatsApp integration
                           },
                         ),
@@ -151,129 +339,8 @@ class DetailsBottomSheet {
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // When status != assigned
-          Visibility(
-            visible: leads.status != 'assigned',
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Lead Details", style: TextStyle(fontSize: 18)),
-                  SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      border: Border.all(
-                        color: Color(0xff000000).withOpacity(0.1),
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.account_circle),
-                            SizedBox(width: 5),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(leads.name ?? '',
-                                    style: TextStyle(fontSize: 14)),
-                                Text(leads.phone ?? '',
-                                    style: TextStyle(fontSize: 14)),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Container(
-                          height: 30,
-                          width: 70,
-                          decoration: BoxDecoration(
-                            color: leads.status == "followup"
-                                ? Colors.orange.withOpacity(.1)
-                                : Colors.green.withOpacity(.1),
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
-                              color: leads.status == "followup"
-                                  ? Colors.orange
-                                  : Colors.green,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              leads.status?.capitalizeFirst ?? '',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: leads.status == "followup"
-                                    ? Colors.orange
-                                    : Colors.green,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: double.infinity,
-                    margin: EdgeInsets.symmetric(vertical: 10),
-                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      border: Border.all(
-                        color: Color(0xff000000).withOpacity(0.1),
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item?.notes ?? '',
-                            style: TextStyle(fontSize: 16)),
-                        SizedBox(height: 5),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "Last Updated : ${item?.updatedAt != null && item!.updatedAt.toString().trim().isNotEmpty ? dashController.formattedDateTime(item.updatedAt??'') : ''}",
-                              style: TextStyle(fontSize: 11),
-                            ),
-                            Text(
-                              "${leads.status?.capitalizeFirst ?? ''} : ${leads.meetDatetime != null && leads.meetDatetime.toString().trim().isNotEmpty ? dashController.formattedDateTime(leads.meetDatetime??'') : ''}",
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: leads.status == "followup"
-                                    ? Colors.orange
-                                    : Colors.green,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ],
