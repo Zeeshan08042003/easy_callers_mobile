@@ -223,6 +223,7 @@ class CallTrackerHomePage extends StatelessWidget {
                                         },
                                       )
                                     : Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                               "${item.status?.capitalizeFirst} at",

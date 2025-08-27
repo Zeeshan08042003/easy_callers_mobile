@@ -12,7 +12,7 @@ class WhatsAppCustomMessage {
       controller = Get.put(ScriptController());
     } else {
       controller = Get.find<ScriptController>();
-      controller.getAllScript();
+      // controller.getAllScript();
     }
 
     Widget scriptCard({

@@ -270,10 +270,6 @@ class DetailsBottomSheet {
                                 style: TextStyle(fontSize: 16)),
                             SizedBox(height: 15),
                             Text(
-                              "Last Updated at: ${item?.updatedAt != null && item!.updatedAt.toString().trim().isNotEmpty ? dashController.formattedDateTime(item.updatedAt??'') : ''}",
-                              style: TextStyle(fontSize: 11),
-                            ),
-                            Text(
                               "${leads.status?.capitalizeFirst ?? ''} at : ${leads.meetDatetime != null && leads.meetDatetime.toString().trim().isNotEmpty ? dashController.formattedDateTime(leads.meetDatetime??'') : ''}",
                               style: TextStyle(
                                 fontSize: 11,
@@ -282,6 +278,11 @@ class DetailsBottomSheet {
                                     ? Colors.orange
                                     : Colors.green,
                               ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              "Last Updated at: ${item?.updatedAt != null && item!.updatedAt.toString().trim().isNotEmpty ? dashController.formattedDateTime(item.updatedAt??'') : ''}",
+                              style: TextStyle(fontSize: 11),
                             ),
                           ],
                         ),
