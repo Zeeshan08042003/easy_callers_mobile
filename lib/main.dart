@@ -1,40 +1,59 @@
-import 'package:easy_callers_mobile/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-void main() {
+import 'package:easy_callers_mobile/core/services/supabase_service.dart';
+import 'package:easy_callers_mobile/core/services/notification_service.dart';
+import 'package:easy_callers_mobile/app/routes/app_pages.dart';
+import 'package:easy_callers_mobile/app/routes/app_routes.dart';
+import 'package:easy_callers_mobile/app/bindings/initial_binding.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase
+  final supabaseService = await SupabaseService.init();
+  Get.put(supabaseService);
+
+  // Initialize notification service
+  final notificationService = await NotificationService().init();
+  Get.put(notificationService);
+
+  // Register CallController (platform channel for calls)
+  Get.put(CallController());
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    var controller = Get.put(CallController());
-
     return GetMaterialApp(
-      title: 'Flutter Demo',
+      title: 'Easy Callers',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         fontFamily: "Poppins",
         useMaterial3: true,
+        colorSchemeSeed: const Color(0xff2D201C),
+        brightness: Brightness.light,
       ),
-      home: const LoginScreen(),
+      initialBinding: InitialBinding(),
+      initialRoute: AppRoutes.login,
+      getPages: AppPages.pages,
     );
   }
 }
 
-
+/// Platform channel controller for native calling, WhatsApp, and SMS.
+/// Kept from the original codebase.
 class CallController extends GetxController {
   final numberController = TextEditingController();
   final callLog = ''.obs;
 
   static const MethodChannel _platform =
-  MethodChannel('com.easy_callers/call');
-
+      MethodChannel('com.easy_callers/call');
 
   makeCallForIos(String number) async {
     await _platform.invokeMethod('startCall', number);
@@ -43,12 +62,12 @@ class CallController extends GetxController {
       if (call.method == 'callEnded') {
         String duration = call.arguments;
         print("⏱️ Call duration: $duration");
-        // Continue your logic as in Kotlin
       }
     });
   }
 
-  launchWhatsAppChatForIos(String number, {String message = "Hello Zeeshan Ahmed"}) async {
+  launchWhatsAppChatForIos(String number,
+      {String message = "Hello"}) async {
     try {
       await _platform.invokeMethod('whatsappChat', {
         'number': number,
@@ -60,22 +79,23 @@ class CallController extends GetxController {
   }
 
   Future<void> makeCall({String? phoneNumber}) async {
-    final number = numberController.text.trim();
+    final number = phoneNumber ?? numberController.text.trim();
     if (number.isEmpty) {
       Get.snackbar('Error', 'Please enter a number');
       return;
     }
 
     try {
-      // Await call log result after call ends
-      final String? log = await _platform.invokeMethod('startCall', {'number': phoneNumber ?? number});
+      final String? log =
+          await _platform.invokeMethod('startCall', {'number': number});
       callLog.value = log ?? 'No call log received';
     } on PlatformException catch (e) {
       Get.snackbar('Error', 'Failed to start call: ${e.message}');
     }
   }
 
-  Future<void> sendWhatsAppMessage(List<String> numbers, String message) async {
+  Future<void> sendWhatsAppMessage(
+      List<String> numbers, String message) async {
     try {
       await _platform.invokeMethod('sendBulkWhatsAppMessages', {
         'numbers': numbers,

@@ -1,0 +1,25 @@
+import 'package:get/get.dart';
+import 'package:easy_callers_mobile/core/services/auth_service.dart';
+import 'package:easy_callers_mobile/core/services/lead_service.dart';
+import 'package:easy_callers_mobile/core/services/lead_upload_service.dart';
+import 'package:easy_callers_mobile/core/services/system_service.dart';
+
+/// Initial bindings that register all core services.
+/// Called once when the app starts.
+class InitialBinding extends Bindings {
+  @override
+  void dependencies() {
+    // Core services (already initialized in main.dart via Get.put)
+    // These are accessed here for reference
+
+    // Auth service
+    Get.lazyPut<AuthService>(() => AuthService(), fenix: true);
+
+    // Lead services
+    Get.lazyPut<LeadService>(() => LeadService(), fenix: true);
+    Get.lazyPut<LeadUploadService>(() => LeadUploadService(), fenix: true);
+    
+    // System settings service
+    Get.lazyPut<SystemService>(() => SystemService(), fenix: true);
+  }
+}

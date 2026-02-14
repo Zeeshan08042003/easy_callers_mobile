@@ -38,6 +38,27 @@ dependencies:
   flutter_svg: ^2.1.0
   url_launcher: ^6.3.1
 
+  # Supabase
+  supabase_flutter: ^2.8.4
+
+  # File handling
+  file_picker: ^8.1.7
+  excel: ^4.0.6             # Parse Excel files
+  # pdf_text: will be handled via Edge Function
+
+  # Charts & Reports
+  fl_chart: ^0.70.2
+
+  # Local storage & notifications
+  shared_preferences: ^2.3.4
+  flutter_local_notifications: ^18.0.1
+
+  # Date formatting
+  intl: ^0.20.2
+
+  # UUID generation
+  uuid: ^4.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
