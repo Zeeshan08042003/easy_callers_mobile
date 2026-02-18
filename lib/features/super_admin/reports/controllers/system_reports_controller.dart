@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/services/lead_service.dart';
+import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 
 class SystemReportsController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();

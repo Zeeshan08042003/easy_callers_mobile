@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
-import 'package:easy_callers_mobile/core/models/manager_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 
 import 'package:easy_callers_mobile/features/manager/employees/views/employee_detail_view.dart';
 import 'package:easy_callers_mobile/features/manager/employees/bindings/employee_detail_binding.dart';

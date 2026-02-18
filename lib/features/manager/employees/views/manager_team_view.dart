@@ -7,12 +7,9 @@ import 'package:easy_callers_mobile/features/manager/employees/views/employee_de
 import 'package:easy_callers_mobile/features/manager/employees/bindings/employee_detail_binding.dart';
 import 'package:easy_callers_mobile/features/manager/dashboard/views/manager_dashboard_view.dart';
 import 'package:easy_callers_mobile/features/manager/dashboard/bindings/manager_dashboard_binding.dart';
-import 'package:easy_callers_mobile/features/manager/leads/views/lead_controller_view.dart';
-import 'package:easy_callers_mobile/features/manager/leads/bindings/lead_controller_binding.dart';
 import 'package:easy_callers_mobile/features/manager/reports/views/manager_reports_view.dart';
 import 'package:easy_callers_mobile/features/manager/reports/bindings/manager_reports_binding.dart';
-import 'package:easy_callers_mobile/app/routes/app_routes.dart';
-
+import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 import '../../../profile/bindings/profile_binding.dart';
 import '../../../profile/views/profile_view.dart';
 
@@ -162,7 +159,9 @@ class ManagerTeamView extends GetView<ManagerTeamController> {
     );
   }
 
-  Widget _buildEmployeeCard(dynamic employee) {
+  Widget _buildEmployeeCard(EmployeeModel employee) {
+    final bool isOTPExpired = !employee.isActive && employee.isOTPExpired;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -171,7 +170,8 @@ class ManagerTeamView extends GetView<ManagerTeamController> {
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: InkWell(
-        onTap: () => Get.to(() => const EmployeeDetailView(), binding: EmployeeDetailBinding(), arguments: employee),
+        onTap: () => Get.to(() => const EmployeeDetailView(),
+            binding: EmployeeDetailBinding(), arguments: employee),
         child: Row(
           children: [
             ClipRRect(
@@ -190,26 +190,81 @@ class ManagerTeamView extends GetView<ManagerTeamController> {
                 children: [
                   Text(
                     employee.fullName,
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '18 Visits • 32% Conv.', // Example stats
-                    style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 13),
+                    employee.email,
+                    style: TextStyle(
+                        color: AppColors.textSecondary.withOpacity(0.7),
+                        fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Text(
-              'Active',
-              style: TextStyle(
-                color: Color(0xFF3B82F6),
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+            if (employee.isActive)
+              const Text(
+                'Active',
+                style: TextStyle(
+                  color: Color(0xFF3B82F6),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              )
+            else if (isOTPExpired)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                   const Text(
+                    'OTP Expired',
+                    style: TextStyle(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: () => controller.resendOTP(employee),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.refresh, size: 12, color: AppColors.danger),
+                          SizedBox(width: 4),
+                          Text(
+                            'Resend',
+                            style: TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              const Text(
+                'Pending',
+                style: TextStyle(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
-            ),
             const SizedBox(width: 10),
-            Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textSecondary.withOpacity(0.4), size: 16),
+            Icon(Icons.arrow_forward_ios_rounded,
+                color: AppColors.textSecondary.withOpacity(0.4), size: 16),
           ],
         ),
       ),

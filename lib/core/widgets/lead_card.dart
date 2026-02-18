@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
-import 'package:easy_callers_mobile/core/models/lead_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_model.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 
 class LeadCard extends StatelessWidget {

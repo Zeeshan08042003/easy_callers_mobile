@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/employee_model.dart';
-import 'package:easy_callers_mobile/core/services/lead_service.dart';
+import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
+import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 
 class ManagerTeamController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();
@@ -69,6 +70,74 @@ class ManagerTeamController extends GetxController {
       Get.snackbar('Error', 'Failed to create employee: $e');
     } finally {
       isCreating.value = false;
+    }
+  }
+
+  Future<void> resendOTP(EmployeeModel employee) async {
+    try {
+      isLoading.value = true;
+      final newOtp = await _authService.resendEmployeeOTP(employee.email);
+      
+      if (newOtp != null) {
+        // Show success with new OTP
+        Get.dialog(
+          AlertDialog(
+            backgroundColor: AppColors.cardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('New OTP Generated', style: TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'A new activation code has been generated for',
+                  style: TextStyle(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                Text(
+                  employee.fullName,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    newOtp,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'This code is valid for 24 hours.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Close', style: TextStyle(color: AppColors.primary)),
+              ),
+            ],
+          ),
+        );
+        fetchEmployees(); // Refresh list to update expiry state if needed
+      } else {
+        Get.snackbar('Error', 'Failed to generate new OTP');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to resend OTP: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 

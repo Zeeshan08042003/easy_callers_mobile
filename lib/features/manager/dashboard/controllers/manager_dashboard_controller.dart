@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/services/lead_service.dart';
+import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
-import 'package:easy_callers_mobile/core/models/lead_batch_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dart';
 import 'package:easy_callers_mobile/features/manager/leads/views/distribute_leads_view.dart';
 import 'package:easy_callers_mobile/features/manager/leads/bindings/distribute_leads_binding.dart';
 

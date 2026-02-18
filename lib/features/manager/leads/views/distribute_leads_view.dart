@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 import 'package:easy_callers_mobile/features/manager/leads/controllers/distribute_leads_controller.dart';
-import 'package:easy_callers_mobile/core/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 
 class DistributeLeadsView extends GetView<DistributeLeadsController> {
   const DistributeLeadsView({super.key});
@@ -178,7 +178,7 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
           style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         Obx(() => Text(
-          '${controller.employees.length} Employees Active',
+          '${controller.employees.length} Active Caller${controller.employees.length != 1 ? 's' : ''}',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         )),
       ],
@@ -187,9 +187,47 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
 
   Widget _buildEmployeeAllocationList() {
     return Obx(() {
-      if (controller.isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
+      if (controller.isDistributing.value && controller.employees.isEmpty) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(40.0),
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
       }
+      
+      if (controller.employees.isEmpty) {
+        return Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            children: [
+              Icon(
+                Icons.people_outline_rounded,
+                size: 64,
+                color: AppColors.textSecondary.withOpacity(0.3),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No Active Employees',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Activate employees to distribute leads',
+                style: TextStyle(
+                  color: AppColors.textSecondary.withOpacity(0.6),
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      
       return ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -326,13 +364,13 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
             width: double.infinity,
             height: 56,
             child: Obx(() => ElevatedButton(
-              onPressed: controller.isLoading.value ? null : controller.executeDistribution,
+              onPressed: controller.isDistributing.value ? null : controller.executeDistribution,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: controller.isLoading.value 
+              child: controller.isDistributing.value 
                 ? const CircularProgressIndicator(color: Colors.white)
                 : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,

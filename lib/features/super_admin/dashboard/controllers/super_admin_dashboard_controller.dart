@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/manager_model.dart';
-import 'package:easy_callers_mobile/core/services/lead_service.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
+import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class SuperAdminDashboardController extends GetxController {

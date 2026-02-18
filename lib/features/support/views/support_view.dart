@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
-import 'package:easy_callers_mobile/core/services/system_service.dart';
+import 'package:easy_callers_mobile/features/super_admin/services/system_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SupportView extends StatelessWidget {

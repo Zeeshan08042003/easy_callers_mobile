@@ -1,9 +1,9 @@
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:easy_callers_mobile/core/constants/supabase_constants.dart';
-import 'package:easy_callers_mobile/core/models/super_admin_model.dart';
-import 'package:easy_callers_mobile/core/models/manager_model.dart';
-import 'package:easy_callers_mobile/core/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/super_admin_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 
 /// Singleton service that wraps the Supabase client.

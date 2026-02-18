@@ -5,7 +5,7 @@ import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/core/constants/supabase_constants.dart';
-import 'package:easy_callers_mobile/core/models/lead_batch_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dart';
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 
 

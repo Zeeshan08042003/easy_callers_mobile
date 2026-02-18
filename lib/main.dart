@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
-import 'package:easy_callers_mobile/core/services/notification_service.dart';
+import 'package:easy_callers_mobile/features/employee/services/notification_service.dart';
 import 'package:easy_callers_mobile/app/routes/app_pages.dart';
 import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 import 'package:easy_callers_mobile/app/bindings/initial_binding.dart';
@@ -86,9 +86,16 @@ class CallController extends GetxController {
     }
 
     try {
-      final String? log =
+      final dynamic logData =
           await _platform.invokeMethod('startCall', {'number': number});
-      callLog.value = log ?? 'No call log received';
+      
+      if (logData is Map) {
+        callLog.value = logData['display_string'] ?? 'Call finished';
+      } else if (logData is String) {
+        callLog.value = logData;
+      } else {
+        callLog.value = 'No call log received';
+      }
     } on PlatformException catch (e) {
       Get.snackbar('Error', 'Failed to start call: ${e.message}');
     }

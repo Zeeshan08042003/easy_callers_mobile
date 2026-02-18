@@ -14,7 +14,7 @@ WHERE LOWER(email) = LOWER('sharmanatasha536@gmail.com');
 -- 3. Check with ILIKE (what the app uses)
 SELECT id, email, first_name, last_name, is_active, otp_code, otp_expires_at, created_at
 FROM employees
-WHERE email ILIKE 'sharmanatasha536@gmail.com';
+WHERE email ILIKE 'sharmanatasha536@gmail.  com';
 
 -- 4. Show ALL employees to see what's in the database
 SELECT id, email, first_name, last_name, is_active, manager_id, created_at

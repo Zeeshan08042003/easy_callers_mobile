@@ -359,7 +359,16 @@ class MainActivity : FlutterActivity() {
                 }
                 val status = if (type == CallLog.Calls.OUTGOING_TYPE && duration == 0L) "Declined or Failed" else "Completed"
 
-                val callDetails = """
+                val callData = HashMap<String, Any>()
+                callData["number"] = number
+                callData["type"] = typeLabel
+                callData["status"] = status
+                callData["date"] = formattedDate
+                callData["duration"] = duration
+                callData["duration_formatted"] = formatDuration(duration)
+                callData["is_connected"] = duration > 0L
+                
+                callData["display_string"] = """
                     📞 Last Call Info:
                     • Number: $number
                     • Type: $typeLabel
@@ -368,12 +377,12 @@ class MainActivity : FlutterActivity() {
                     • Duration: ${formatDuration(duration)}
                 """.trimIndent()
 
-                result.success(callDetails)
+                result.success(callData)
             } else {
-                result.success("No call log found")
+                result.success(null)
             }
         } ?: run {
-            result.success("No call log data available")
+            result.success(null)
         }
     }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/system_settings_model.dart';
-import 'package:easy_callers_mobile/core/services/system_service.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/system_settings_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/services/system_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class SystemSettingsController extends GetxController {

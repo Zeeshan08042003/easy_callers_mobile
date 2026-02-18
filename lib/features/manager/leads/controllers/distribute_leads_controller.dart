@@ -1,8 +1,8 @@
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/manager_model.dart';
-import 'package:easy_callers_mobile/core/models/employee_model.dart';
-import 'package:easy_callers_mobile/core/models/lead_batch_model.dart';
-import 'package:easy_callers_mobile/core/services/lead_service.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dart';
+import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 enum DistributionMethod { equal, custom }
@@ -16,7 +16,7 @@ class DistributeLeadsController extends GetxController {
   final RxMap<String, int> allocations = <String, int>{}.obs; // employeeId -> leadCount
   
   final Rx<DistributionMethod> method = DistributionMethod.equal.obs;
-  final RxBool isLoading = false.obs;
+  final RxBool isDistributing = false.obs;
   final RxInt totalBatchLeads = 0.obs;
 
   @override
@@ -32,19 +32,31 @@ class DistributeLeadsController extends GetxController {
 
   Future<void> fetchEmployees() async {
     try {
-      isLoading.value = true;
+      isDistributing.value = true;
       final managerId = _authService.currentManager.value?.id;
       if (managerId == null) return;
 
       final result = await _leadService.getEmployeesByManager(managerId);
-      employees.value = result;
+      
+      // Filter to only active employees (callers)
+      employees.value = result.where((emp) => emp.isActive).toList();
+      
+      if (employees.isEmpty) {
+        Get.snackbar(
+          'No Active Employees',
+          'You need at least one active employee to distribute leads',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        isDistributing.value = false;
+        return;
+      }
       
       // Initialize equal distribution
       _calculateEqualDistribution();
     } catch (e) {
       Get.snackbar('Error', 'Failed to fetch employees: $e');
     } finally {
-      isLoading.value = false;
+      isDistributing.value = false;
     }
   }
 
@@ -92,7 +104,7 @@ class DistributeLeadsController extends GetxController {
     }
 
     try {
-      isLoading.value = true;
+      isDistributing.value = true;
       
       // 1. Get unassigned lead IDs from this batch
       final leadIds = await _leadService.getUnassignedLeadsFromBatch(batch.id);
@@ -126,7 +138,7 @@ class DistributeLeadsController extends GetxController {
     } catch (e) {
       Get.snackbar('Error', 'Distribution failed: $e');
     } finally {
-      isLoading.value = false;
+      isDistributing.value = false;
     }
   }
 }

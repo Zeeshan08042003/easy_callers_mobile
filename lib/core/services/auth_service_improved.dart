@@ -8,10 +8,10 @@ import 'package:easy_callers_mobile/features/employee/services/notification_serv
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 
-/// Handles all authentication logic with separate role tables:
-/// - Super Admin & Manager: email/password login
-/// - Employee: OTP-based first activation, then employee/password
-/// - Session management
+/// IMPROVED Authentication Service
+/// 
+/// Simplified employee authentication flow with better error handling
+/// and cleaner code structure.
 class AuthService extends GetxService {
   final SupabaseService _supabase = Get.find<SupabaseService>();
   final NotificationService _notificationService = Get.find<NotificationService>();
@@ -98,7 +98,7 @@ class AuthService extends GetxService {
         final emp = result.profile as EmployeeModel;
         if (!emp.isActive) {
           error.value =
-              'Your account is not active. Please verify with OTP first.';
+              'Your account is not active. Please complete activation first.';
           await _supabase.client.auth.signOut();
           _clearCurrentUser();
           return null;
@@ -118,7 +118,7 @@ class AuthService extends GetxService {
   }
 
   // ============================================
-  // EMPLOYEE OTP ACTIVATION
+  // EMPLOYEE OTP ACTIVATION (SIMPLIFIED)
   // ============================================
 
   /// Verify OTP for employee first-time activation
@@ -130,25 +130,30 @@ class AuthService extends GetxService {
       isLoading.value = true;
       error.value = '';
 
+      final normalizedEmail = email.toLowerCase().trim();
+      
+      // Call the database function to get employee
       final result = await _supabase.client.rpc(
         'get_employee_for_otp',
-        params: {
-          'input_email': email.trim().toLowerCase(),
-        },
+        params: {'input_email': normalizedEmail},
       );
 
-      if (result == null || result.isEmpty) {
+      if (result == null || (result is List && result.isEmpty)) {
         error.value = 'No employee account found with this email.';
         return false;
       }
 
-      final employee = EmployeeModel.fromJson(result.first);
+      // Parse the employee data
+      final employeeData = result is List ? result.first : result;
+      final employee = EmployeeModel.fromJson(employeeData);
 
+      // Verify OTP
       if (employee.otpCode != otpCode) {
-        error.value = 'Invalid OTP. Please try again.';
+        error.value = 'Invalid OTP code. Please try again.';
         return false;
       }
 
+      // Check expiration
       if (employee.isOTPExpired) {
         error.value = 'OTP has expired. Please request a new one.';
         return false;
@@ -156,8 +161,8 @@ class AuthService extends GetxService {
 
       return true;
     } catch (e) {
-      error.value = 'Unexpected error: $e';
-      print('error : $e');
+      error.value = 'Error verifying OTP: $e';
+      print('OTP Verification Error: $e');
       return false;
     } finally {
       isLoading.value = false;
@@ -174,55 +179,9 @@ class AuthService extends GetxService {
       error.value = '';
 
       final normalizedEmail = email.toLowerCase().trim();
-
-      // STEP 1: Check if employee exists in database BEFORE creating auth account
-      print("=== Employee Activation ===");
-      print("Checking if employee exists: '$normalizedEmail'");
-      
-      List<dynamic> existingRecords = await _supabase.employeesTable
-          .select()
-          .ilike('email', normalizedEmail);
-      
-      if (existingRecords.isEmpty) {
-        // Try exact match as fallback
-        existingRecords = await _supabase.employeesTable
-            .select()
-            .eq('email', normalizedEmail);
-      }
-      
-      // If still not found, show helpful error
-      if (existingRecords.isEmpty) {
-        final allEmployees = await _supabase.employeesTable.select();
-        print("❌ Employee not found in database");
-        print("Total employees in database: ${allEmployees.length}");
-        
-        if (allEmployees.isNotEmpty) {
-          print("Available employee emails:");
-          for (var emp in allEmployees.take(10)) {
-            print("  - ${emp['email']} (${emp['first_name']} ${emp['last_name']})");
-          }
-        }
-        
-        error.value = 
-            'No employee account found with email: $normalizedEmail\n\n'
-            'This email was not created by a manager.\n'
-            'Please ask your manager to create your employee account first.';
-        return null;
-      }
-      
-      if (existingRecords.length > 1) {
-        error.value = 'Multiple employee accounts found. Please contact your administrator.';
-        print("❌ Duplicate employee records found for $normalizedEmail");
-        return null;
-      }
-
-      final employeeRecord = existingRecords.first;
-      final employeeId = employeeRecord['id'];
-      print("✅ Employee found in database: ID=$employeeId");
-
-      // STEP 2: Create or get auth account
       String? authUserId;
-      
+
+      // 1. Create or get auth account
       try {
         final authResponse = await _supabase.client.auth.signUp(
           email: normalizedEmail,
@@ -231,17 +190,14 @@ class AuthService extends GetxService {
 
         if (authResponse.user != null) {
           authUserId = authResponse.user!.id;
-          print("✅ Auth account created: $authUserId");
         } else {
           error.value = 'Failed to create account. Please try again.';
           return null;
         }
       } on AuthException catch (e) {
-        // If user already exists, try to sign in to get the auth ID
+        // If user already exists, try to sign in
         if (e.message.contains('already registered') || 
             e.message.contains('User already registered')) {
-          print("⚠️ Auth account already exists, signing in...");
-          
           try {
             final signInResponse = await _supabase.client.auth.signInWithPassword(
               email: normalizedEmail,
@@ -250,14 +206,12 @@ class AuthService extends GetxService {
             
             if (signInResponse.user != null) {
               authUserId = signInResponse.user!.id;
-              print("✅ Signed in with existing account: $authUserId");
             } else {
               error.value = 'Account exists but password is incorrect.';
               return null;
             }
           } catch (signInError) {
             error.value = 'Account exists but password is incorrect.';
-            print("❌ Sign in failed: $signInError");
             return null;
           }
         } else {
@@ -270,9 +224,23 @@ class AuthService extends GetxService {
         return null;
       }
 
-      // STEP 3: Link auth account to employee record and activate
-      print("Activating employee: linking auth_id=$authUserId to employee_id=$employeeId");
-      
+      // 2. Find employee record using ILIKE for case-insensitive match
+      final employeeRecords = await _supabase.employeesTable
+          .select()
+          .ilike('email', normalizedEmail);
+
+      if (employeeRecords.isEmpty) {
+        error.value = 'No employee account found. Contact your manager.';
+        return null;
+      }
+
+      if (employeeRecords.length > 1) {
+        error.value = 'Multiple accounts found. Contact your administrator.';
+        return null;
+      }
+
+      // 3. Update employee: activate and link auth_id
+      final employeeId = employeeRecords.first['id'];
       await _supabase.employeesTable.update({
         'auth_id': authUserId,
         'is_active': true,
@@ -280,9 +248,7 @@ class AuthService extends GetxService {
         'otp_expires_at': null,
       }).eq('id', employeeId);
 
-      print("✅ Employee activated successfully");
-
-      // STEP 4: Fetch and return updated employee profile
+      // 4. Fetch and return updated employee
       final data = await _supabase.employeesTable
           .select()
           .eq('id', employeeId)
@@ -290,17 +256,14 @@ class AuthService extends GetxService {
 
       final employee = EmployeeModel.fromJson(data);
       _setCurrentUser(UserRole.employee, employee);
-      print("✅ Logged in as: ${employee.fullName}");
       
       return employee;
     } on AuthException catch (e) {
-      print("❌ Auth error: ${e.message}");
       error.value = e.message;
       return null;
-    } catch (e, stackTrace) {
-      print("❌ Error activating employee: $e");
-      print("Stack trace: $stackTrace");
+    } catch (e) {
       error.value = 'Error activating employee: $e';
+      print('Activation Error: $e');
       return null;
     } finally {
       isLoading.value = false;

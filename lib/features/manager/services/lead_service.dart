@@ -3,16 +3,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import 'package:path/path.dart' as p;
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/lead_model.dart';
-import 'package:easy_callers_mobile/core/models/lead_batch_model.dart';
-import 'package:easy_callers_mobile/core/models/call_log_model.dart';
-import 'package:easy_callers_mobile/core/models/daily_report_model.dart';
-import 'package:easy_callers_mobile/core/models/notification_model.dart';
-import 'package:easy_callers_mobile/core/models/manager_model.dart';
-import 'package:easy_callers_mobile/core/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/call_log_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/daily_report_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/notification_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for all lead-related database operations.
 /// Used by Super Admin, Manager, and Employee controllers.
@@ -354,6 +353,129 @@ class LeadService extends GetxService {
     }
   }
 
+  /// Get count of unattended leads for a manager's team
+  /// Unattended leads are those that are assigned but have no call logs
+  /// and were assigned more than 24 hours ago
+  Future<int> getUnattendedLeadsCount(String managerId) async {
+    try {
+      // Get all employees under this manager
+      final employees = await getEmployeesByManager(managerId);
+      final employeeIds = employees.map((e) => e.id).toList();
+
+      if (employeeIds.isEmpty) return 0;
+
+      // Get leads assigned to these employees with status 'assigned'
+      // that were created more than 24 hours ago
+      final twentyFourHoursAgo = DateTime.now().subtract(const Duration(hours: 24));
+      
+      final leadsResponse = await _supabase.leadsTable
+          .select('id')
+          .inFilter('assigned_to', employeeIds)
+          .eq('status', LeadStatus.assigned.value)
+          .lt('updated_at', twentyFourHoursAgo.toIso8601String());
+
+      final leads = (leadsResponse as List);
+      
+      if (leads.isEmpty) return 0;
+
+      final leadIds = leads.map((l) => l['id'] as String).toList();
+      
+      // Get all lead IDs that HAVE call logs in a single query
+      final logsResponse = await _supabase.callLogsTable
+          .select('lead_id')
+          .inFilter('lead_id', leadIds);
+      
+      final leadIdsWithLogs = (logsResponse as List)
+          .map((log) => log['lead_id'] as String)
+          .toSet();
+
+      // Count leads that DO NOT have logs
+      int unattendedCount = 0;
+      for (var id in leadIds) {
+        if (!leadIdsWithLogs.contains(id)) {
+          unattendedCount++;
+        }
+      }
+
+      return unattendedCount;
+    } catch (e) {
+      print('Error getting unattended leads count: $e');
+      return 0;
+    }
+  }
+
+  /// Get unattended leads for a manager's team
+  /// Returns list of LeadModel objects that are assigned but have no call logs
+  Future<List<LeadModel>> getUnattendedLeads(String managerId) async {
+    try {
+      // Get all employees under this manager
+      final employees = await getEmployeesByManager(managerId);
+      final employeeIds = employees.map((e) => e.id).toList();
+
+      if (employeeIds.isEmpty) return [];
+
+      // Get leads assigned to these employees with status 'assigned'
+      // that were created more than 24 hours ago
+      final twentyFourHoursAgo = DateTime.now().subtract(const Duration(hours: 24));
+      
+      final leadsResponse = await _supabase.leadsTable
+          .select('*, employees(first_name, last_name)')
+          .inFilter('assigned_to', employeeIds)
+          .eq('status', LeadStatus.assigned.value)
+          .lt('updated_at', twentyFourHoursAgo.toIso8601String());
+
+      final leads = (leadsResponse as List)
+          .map((json) => LeadModel.fromJson(json))
+          .toList();
+      
+      if (leads.isEmpty) return [];
+
+      final leadIds = leads.map((l) => l.id).toList();
+
+      // Get all lead IDs that HAVE call logs in a single query
+      final logsResponse = await _supabase.callLogsTable
+          .select('lead_id')
+          .inFilter('lead_id', leadIds);
+      
+      final leadIdsWithLogs = (logsResponse as List)
+          .map((log) => log['lead_id'] as String)
+          .toSet();
+
+      // Filter leads that DO NOT have logs
+      return leads.where((l) => !leadIdsWithLogs.contains(l.id)).toList();
+    } catch (e) {
+      print('Error getting unattended leads: $e');
+      return [];
+    }
+  }
+
+  /// Reassign unattended leads to a specific employee
+  /// Returns the number of leads reassigned
+  Future<int> reassignUnattendedLeadsToEmployee({
+    required String managerId,
+    required String targetEmployeeId,
+  }) async {
+    try {
+      // Get unattended leads
+      final unattendedLeads = await getUnattendedLeads(managerId);
+      
+      if (unattendedLeads.isEmpty) return 0;
+
+      // Reassign all leads in a single bulk update
+      final leadIds = unattendedLeads.map((l) => l.id).toList();
+      
+      await _supabase.leadsTable.update({
+        'assigned_to': targetEmployeeId,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).inFilter('id', leadIds);
+
+      return leadIds.length;
+    } catch (e) {
+      print('Error reassigning unattended leads: $e');
+      return 0;
+    }
+  }
+
   /// Get IDs of unassigned leads from a specific batch
   Future<List<String>> getUnassignedLeadsFromBatch(String batchId) async {
     try {
@@ -423,12 +545,12 @@ class LeadService extends GetxService {
             leadIds.sublist(currentIndex, currentIndex + count);
         currentIndex += count;
 
-        // Update in batch
-        for (final leadId in assignedLeadIds) {
+        // Update in bulk for this employee
+        if (assignedLeadIds.isNotEmpty) {
           await _supabase.leadsTable.update({
             'assigned_to': employeeIds[i],
             'status': LeadStatus.assigned.value,
-          }).eq('id', leadId);
+          }).inFilter('id', assignedLeadIds);
         }
       }
 
@@ -455,11 +577,12 @@ class LeadService extends GetxService {
         final assignedLeadIds = leadIds.sublist(currentIndex, end);
         currentIndex = end;
 
-        for (final leadId in assignedLeadIds) {
+        // Update in bulk for this employee
+        if (assignedLeadIds.isNotEmpty) {
           await _supabase.leadsTable.update({
             'assigned_to': employeeId,
             'status': LeadStatus.assigned.value,
-          }).eq('id', leadId);
+          }).inFilter('id', assignedLeadIds);
         }
       }
 

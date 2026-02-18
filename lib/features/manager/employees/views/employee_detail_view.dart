@@ -57,6 +57,8 @@ class EmployeeDetailView extends GetView<EmployeeDetailController> {
 
   Widget _buildProfileHeader() {
     final emp = controller.employee.value!;
+    final bool isOTPExpired = !emp.isActive && emp.isOTPExpired;
+
     return Row(
       children: [
         Stack(
@@ -64,7 +66,8 @@ class EmployeeDetailView extends GetView<EmployeeDetailController> {
             Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
+                border: Border.all(
+                    color: AppColors.primary.withOpacity(0.3), width: 2),
               ),
               child: const CircleAvatar(
                 radius: 44,
@@ -78,7 +81,9 @@ class EmployeeDetailView extends GetView<EmployeeDetailController> {
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: AppColors.success,
+                  color: emp.isActive
+                      ? AppColors.success
+                      : (isOTPExpired ? AppColors.danger : AppColors.warning),
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.background, width: 3),
                 ),
@@ -101,18 +106,69 @@ class EmployeeDetailView extends GetView<EmployeeDetailController> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                'Senior Lead Representative',
-                style: TextStyle(
-                  color: AppColors.textSecondary.withOpacity(0.8),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
+              if (emp.isActive)
+                Text(
+                  'Active Lead Representative',
+                  style: TextStyle(
+                    color: AppColors.textSecondary.withOpacity(0.8),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              else if (isOTPExpired)
+                Row(
+                  children: [
+                    const Text(
+                      'OTP Expired ',
+                      style: TextStyle(
+                        color: AppColors.danger,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => controller.resendOTP(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.refresh,
+                                size: 12, color: AppColors.danger),
+                            SizedBox(width: 4),
+                            Text(
+                              'Resend',
+                              style: TextStyle(
+                                  color: AppColors.danger,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  'Pending Activation',
+                  style: TextStyle(
+                    color: AppColors.warning.withOpacity(0.8),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _buildProfileBadge('TOP PERFORMER', AppColors.primary),
+                  _buildProfileBadge(
+                      emp.isActive ? 'TOP PERFORMER' : 'NEW AGENT',
+                      emp.isActive ? AppColors.primary : AppColors.warning),
                   const SizedBox(width: 12),
                   Text(
                     '• Team Alpha',
@@ -430,36 +486,145 @@ class EmployeeDetailView extends GetView<EmployeeDetailController> {
     return Container(
       padding: const EdgeInsets.all(20),
       color: AppColors.background,
-      child: Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.chat_bubble_outline, size: 18),
-              label: const Text('Contact'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: BorderSide(color: Colors.white.withOpacity(0.1)),
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Obx(() {
+        final hasUnattendedLeads = controller.unattendedLeadsCount.value > 0;
+        final isActive = controller.employee.value?.isActive ?? false;
+        
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Show unattended leads button if available and employee is active
+            if (hasUnattendedLeads && isActive)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ElevatedButton.icon(
+                  onPressed: controller.isReassigning.value 
+                      ? null 
+                      : () => _showReassignConfirmation(),
+                  icon: controller.isReassigning.value
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.autorenew, size: 18),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        controller.isReassigning.value
+                            ? 'Reassigning...'
+                            : 'Reassign Unattended Leads',
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${controller.unattendedLeadsCount.value}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.warning,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                ),
               ),
+            // Original action buttons
+            Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                    label: const Text('Contact'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.assignment_ind_outlined, size: 18),
+                    label: const Text('Assign New Lead'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ],
+        );
+      }),
+    );
+  }
+
+  void _showReassignConfirmation() {
+    final count = controller.unattendedLeadsCount.value;
+    final employeeName = controller.employee.value?.firstName ?? 'this employee';
+    
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.autorenew, color: AppColors.warning),
+            SizedBox(width: 12),
+            Text(
+              'Reassign Unattended Leads',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+          ],
+        ),
+        content: Text(
+          'This will reassign $count unattended lead${count != 1 ? 's' : ''} to $employeeName.\n\nUnattended leads are those that have been assigned for more than 24 hours but have no call activity.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
-          const SizedBox(width: 15),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.assignment_ind_outlined, size: 18),
-              label: const Text('Assign New Lead'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              controller.reassignUnattendedLeads();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
+            child: const Text('Reassign'),
           ),
         ],
       ),

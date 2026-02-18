@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/system_settings_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/system_settings_model.dart';
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 
 class SystemService extends GetxService {

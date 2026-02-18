@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/super_admin_model.dart';
-import 'package:easy_callers_mobile/core/models/manager_model.dart';
-import 'package:easy_callers_mobile/core/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/super_admin_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
+import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:easy_callers_mobile/features/super_admin/dashboard/views/super_admin_dashboard_view.dart';

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/core/models/lead_model.dart';
-import 'package:easy_callers_mobile/core/services/lead_service.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_model.dart';
+import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
-import 'package:easy_callers_mobile/core/models/call_log_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/call_log_model.dart';
 import 'package:uuid/uuid.dart';
 
 class CallFeedbackController extends GetxController {
