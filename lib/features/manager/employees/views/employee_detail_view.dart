@@ -424,8 +424,8 @@ class EmployeeDetailView extends GetView<EmployeeDetailController> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Recent Lead Distribution',
+            Text(
+              'Recent Lead Distribution ${controller.assignedLeads.length}',
               style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             TextButton(

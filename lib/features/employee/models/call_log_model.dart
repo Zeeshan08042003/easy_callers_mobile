@@ -1,13 +1,14 @@
 import 'package:easy_callers_mobile/core/utils/enums.dart';
+import 'package:easy_callers_mobile/features/employee/models/lead_status_model.dart';
 
 class CallLogModel {
   final String id;
   final String leadId;
   final String employeeId;
-  final CallStatus? callStatus;
+  final String? callStatus;
   final String? callDuration;
   final int callDurationSeconds;
-  final CallLeadStatus? leadStatus;
+  final dynamic leadStatus;
   final String? feedback;
   final DateTime? followUpDate;
   final String? followUpNotes;
@@ -77,14 +78,10 @@ class CallLogModel {
       id: json['id'] as String,
       leadId: json['lead_id'] as String,
       employeeId: json['employee_id'] as String,
-      callStatus: json['call_status'] != null
-          ? CallStatus.fromString(json['call_status'] as String)
-          : null,
+      callStatus: json['call_status'] as String?,
       callDuration: json['call_duration'] as String?,
       callDurationSeconds: json['call_duration_seconds'] as int? ?? 0,
-      leadStatus: json['lead_status'] != null
-          ? CallLeadStatus.fromString(json['lead_status'] as String)
-          : null,
+      leadStatus: json['lead_status'] as String?,
       feedback: json['feedback'] as String?,
       followUpDate: json['follow_up_date'] != null
           ? DateTime.parse(json['follow_up_date'] as String)
@@ -102,12 +99,20 @@ class CallLogModel {
       'lead_id': leadId,
       'employee_id': employeeId,
     };
-    if (callStatus != null) map['call_status'] = callStatus!.value;
+    if (callStatus != null) map['call_status'] = callStatus;
     if (callDuration != null) map['call_duration'] = callDuration;
     if (callDurationSeconds > 0) {
       map['call_duration_seconds'] = callDurationSeconds;
     }
-    if (leadStatus != null) map['lead_status'] = leadStatus!.value;
+    if (leadStatus != null) {
+      if (leadStatus is CallLeadStatus) {
+        map['lead_status'] = (leadStatus as CallLeadStatus).value;
+      } else if (leadStatus is LeadStatusModel) {
+        map['lead_status'] = (leadStatus as LeadStatusModel).value;
+      } else {
+        map['lead_status'] = leadStatus.toString();
+      }
+    }
     if (feedback != null) map['feedback'] = feedback;
     if (followUpDate != null) {
       map['follow_up_date'] = followUpDate!.toIso8601String();
@@ -118,5 +123,5 @@ class CallLogModel {
 
   @override
   String toString() =>
-      'CallLogModel(lead: $leadName, status: ${callStatus?.displayName})';
+      'CallLogModel(lead: $leadName, status: $callStatus)';
 }

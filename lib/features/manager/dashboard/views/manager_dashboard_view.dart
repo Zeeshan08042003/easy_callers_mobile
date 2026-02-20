@@ -14,30 +14,35 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 30),
-              _buildActionRow(),
-              const SizedBox(height: 30),
-              _buildStatsRow(),
-              const SizedBox(height: 25),
-              _buildPerformanceCard(),
-              const SizedBox(height: 30),
-              _buildWeeklyDistribution(),
-              const SizedBox(height: 30),
-              _buildTeamStatusSection(),
-            ],
+    return RefreshIndicator(
+      onRefresh: () { 
+        return controller.fetchDashboardData();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 30),
+                _buildActionRow(),
+                const SizedBox(height: 30),
+                _buildStatsRow(),
+                const SizedBox(height: 25),
+                _buildPerformanceCard(),
+                const SizedBox(height: 30),
+                _buildWeeklyDistribution(),
+                const SizedBox(height: 30),
+                _buildTeamStatusSection(),
+              ],
+            ),
           ),
         ),
+        bottomNavigationBar: _buildBottomNav(),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -160,8 +165,8 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
             ],
           ),
           
-          // Distribute Button (shown after upload)
-          if (hasLastBatch) ...[
+          // Distribute Button (shown if unassigned leads exist)
+          if (hasLastBatch && controller.unassignedCount.value > 0) ...[
             const SizedBox(height: 15),
             SizedBox(
               width: double.infinity,
@@ -169,7 +174,7 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                 onPressed: controller.isLoading.value ? null : () => controller.distributeLeads(),
                 icon: const Icon(Icons.share_outlined, size: 24),
                 label: Text(
-                  'Distribute $batchLeads Leads',
+                  'Distribute ${controller.unassignedCount.value} Leads',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(

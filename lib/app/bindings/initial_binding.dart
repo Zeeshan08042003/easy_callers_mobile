@@ -12,8 +12,7 @@ class InitialBinding extends Bindings {
     // Core services (already initialized in main.dart via Get.put)
     // These are accessed here for reference
 
-    // Auth service
-    Get.lazyPut<AuthService>(() => AuthService(), fenix: true);
+    // Auth service is already initialized in main.dart
 
     // Lead services
     Get.lazyPut<LeadService>(() => LeadService(), fenix: true);

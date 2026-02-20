@@ -4,6 +4,7 @@ import 'package:easy_callers_mobile/feedback/feedback_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../features/employee/controllers/call_controller.dart';
 import '../main.dart';
 import 'details_bottom_sheet.dart';
 
@@ -79,7 +80,7 @@ class TotalLeads extends StatelessWidget {
                               radius: 8,
                               onTap: () async {
                                 var controller = Get.find<CallController>();
-                                controller.makeCall(phoneNumber: item['number']);
+                                controller.makeCall(phoneNumber: item['number']??'');
                               },
                             )
                             // Text(item["time"], style: TextStyle(color: Colors.grey,fontSize: 10))

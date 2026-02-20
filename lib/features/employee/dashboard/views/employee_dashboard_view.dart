@@ -293,17 +293,38 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
               if (controller.assignedLeads.isEmpty) {
                 return _buildEmptyQueue();
               }
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: controller.assignedLeads.length > 3 
-                    ? 3 
-                    : controller.assignedLeads.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final lead = controller.assignedLeads[index];
-                  return _buildLeadQueueCard(lead);
-                },
+              return Column(
+                children: [
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: controller.assignedLeads.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final lead = controller.assignedLeads[index];
+                      return _buildLeadQueueCard(lead);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  if (controller.hasMoreLeads.value)
+                    controller.isLoadingMore.value
+                        ? const Center(child: CircularProgressIndicator())
+                        : SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: controller.loadMoreLeads,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(color: AppColors.primary),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 15),
+                              ),
+                              child: const Text('Load More Leads'),
+                            ),
+                          ),
+                ],
               );
             }),
             const SizedBox(height: 100),

@@ -7,6 +7,9 @@ import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../main.dart';
+import '../controllers/call_controller.dart';
+
 class LeadDetailView extends StatelessWidget {
   final LeadModel lead;
 
@@ -62,6 +65,8 @@ class LeadDetailView extends StatelessWidget {
             _buildCallButton(controller),
             const SizedBox(height: 32),
             _buildLeadInfo(controller),
+            const SizedBox(height: 32),
+            _buildCallDynamicStatus(controller),
             const SizedBox(height: 32),
             _buildUpdateCallStatus(controller),
             const SizedBox(height: 32),
@@ -157,24 +162,27 @@ class LeadDetailView extends StatelessWidget {
           child: _buildActionButton(
             icon: Icons.message_rounded,
             label: 'MESSAGE',
-            onTap: () => controller.sendSMS(),
+            onTap: () => controller.sendMobileSMS(),
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: _buildActionButton(
-            icon: Icons.email_rounded,
-            label: 'EMAIL',
-            onTap: () async {
-              if (lead.email != null) {
-                final uri = Uri.parse('mailto:${lead.email}');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
+        Visibility(
+          visible: lead.email != null,
+          child: Expanded(
+            child: _buildActionButton(
+              icon: Icons.email_rounded,
+              label: 'EMAIL',
+              onTap: () async {
+                if (lead.email != null) {
+                  final uri = Uri.parse('mailto:${lead.email}');
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  }
+                } else {
+                  Get.snackbar('No Email', 'This lead has no email address');
                 }
-              } else {
-                Get.snackbar('No Email', 'This lead has no email address');
-              }
-            },
+              },
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -182,7 +190,7 @@ class LeadDetailView extends StatelessWidget {
           child: _buildActionButton(
             icon: Icons.phone_android_rounded,
             label: 'WHATSAPP',
-            onTap: () => controller.whatsappCall(),
+            onTap: () => controller.whatsappMsg(),
           ),
         ),
       ],
@@ -237,53 +245,48 @@ class LeadDetailView extends StatelessWidget {
           elevation: 4,
         ),
         child: Obx(() => Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.phone_rounded, size: 24),
-                const SizedBox(width: 12),
-                const Text(
-                  'Call Client',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.phone_rounded, size: 24),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Call Client',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
+                if (controller.callDurationSeconds.value > 0)
+                  Text(
+                    'Last duration: ${Duration(seconds: controller.callDurationSeconds.value).toString().split('.').first.padLeft(8, "0")}',
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.normal),
+                  ),
               ],
-            ),
-            if (controller.callDurationSeconds.value > 0)
-              Text(
-                'Last duration: ${Duration(seconds: controller.callDurationSeconds.value).toString().split('.').first.padLeft(8, "0")}',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
-              ),
-          ],
-        )),
+            )),
       ),
     );
   }
 
+  //will show proper call log report over here
   Widget _buildLeadInfo(LeadDetailController controller) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildInfoCard(
-            label: 'LAST CONTACTED',
-            value: '2 days ago',
-            icon: Icons.access_time_rounded,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildInfoCard(
-            label: 'LEAD SCORE',
-            value: '8.5/10',
-            icon: Icons.star_rounded,
-            valueColor: AppColors.success,
-          ),
-        ),
-      ],
+    return Visibility(
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildInfoCard(
+              label: 'LAST CONTACTED',
+              value: '2 days ago',
+              icon: Icons.access_time_rounded,
+            ),
+          )
+        ],
+      ),
     );
   }
 
@@ -346,36 +349,35 @@ class LeadDetailView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        Obx(() => Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _buildStatusChip(
-              label: 'Interested',
-              isSelected: controller.selectedStatus.value == 'interested',
-              onTap: () => controller.selectedStatus.value = 'interested',
-              color: AppColors.success,
-            ),
-            _buildStatusChip(
-              label: 'Not Interested',
-              isSelected: controller.selectedStatus.value == 'not_interested',
-              onTap: () => controller.selectedStatus.value = 'not_interested',
-              color: const Color(0xFFFF6B6B),
-            ),
-            _buildStatusChip(
-              label: 'Callback',
-              isSelected: controller.selectedStatus.value == 'callback',
-              onTap: () => controller.selectedStatus.value = 'callback',
-              color: AppColors.primary,
-            ),
-            _buildStatusChip(
-              label: 'No Answer',
-              isSelected: controller.selectedStatus.value == 'no_answer',
-              onTap: () => controller.selectedStatus.value = 'no_answer',
-              color: AppColors.textSecondary,
-            ),
-          ],
-        )),
+        Obx(() => GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 3.5/1,
+              ),
+              itemCount: controller.availableLeadStatuses.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final status = controller.availableLeadStatuses[index];
+                Color chipColor = AppColors.primary;
+                
+                // Keep some default colors
+                if (status.value == 'interested') chipColor = AppColors.success;
+                if (status.value == 'not_interested') chipColor = const Color(0xFFFF6B6B);
+                if (status.value == 'follow_up') chipColor = AppColors.warning;
+                if (status.value == 'closed') chipColor = AppColors.danger;
+                if (status.value == 'visiting') chipColor = AppColors.success;
+
+                return _buildStatusChip(
+                  label: status.displayName,
+                  isSelected: controller.selectedStatus.value == status.value,
+                  onTap: () => controller.selectedStatus.value = status.value,
+                  color: chipColor,
+                );
+              },
+            ))
       ],
     );
   }
@@ -398,12 +400,14 @@ class LeadDetailView extends StatelessWidget {
             color: isSelected ? color : Colors.white.withOpacity(0.05),
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : AppColors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
@@ -451,8 +455,22 @@ class LeadDetailView extends StatelessWidget {
 
   Widget _buildFollowUpReminder(LeadDetailController controller) {
     return Obx(() {
-      final needsFollowUp = controller.selectedStatus.value == 'callback' ||
-          controller.selectedStatus.value == 'interested';
+      final statusValue = controller.selectedStatus.value;
+      
+      // Find the status model to see the mapping
+      final statusModel = controller.availableLeadStatuses.firstWhereOrNull(
+        (s) => s.value == statusValue
+      );
+      
+      bool needsFollowUp = statusValue == 'callback' ||
+          statusValue == 'interested' ||
+          statusValue == 'follow_up';
+          
+      if (statusModel != null) {
+        needsFollowUp = statusModel.leadStatusMapping == 'follow_up' || 
+                       statusModel.value == 'callback' || 
+                       statusModel.value == 'interested';
+      }
 
       if (!needsFollowUp) return const SizedBox.shrink();
 
@@ -490,15 +508,15 @@ class LeadDetailView extends StatelessWidget {
               ),
             ),
             Obx(() => Switch(
-              value: controller.followUpEnabled.value,
-              onChanged: (value) {
-                controller.followUpEnabled.value = value;
-                if (value) {
-                  _showFollowUpDatePicker(controller);
-                }
-              },
-              activeColor: AppColors.primary,
-            )),
+                  value: controller.followUpEnabled.value,
+                  onChanged: (value) {
+                    controller.followUpEnabled.value = value;
+                    if (value) {
+                      _showFollowUpDatePicker(controller);
+                    }
+                  },
+                  activeColor: AppColors.primary,
+                )),
           ],
         ),
       );
@@ -536,29 +554,118 @@ class LeadDetailView extends StatelessWidget {
           width: double.infinity,
           height: 56,
           child: Obx(() => ElevatedButton(
-            onPressed: controller.isLoading.value ? null : controller.saveUpdate,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.background,
-              disabledBackgroundColor: AppColors.cardBg,
-              disabledForegroundColor: AppColors.textSecondary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 0,
-            ),
-            child: controller.isLoading.value
-                ? const CircularProgressIndicator(color: AppColors.background)
-                : const Text(
-                    'Save Update',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                onPressed:
+                    controller.isLoading.value ? null : controller.saveUpdate,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.background,
+                  disabledBackgroundColor: AppColors.cardBg,
+                  disabledForegroundColor: AppColors.textSecondary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-          )),
+                  elevation: 0,
+                ),
+                child: controller.isLoading.value
+                    ? const CircularProgressIndicator(
+                        color: AppColors.background)
+                    : const Text(
+                        'Save Update',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              )),
         ),
       ),
     );
   }
+
+  Widget _buildCallDynamicStatus(LeadDetailController controller) {
+    return Obx(() {
+      final session = controller.callController.callSession.value;
+
+      if (session == null) {
+        return _buildEmptyCallState();
+      }
+
+      return Container(
+        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: session.statusBackgroundColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: session.statusColor,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              session.isConnected
+                  ? Icons.call_made
+                  : Icons.call_missed,
+              color: session.statusColor,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session.status,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: session.statusColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Duration: ${session.duration}",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildEmptyCallState() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: const [
+          Icon(Icons.call, color: Colors.grey),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              "No call activity yet",
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
 }

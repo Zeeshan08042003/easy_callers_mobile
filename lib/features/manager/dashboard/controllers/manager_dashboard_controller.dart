@@ -9,12 +9,13 @@ class ManagerDashboardController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();
   final AuthService _authService = Get.find<AuthService>();
 
-  final totalLeads = 1240.obs;
-  final leadsAssigned = 85.obs;
-  final teamPerformance = 92.4.obs;
+  final totalLeads = 0.obs;
+  final leadsAssigned = 0.obs;
+  final teamPerformance = 0.0.obs;
   
   final isLoading = false.obs;
   final Rx<LeadBatchModel?> lastUploadedBatch = Rx<LeadBatchModel?>(null);
+  final unassignedCount = 0.obs;
   
   // Team members list
   final teamMembers = <Map<String, dynamic>>[].obs;
@@ -25,7 +26,15 @@ class ManagerDashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    // Fetch initial data
     fetchDashboardData();
+    
+    // Also listen for manager changes (e.g. after login/reboot) to ensure data loads
+    ever(_authService.currentManager, (manager) {
+      if (manager != null) {
+        fetchDashboardData();
+      }
+    });
   }
 
   Future<void> uploadLeads() async {
@@ -96,11 +105,14 @@ class ManagerDashboardController extends GetxController {
       print('🚀 Navigating to distribution screen with batch: ${batch.id}');
       
       // Use Get.to instead of Get.toNamed to pass arguments directly
-      Get.to(
+      await Get.to(
         () => const DistributeLeadsView(),
         binding: DistributeLeadsBinding(),
         arguments: batch,
       );
+      
+      // Refresh after returning from distribution screen
+      await fetchDashboardData();
     } catch (e, stackTrace) {
       print('❌ Error in distributeLeads: $e');
       print('📍 Stack trace: $stackTrace');
@@ -116,48 +128,41 @@ class ManagerDashboardController extends GetxController {
 
   Future<void> fetchDashboardData() async {
     isLoading.value = true;
-    
+
     try {
       final managerId = _authService.currentManager.value?.id;
-      
+
       // Fetch latest batch with unassigned leads (if any)
       if (managerId != null) {
         final batch = await _leadService.getLatestBatchWithUnassignedLeads(managerId);
         lastUploadedBatch.value = batch;
+
+        if (batch != null) {
+          final unassigned = await _leadService.getUnassignedLeadsFromBatch(batch.id);
+          unassignedCount.value = unassigned.length;
+        } else {
+          unassignedCount.value = 0;
+        }
+
+        // Fetch real dashboard statistics
+        final stats = await _leadService.getManagerDashboardStats(managerId);
+        totalLeads.value = stats['totalLeads'] as int;
+        print("Total value : ${totalLeads.value}");
+        final assignedCount = stats['assignedLeads'] as int;
+        if (totalLeads.value > 0) {
+          leadsAssigned.value = ((assignedCount / totalLeads.value) * 100).toInt();
+        } else {
+          leadsAssigned.value = 0;
+        }
+
+        teamPerformance.value = (stats['performance'] as num).toDouble().toPrecision(1);
+
+        // Fetch real team members and their activity
+        final team = await _leadService.getManagerTeamStats(managerId);
+        if (team.isNotEmpty) {
+          teamMembers.value = team;
+        }
       }
-      
-      // Simulate API delay for other data
-      await Future.delayed(const Duration(milliseconds: 800));
-      
-      // Mock data update
-      totalLeads.value = 1240;
-      leadsAssigned.value = 85;
-      teamPerformance.value = 92.4;
-      
-      // Mock team members
-      teamMembers.value = [
-        {
-          'name': 'Jane Smith',
-          'calls': '45 Calls',
-          'progress': 0.7,
-          'status': 'Active',
-          'statusColor': 0xFF10B981, // Green
-        },
-        {
-          'name': 'Marcus Chen',
-          'calls': '38 Calls',
-          'progress': 0.6,
-          'status': 'Active',
-          'statusColor': 0xFF10B981,
-        },
-        {
-          'name': 'David Miller',
-          'calls': '24 Calls',
-          'progress': 0.4,
-          'status': 'Away',
-          'statusColor': 0xFFF59E0B, // Orange
-        },
-      ];
     } catch (e) {
       print('Error fetching dashboard data: $e');
     } finally {

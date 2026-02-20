@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/super_admin_model.dart';
@@ -6,7 +7,9 @@ import 'package:easy_callers_mobile/features/super_admin/models/manager_model.da
 import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 import 'package:easy_callers_mobile/features/employee/services/notification_service.dart';
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
+import 'package:easy_callers_mobile/core/services/storage_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
+import 'dart:convert';
 
 /// Handles all authentication logic with separate role tables:
 /// - Super Admin & Manager: email/password login
@@ -15,6 +18,7 @@ import 'package:easy_callers_mobile/core/utils/enums.dart';
 class AuthService extends GetxService {
   final SupabaseService _supabase = Get.find<SupabaseService>();
   final NotificationService _notificationService = Get.find<NotificationService>();
+  final StorageService _storage = Get.find<StorageService>();
 
   /// The detected role of the current user
   final Rx<UserRole?> currentRole = Rx<UserRole?>(null);
@@ -437,14 +441,102 @@ class AuthService extends GetxService {
   }
 
   // ============================================
+  // MANAGER: SELF REGISTRATION
+  // ============================================
+  
+  /// Register a new manager (self-registration)
+  Future<ManagerModel?> registerManager({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    String? phone,
+  }) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      // 1. Create auth account
+      final normalizedEmail = email.toLowerCase().trim();
+      final authResponse = await _supabase.client.auth.signUp(
+        email: normalizedEmail,
+        password: password,
+      );
+
+      if (authResponse.user == null) {
+        error.value = 'Failed to create auth account.';
+        return null;
+      }
+
+      final authId = authResponse.user!.id;
+
+      // 2. Insert into managers table
+      // Default max_employees to 10 for new self-registered managers
+      final insertData = <String, dynamic>{
+        'auth_id': authId,
+        'email': normalizedEmail,
+        'first_name': firstName,
+        'last_name': lastName,
+        'is_active': true,
+        'max_employees': 10, 
+      };
+      if (phone != null) insertData['phone'] = phone;
+
+      final response = await _supabase.managersTable
+          .insert(insertData)
+          .select()
+          .single();
+
+      final manager = ManagerModel.fromJson(response);
+      
+      // 3. Set current user session
+      _setCurrentUser(UserRole.manager, manager);
+      
+      // 4. Log initial activity
+      await _logActivity(
+        action: 'manager_self_registration',
+        targetType: 'manager',
+        targetId: manager.id,
+        details: {'email': normalizedEmail},
+      );
+
+      return manager;
+    } on AuthException catch (e) {
+      error.value = e.message;
+      return null;
+    } catch (e) {
+      error.value = 'Registration error: $e';
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ============================================
   // SESSION MANAGEMENT
   // ============================================
 
   /// Check if there's an existing session and load user profile
   Future<UserRole?> restoreSession() async {
     try {
-      if (!_supabase.isLoggedIn) return null;
+      if (!_supabase.isLoggedIn) {
+        await _storage.clear();
+        return null;
+      }
 
+      // 1. Try to load from local storage first for speed
+      final cachedRoleStr = _storage.getString(StorageService.keyUserRole);
+      final cachedProfile = _storage.getJson(StorageService.keyUserProfile);
+
+      if (cachedRoleStr != null && cachedProfile != null) {
+        final role = UserRole.fromString(cachedRoleStr);
+        
+        // Populate reactive variables
+        _setCurrentUser(role, _parseProfile(role, cachedProfile), saveToStorage: false);
+        return role;
+      }
+
+      // 2. Fallback to server discovery if local cache missing
       final result = await _supabase.detectCurrentUser();
       if (result != null) {
         _setCurrentUser(result.role, result.profile);
@@ -457,11 +549,23 @@ class AuthService extends GetxService {
     }
   }
 
+  dynamic _parseProfile(UserRole role, Map<String, dynamic> json) {
+    switch (role) {
+      case UserRole.superAdmin:
+        return SuperAdminModel.fromJson(json);
+      case UserRole.manager:
+        return ManagerModel.fromJson(json);
+      case UserRole.employee:
+        return EmployeeModel.fromJson(json);
+    }
+  }
+
   /// Logout
   Future<void> logout() async {
     try {
       _notificationService.stopListening();
       await _supabase.client.auth.signOut();
+      await _storage.clear();
       _clearCurrentUser();
     } catch (e) {
       print('Error logging out: $e');
@@ -472,28 +576,41 @@ class AuthService extends GetxService {
   // HELPERS
   // ============================================
 
-  void _setCurrentUser(UserRole role, dynamic profile) {
+  void _setCurrentUser(UserRole role, dynamic profile, {bool saveToStorage = true}) {
     _clearCurrentUser();
     currentRole.value = role;
 
     String? userId;
+    Map<String, dynamic>? profileJson;
 
     switch (role) {
       case UserRole.superAdmin:
         final admin = profile as SuperAdminModel;
         currentSuperAdmin.value = admin;
         userId = admin.id;
+        profileJson = admin.toJson();
         break;
       case UserRole.manager:
         final manager = profile as ManagerModel;
         currentManager.value = manager;
         userId = manager.id;
+        profileJson = manager.toJson();
         break;
       case UserRole.employee:
         final employee = profile as EmployeeModel;
         currentEmployee.value = employee;
         userId = employee.id;
+        profileJson = employee.toJson();
         break;
+    }
+
+    // Save to local storage for persistence
+    if (saveToStorage) {
+      _storage.setString(StorageService.keyUserRole, role.value);
+      if (profileJson != null) {
+        _storage.setJson(StorageService.keyUserProfile, profileJson);
+      }
+      _storage.setBool(StorageService.keyIsLoggedIn, true);
     }
 
     // Start listening for notifications if we have a userId

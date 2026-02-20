@@ -63,22 +63,22 @@ enum LeadStatus {
 
 /// Call outcome status
 enum CallStatus {
-  connected('connected'),
-  notConnected('not_connected'),
-  busy('busy'),
-  switchedOff('switched_off'),
-  wrongNumber('wrong_number'),
-  notReachable('not_reachable');
+  completed('Completed'),
+  declinedOrFailed('Declined or Failed'),
+  busy('Busy'),
+  switchedOff('Switched Off'),
+  wrongNumber('Wrong Number'),
+  notReachable('Not Reachable');
 
   final String value;
   const CallStatus(this.value);
 
   String get displayName {
     switch (this) {
-      case CallStatus.connected:
-        return 'Connected';
-      case CallStatus.notConnected:
-        return 'Not Connected';
+      case CallStatus.completed:
+        return 'Completed';
+      case CallStatus.declinedOrFailed:
+        return 'Declined or Failed';
       case CallStatus.busy:
         return 'Busy';
       case CallStatus.switchedOff:
@@ -91,10 +91,23 @@ enum CallStatus {
   }
 
   static CallStatus fromString(String value) {
-    return CallStatus.values.firstWhere(
-      (e) => e.value == value,
-      orElse: () => CallStatus.notConnected,
-    );
+    // Exact match
+    for (var status in CallStatus.values) {
+      if (status.value.toLowerCase() == value.toLowerCase()) {
+        return status;
+      }
+    }
+    
+    // Fallback mappings
+    final lower = value.toLowerCase();
+    if (lower.contains('completed') || lower.contains('connected')) {
+      return CallStatus.completed;
+    }
+    if (lower.contains('declined') || lower.contains('failed') || lower.contains('no_answer') || lower.contains('not_connected')) {
+      return CallStatus.declinedOrFailed;
+    }
+
+    return CallStatus.declinedOrFailed;
   }
 }
 
@@ -104,7 +117,7 @@ enum CallLeadStatus {
   notInterested('not_interested'),
   followUp('follow_up'),
   callback('callback'),
-  converted('converted'),
+  visiting('visiting'),
   closed('closed');
 
   final String value;
@@ -120,8 +133,8 @@ enum CallLeadStatus {
         return 'Follow Up';
       case CallLeadStatus.callback:
         return 'Callback';
-      case CallLeadStatus.converted:
-        return 'Converted';
+      case CallLeadStatus.visiting:
+        return 'Visiting';
       case CallLeadStatus.closed:
         return 'Closed';
     }

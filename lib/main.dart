@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
+import 'package:easy_callers_mobile/core/services/storage_service.dart';
+import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/features/employee/services/notification_service.dart';
 import 'package:easy_callers_mobile/app/routes/app_pages.dart';
 import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 import 'package:easy_callers_mobile/app/bindings/initial_binding.dart';
+import 'package:easy_callers_mobile/core/utils/enums.dart';
+
+import 'features/employee/controllers/call_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,14 +23,39 @@ void main() async {
   final notificationService = await NotificationService().init();
   Get.put(notificationService);
 
+  // Initialize storage service
+  final storageService = await StorageService.init();
+  Get.put(storageService);
+
+  // Initialize Auth service and restore session
+  final authService = Get.put(AuthService(), permanent: true);
+  final role = await authService.restoreSession();
+
+  // Determine initial route
+  String initialRoute = AppRoutes.login;
+  if (role != null) {
+    switch (role) {
+      case UserRole.superAdmin:
+        initialRoute = AppRoutes.superAdminDashboard;
+        break;
+      case UserRole.manager:
+        initialRoute = AppRoutes.managerDashboard;
+        break;
+      case UserRole.employee:
+        initialRoute = AppRoutes.employeeDashboard;
+        break;
+    }
+  }
+
   // Register CallController (platform channel for calls)
   Get.put(CallController());
 
-  runApp(const MyApp());
+  runApp(MyApp(initialRoute: initialRoute));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String initialRoute;
+  const MyApp({super.key, required this.initialRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +69,7 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.light,
       ),
       initialBinding: InitialBinding(),
-      initialRoute: AppRoutes.login,
+      initialRoute: initialRoute,
       getPages: AppPages.pages,
     );
   }
@@ -48,85 +77,85 @@ class MyApp extends StatelessWidget {
 
 /// Platform channel controller for native calling, WhatsApp, and SMS.
 /// Kept from the original codebase.
-class CallController extends GetxController {
-  final numberController = TextEditingController();
-  final callLog = ''.obs;
-
-  static const MethodChannel _platform =
-      MethodChannel('com.easy_callers/call');
-
-  makeCallForIos(String number) async {
-    await _platform.invokeMethod('startCall', number);
-
-    _platform.setMethodCallHandler((call) async {
-      if (call.method == 'callEnded') {
-        String duration = call.arguments;
-        print("⏱️ Call duration: $duration");
-      }
-    });
-  }
-
-  launchWhatsAppChatForIos(String number,
-      {String message = "Hello"}) async {
-    try {
-      await _platform.invokeMethod('whatsappChat', {
-        'number': number,
-        'message': message,
-      });
-    } catch (e) {
-      print("Failed to open WhatsApp: $e");
-    }
-  }
-
-  Future<void> makeCall({String? phoneNumber}) async {
-    final number = phoneNumber ?? numberController.text.trim();
-    if (number.isEmpty) {
-      Get.snackbar('Error', 'Please enter a number');
-      return;
-    }
-
-    try {
-      final dynamic logData =
-          await _platform.invokeMethod('startCall', {'number': number});
-      
-      if (logData is Map) {
-        callLog.value = logData['display_string'] ?? 'Call finished';
-      } else if (logData is String) {
-        callLog.value = logData;
-      } else {
-        callLog.value = 'No call log received';
-      }
-    } on PlatformException catch (e) {
-      Get.snackbar('Error', 'Failed to start call: ${e.message}');
-    }
-  }
-
-  Future<void> sendWhatsAppMessage(
-      List<String> numbers, String message) async {
-    try {
-      await _platform.invokeMethod('sendBulkWhatsAppMessages', {
-        'numbers': numbers,
-        'message': message,
-      });
-    } catch (e) {
-      print("Error sending messages: $e");
-    }
-  }
-
-  static Future<void> sendSMS(String number, String message) async {
-    try {
-      await _platform.invokeMethod('sendSMS', {
-        'number': number,
-        'message': message,
-      });
-    } on PlatformException catch (e) {
-      print("Failed to send SMS: ${e.message}");
-    }
-  }
-
-  @override
-  void onClose() {
-    numberController.dispose();
-    super.onClose();
-  }
-}
+// class CallController extends GetxController {
+//   final numberController = TextEditingController();
+//   final callLog = ''.obs;
+//
+//   static const MethodChannel _platform =
+//       MethodChannel('com.easy_callers/call');
+//
+//   makeCallForIos(String number) async {
+//     await _platform.invokeMethod('startCall', number);
+//
+//     _platform.setMethodCallHandler((call) async {
+//       if (call.method == 'callEnded') {
+//         String duration = call.arguments;
+//         print("⏱️ Call duration: $duration");
+//       }
+//     });
+//   }
+//
+//   launchWhatsAppChatForIos(String number,
+//       {String message = "Hello"}) async {
+//     try {
+//       await _platform.invokeMethod('whatsappChat', {
+//         'number': number,
+//         'message': message,
+//       });
+//     } catch (e) {
+//       print("Failed to open WhatsApp: $e");
+//     }
+//   }
+//
+//   Future<void> makeCall({String? phoneNumber}) async {
+//     final number = phoneNumber ?? numberController.text.trim();
+//     if (number.isEmpty) {
+//       Get.snackbar('Error', 'Please enter a number');
+//       return;
+//     }
+//
+//     try {
+//       final dynamic logData =
+//           await _platform.invokeMethod('startCall', {'number': number});
+//
+//       if (logData is Map) {
+//         callLog.value = logData['display_string'] ?? 'Call finished';
+//       } else if (logData is String) {
+//         callLog.value = logData;
+//       } else {
+//         callLog.value = 'No call log received';
+//       }
+//     } on PlatformException catch (e) {
+//       Get.snackbar('Error', 'Failed to start call: ${e.message}');
+//     }
+//   }
+//
+//   Future<void> sendWhatsAppMessage(
+//       List<String> numbers, String message) async {
+//     try {
+//       await _platform.invokeMethod('sendBulkWhatsAppMessages', {
+//         'numbers': numbers,
+//         'message': message,
+//       });
+//     } catch (e) {
+//       print("Error sending messages: $e");
+//     }
+//   }
+//
+//   static Future<void> sendSMS(String number, String message) async {
+//     try {
+//       await _platform.invokeMethod('sendSMS', {
+//         'number': number,
+//         'message': message,
+//       });
+//     } on PlatformException catch (e) {
+//       print("Failed to send SMS: ${e.message}");
+//     }
+//   }
+//
+//   @override
+//   void onClose() {
+//     numberController.dispose();
+//     super.onClose();
+//   }
+// }

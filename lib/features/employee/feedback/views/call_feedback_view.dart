@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:easy_callers_mobile/features/employee/feedback/controllers/call_feedback_controller.dart';
+import 'package:easy_callers_mobile/features/employee/models/lead_status_model.dart';
 import 'package:intl/intl.dart';
 
 class CallFeedbackView extends GetView<CallFeedbackController> {
@@ -110,15 +111,21 @@ class CallFeedbackView extends GetView<CallFeedbackController> {
   }
 
   Widget _buildLeadStatusChips() {
-    return Wrap(
+    return Obx(() => Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: CallLeadStatus.values.map((status) => _buildStatusChip<CallLeadStatus>(status)).toList(),
-    );
+      children: controller.availableLeadStatuses.map((status) => _buildStatusChip<LeadStatusModel>(status)).toList(),
+    ));
   }
 
   Widget _buildStatusChip<T>(T status) {
-    final String label = status is CallStatus ? status.displayName : (status as CallLeadStatus).displayName;
+    String label = '';
+    if (status is CallStatus) {
+      label = status.displayName;
+    } else if (status is LeadStatusModel) {
+      label = status.displayName;
+    }
+
     return Obx(() {
       final bool isSelected = (status is CallStatus) 
           ? controller.callStatus.value == status 
@@ -129,7 +136,7 @@ class CallFeedbackView extends GetView<CallFeedbackController> {
           if (status is CallStatus) {
             controller.callStatus.value = status;
           } else {
-            controller.leadStatus.value = status as CallLeadStatus;
+            controller.leadStatus.value = status;
           }
         },
         borderRadius: BorderRadius.circular(12),
@@ -179,7 +186,15 @@ class CallFeedbackView extends GetView<CallFeedbackController> {
   Widget _buildFollowUpPicker() {
     return Obx(() {
       final status = controller.leadStatus.value;
-      if (status != CallLeadStatus.followUp && status != CallLeadStatus.callback) {
+      
+      bool showFollowUp = false;
+      if (status is LeadStatusModel) {
+        showFollowUp = status.leadStatusMapping == 'follow_up' || status.value == 'callback' || status.value == 'follow_up';
+      } else if (status is CallLeadStatus) {
+        showFollowUp = status == CallLeadStatus.followUp || status == CallLeadStatus.callback;
+      }
+      
+      if (!showFollowUp) {
         return const SizedBox.shrink();
       }
       

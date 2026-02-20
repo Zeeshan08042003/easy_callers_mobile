@@ -7,6 +7,8 @@ import 'package:easy_callers_mobile/features/employee/views/call_history_view.da
 import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
 
+import '../../../../core/utils/enums.dart';
+
 class EmployeeDashboardController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();
   final AuthService _authService = Get.find<AuthService>();
@@ -15,9 +17,15 @@ class EmployeeDashboardController extends GetxController {
   final RxList<LeadModel> pendingFollowups = <LeadModel>[].obs;
   final RxMap<String, dynamic> todayStats = <String, dynamic>{}.obs;
   final RxBool isLoading = false.obs;
+  final RxBool isLoadingMore = false.obs;
+  final RxBool hasMoreLeads = true.obs;
   final RxInt currentNavIndex = 0.obs;
+  
+  int _currentPage = 1;
+  final int _pageSize = 15;
 
   // Stats observables
+  final RxInt totalLeadsCount = 0.obs;
   final RxInt pendingLeadsCount = 0.obs;
   final RxInt contactedLeadsCount = 0.obs;
   final RxDouble dailyProgress = 0.0.obs;
@@ -62,19 +70,30 @@ class EmployeeDashboardController extends GetxController {
   Future<void> refreshData() async {
     try {
       isLoading.value = true;
+      _currentPage = 1;
+      hasMoreLeads.value = true;
+      
       final employeeId = _authService.currentEmployee.value?.id;
       if (employeeId == null) return;
 
       // Parallel fetch
       final results = await Future.wait([
-        _leadService.getLeadsByEmployee(employeeId),
+        _leadService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize),
         _leadService.getTodayFollowUps(employeeId),
         _getEmployeeStats(employeeId),
+        _leadService.getLeadsCountByEmployee(employeeId),
+        _leadService.getLeadsCountByEmployee(employeeId, status: LeadStatus.assigned),
       ]);
 
       assignedLeads.value = results[0] as List<LeadModel>;
       pendingFollowups.value = results[1] as List<LeadModel>;
       todayStats.value = results[2] as Map<String, dynamic>;
+      totalLeadsCount.value = results[3] as int;
+      pendingLeadsCount.value = results[4] as int;
+
+      if (assignedLeads.length < _pageSize) {
+        hasMoreLeads.value = false;
+      }
 
       // Update stats
       _updateStats();
@@ -82,6 +101,36 @@ class EmployeeDashboardController extends GetxController {
       Get.snackbar('Error', 'Failed to refresh dashboard: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> loadMoreLeads() async {
+    if (isLoadingMore.value || !hasMoreLeads.value) return;
+
+    try {
+      isLoadingMore.value = true;
+      final employeeId = _authService.currentEmployee.value?.id;
+      if (employeeId == null) return;
+
+      _currentPage++;
+      final moreLeads = await _leadService.getLeadsByEmployee(
+        employeeId, 
+        page: _currentPage, 
+        pageSize: _pageSize
+      );
+
+      if (moreLeads.isEmpty) {
+        hasMoreLeads.value = false;
+      } else {
+        assignedLeads.addAll(moreLeads);
+        if (moreLeads.length < _pageSize) {
+          hasMoreLeads.value = false;
+        }
+      }
+    } catch (e) {
+      // Error is handled by refreshData if needed
+    } finally {
+      isLoadingMore.value = false;
     }
   }
 
@@ -99,8 +148,20 @@ class EmployeeDashboardController extends GetxController {
       );
 
       final totalCalls = callLogs.length;
-      final connectedCalls = callLogs.where((log) => log.callStatus?.value == 'connected').length;
-      final interestedLeads = callLogs.where((log) => log.leadStatus?.value == 'interested').length;
+      final connectedCalls = callLogs.where((log) {
+        final status = log.callStatus?.toLowerCase() ?? '';
+        return status.contains('completed') || status.contains('connected');
+      }).length;
+      final interestedLeads = callLogs.where((log) {
+        if (log.leadStatus == null) return false;
+        if (log.leadStatus is String) {
+          return log.leadStatus == 'interested';
+        }
+        if (log.leadStatus is CallLeadStatus) {
+          return (log.leadStatus as CallLeadStatus).value == 'interested';
+        }
+        return false;
+      }).length;
 
       return {
         'calls_today': totalCalls,
@@ -110,7 +171,6 @@ class EmployeeDashboardController extends GetxController {
         'conversion_rate': totalCalls > 0 ? (interestedLeads / totalCalls) * 100 : 0.0,
       };
     } catch (e) {
-      print('Error getting employee stats: $e');
       return {
         'calls_today': 0,
         'connected_today': 0,
@@ -122,11 +182,6 @@ class EmployeeDashboardController extends GetxController {
   }
 
   void _updateStats() {
-    // Count pending leads (assigned but not contacted)
-    pendingLeadsCount.value = assignedLeads.where((lead) {
-      return lead.status.value == 'assigned' || lead.status.value == 'new';
-    }).length;
-
     // Count contacted leads (from today's stats)
     contactedLeadsCount.value = todayStats['calls_today'] ?? 0;
 

@@ -4,6 +4,7 @@ import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 import 'package:easy_callers_mobile/features/auth/views/login_screen.dart';
 import 'package:easy_callers_mobile/features/auth/views/otp_screen.dart';
 import 'package:easy_callers_mobile/features/auth/views/set_password_screen.dart';
+import 'package:easy_callers_mobile/features/auth/views/manager_registration_view.dart';
 
 // These will be uncommented as the screens are built
 import 'package:easy_callers_mobile/features/super_admin/dashboard/views/super_admin_dashboard_view.dart';
@@ -57,6 +58,10 @@ class AppPages {
     GetPage(
       name: AppRoutes.setPassword,
       page: () => const SetPasswordScreen(),
+    ),
+    GetPage(
+      name: AppRoutes.managerRegistration,
+      page: () => const ManagerRegistrationView(),
     ),
 
     // Super Admin

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:easy_callers_mobile/features/employee/controllers/call_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/manager/models/lead_model.dart';
@@ -5,28 +8,42 @@ import 'package:easy_callers_mobile/features/employee/models/call_log_model.dart
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
-import 'package:flutter/services.dart';
+
+import 'package:easy_callers_mobile/features/employee/models/lead_status_model.dart';
+import '../models/call_session_model.dart';
 
 class LeadDetailController extends GetxController {
-  static const platform = MethodChannel('com.easy_callers/call');
+  // static const platform = MethodChannel('com.easy_callers/call');
   final LeadModel lead;
   final LeadService _leadService = Get.find<LeadService>();
   final AuthService _authService = Get.find<AuthService>();
-
+  final Rx<CallSession?> lastCallSession = Rx<CallSession?>(null);
   LeadDetailController({required this.lead});
 
   final RxString selectedStatus = ''.obs;
+  final RxList<LeadStatusModel> availableLeadStatuses = <LeadStatusModel>[].obs;
   final RxBool followUpEnabled = false.obs;
   final Rx<DateTime?> followUpDate = Rx<DateTime?>(null);
   final RxBool isLoading = false.obs;
   final RxInt callDurationSeconds = 0.obs;
   final TextEditingController notesController = TextEditingController();
-
+  var callController = Get.find<CallController>();
   @override
   void onInit() {
     super.onInit();
     // Set initial status based on lead status
     selectedStatus.value = lead.status.value;
+    fetchLeadStatuses();
+  }
+
+  Future<void> fetchLeadStatuses() async {
+    try {
+      final managerId = _authService.currentEmployee.value?.managerId;
+      final statuses = await _leadService.getLeadStatuses(managerId);
+      availableLeadStatuses.assignAll(statuses);
+    } catch (e) {
+      print('Error loading statuses: $e');
+    }
   }
 
   @override
@@ -35,60 +52,63 @@ class LeadDetailController extends GetxController {
     super.onClose();
   }
 
+
   Future<void> makeCall() async {
     try {
-      final dynamic result = await platform.invokeMethod('startCall', {
-        'number': lead.phone,
-      });
-      
-      if (result != null && result is Map) {
-        final Map<dynamic, dynamic> callData = result;
-        notesController.text = callData['display_string'] ?? '';
-        
-        final bool isConnected = callData['is_connected'] ?? false;
-        final int duration = (callData['duration'] as num?)?.toInt() ?? 0;
-        callDurationSeconds.value = duration;
+      CallSession? session;
 
-        if (!isConnected) {
-          // If call was declined or failed, auto-select "No Answer"
-          selectedStatus.value = 'no_answer';
-        } else {
-          // If call was successful, check duration
-          if (duration > 30) {
-            selectedStatus.value = 'interested';
-          } else if (selectedStatus.value == 'no_answer' || selectedStatus.value == '') {
-            // If it was connected but short, at least move it away from "no_answer"
-            selectedStatus.value = 'callback';
-          }
-        }
-      }
-    } on PlatformException catch (e) {
-      if (e.code == 'PERMISSION_DENIED') {
-        Get.snackbar('Permission Denied', 'Please grant call permissions in settings');
+      if (Platform.isIOS) {
+        session = await callController.makeCallForIos(
+          phoneNumber: lead.phone,
+        );
       } else {
-        Get.snackbar('Error', 'Failed to start call: ${e.message}');
+        session = await callController.makeCall(
+          phoneNumber: lead.phone,
+        );
       }
+
+      if (session == null) {
+        selectedStatus.value = 'no_answer';
+        callDurationSeconds.value = 0;
+        lastCallSession.value = null;
+        return;
+      }
+
+      lastCallSession.value = session;
+      callDurationSeconds.value = session.durationInSeconds;
+      // Save duration
+      callDurationSeconds.value = session.durationInSeconds;
+
+      // Business decision
+      if (!session.isConnected) {
+        selectedStatus.value = 'callback';
+      } else if (session.durationInSeconds > 30) {
+        selectedStatus.value = 'interested';
+      } else {
+        selectedStatus.value = 'callback';
+      }
+
+    } catch (e) {
+      print("object $e");
+      Get.snackbar("Error", "Call failed: $e");
     }
   }
 
-  Future<void> sendSMS() async {
-    try {
-      await platform.invokeMethod('sendSMS', {
-        'number': lead.phone,
-        'message': 'Hello ${lead.name}, ',
-      });
-    } on PlatformException catch (e) {
-      Get.snackbar('Error', 'Failed to send SMS: ${e.message}');
+
+
+  whatsappMsg() {
+    if (Platform.isIOS) {
+      callController.launchWhatsAppChatForIos(lead.phone);
+    } else {
+      callController.sendWhatsAppMessage([lead.phone], "Hello");
     }
   }
 
-  Future<void> whatsappCall() async {
-    try {
-      await platform.invokeMethod('whatsappCall', {
-        'number': lead.phone,
-      });
-    } on PlatformException catch (e) {
-      Get.snackbar('Error', 'Failed to start WhatsApp call: ${e.message}');
+  sendMobileSMS(){
+    if (Platform.isIOS) {
+      callController.sendSMS(lead.phone,"Hello");
+    } else {
+      callController.sendSMS(lead.phone, "Hello");
     }
   }
 
@@ -102,39 +122,14 @@ class LeadDetailController extends GetxController {
         return;
       }
 
-      // Determine call status based on selected status
-      CallStatus callStatus;
-      CallLeadStatus? leadStatus;
-
-      switch (selectedStatus.value) {
-        case 'interested':
-          callStatus = CallStatus.connected;
-          leadStatus = CallLeadStatus.interested;
-          break;
-        case 'not_interested':
-          callStatus = CallStatus.connected;
-          leadStatus = CallLeadStatus.notInterested;
-          break;
-        case 'callback':
-          callStatus = CallStatus.connected;
-          leadStatus = CallLeadStatus.callback;
-          break;
-        case 'no_answer':
-          callStatus = CallStatus.notConnected;
-          leadStatus = null;
-          break;
-        default:
-          callStatus = CallStatus.connected;
-          leadStatus = null;
-      }
-
+      final session = callController.callSession.value;
       // Create call log
       final callLog = CallLogModel(
         id: '', // Will be generated by database
         leadId: lead.id,
         employeeId: employeeId,
-        callStatus: callStatus,
-        leadStatus: leadStatus,
+        callStatus: session?.status?? (lastCallSession.value?.status ?? 'Completed'),
+        leadStatus: selectedStatus.value,
         callDurationSeconds: callDurationSeconds.value,
         feedback: notesController.text.trim().isNotEmpty 
             ? notesController.text.trim() 

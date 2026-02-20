@@ -207,31 +207,32 @@ class CallHistoryView extends StatelessWidget {
     Color bgColor;
     String statusText;
 
-    final callStatusValue = log.callStatus?.value ?? 'unknown';
-    switch (callStatusValue) {
-      case 'connected':
-        icon = Icons.person_rounded;
-        iconColor = AppColors.primary;
-        bgColor = AppColors.primary.withOpacity(0.1);
-        statusText = 'Completed';
-        break;
-      case 'no_answer':
-        icon = Icons.person_outline_rounded;
-        iconColor = const Color(0xFFFF6B6B);
-        bgColor = const Color(0xFFFF6B6B).withOpacity(0.1);
-        statusText = 'No Answer';
-        break;
-      case 'busy':
-        icon = Icons.phone_missed_rounded;
-        iconColor = const Color(0xFFFFB84D);
-        bgColor = const Color(0xFFFFB84D).withOpacity(0.1);
-        statusText = 'Busy';
-        break;
-      default:
-        icon = Icons.phone_callback_rounded;
-        iconColor = AppColors.textSecondary;
-        bgColor = AppColors.cardBg;
-        statusText = 'Follow-up';
+    final callStatusValue = (log.callStatus ?? 'unknown').toLowerCase();
+    if (callStatusValue.contains('completed') || callStatusValue.contains('connected')) {
+      icon = Icons.person_rounded;
+      iconColor = AppColors.primary;
+      bgColor = AppColors.primary.withOpacity(0.1);
+      statusText = 'Completed';
+    } else if (callStatusValue.contains('no_answer') || callStatusValue.contains('declined')) {
+      icon = Icons.person_outline_rounded;
+      iconColor = const Color(0xFFFF6B6B);
+      bgColor = const Color(0xFFFF6B6B).withOpacity(0.1);
+      statusText = 'No Answer';
+    } else if (callStatusValue.contains('busy')) {
+      icon = Icons.phone_missed_rounded;
+      iconColor = const Color(0xFFFFB84D);
+      bgColor = const Color(0xFFFFB84D).withOpacity(0.1);
+      statusText = 'Busy';
+    } else if (callStatusValue.contains('failed')) {
+      icon = Icons.error_outline_rounded;
+      iconColor = const Color(0xFFFF6B6B);
+      bgColor = const Color(0xFFFF6B6B).withOpacity(0.1);
+      statusText = 'Failed';
+    } else {
+      icon = Icons.phone_callback_rounded;
+      iconColor = AppColors.textSecondary;
+      bgColor = AppColors.cardBg;
+      statusText = log.callStatus ?? 'Follow-up';
     }
 
     // Check if it's a follow-up

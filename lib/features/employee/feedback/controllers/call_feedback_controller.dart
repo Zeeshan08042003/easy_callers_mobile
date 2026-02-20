@@ -5,6 +5,8 @@ import 'package:easy_callers_mobile/features/manager/services/lead_service.dart'
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:easy_callers_mobile/features/employee/models/call_log_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/call_session_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/lead_status_model.dart';
 import 'package:uuid/uuid.dart';
 
 class CallFeedbackController extends GetxController {
@@ -12,9 +14,12 @@ class CallFeedbackController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
 
   late LeadModel lead;
+  CallSession? callSessionData;
   
   final Rx<CallStatus?> callStatus = Rx<CallStatus?>(null);
-  final Rx<CallLeadStatus?> leadStatus = Rx<CallLeadStatus?>(null);
+  final Rx<dynamic> leadStatus = Rx<dynamic>(null);
+  final RxList<LeadStatusModel> availableLeadStatuses = <LeadStatusModel>[].obs;
+  
   final TextEditingController feedbackController = TextEditingController();
   final Rx<DateTime?> followUpDate = Rx<DateTime?>(null);
   
@@ -23,10 +28,36 @@ class CallFeedbackController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    if (Get.arguments != null && Get.arguments is LeadModel) {
-      lead = Get.arguments as LeadModel;
+    final args = Get.arguments;
+    if (args != null) {
+      if (args is LeadModel) {
+        lead = args;
+      } else if (args is Map) {
+        lead = args['lead'] as LeadModel;
+        callSessionData = args['session'] as CallSession?;
+        
+        if (callSessionData != null) {
+          // Pre-populate call status from native result
+          callStatus.value = CallStatus.fromString(callSessionData!.status);
+        }
+      }
     } else {
       Get.back();
+      return;
+    }
+    fetchLeadStatuses();
+  }
+
+  Future<void> fetchLeadStatuses() async {
+    try {
+      isLoading.value = true;
+      final managerId = _authService.currentEmployee.value?.managerId;
+      final statuses = await _leadService.getLeadStatuses(managerId);
+      availableLeadStatuses.assignAll(statuses);
+    } catch (e) {
+      print('Error loading statuses: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
@@ -45,7 +76,7 @@ class CallFeedbackController extends GetxController {
         id: const Uuid().v4(),
         leadId: lead.id,
         employeeId: employeeId,
-        callStatus: callStatus.value,
+        callStatus: callStatus.value?.value,
         leadStatus: leadStatus.value,
         feedback: feedbackController.text,
         followUpDate: followUpDate.value,

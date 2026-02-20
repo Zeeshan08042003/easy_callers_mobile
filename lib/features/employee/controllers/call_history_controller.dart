@@ -68,7 +68,9 @@ class CallHistoryController extends GetxController {
 
     if (weeklyLogs.isNotEmpty) {
       final successfulCalls = weeklyLogs.where((log) {
-        return log.callStatus?.value == 'connected' &&
+        final status = log.callStatus?.toLowerCase() ?? '';
+        final isConnected = status.contains('completed') || status.contains('connected');
+        return isConnected &&
             (log.leadStatus?.value == 'interested' ||
                 log.leadStatus?.value == 'callback');
       }).length;
@@ -86,9 +88,13 @@ class CallHistoryController extends GetxController {
     switch (selectedFilter.value) {
       case 'missed':
         filtered = filtered.where((log) {
-          return log.callStatus?.value == 'no_answer' ||
-              log.callStatus?.value == 'busy' ||
-              log.callStatus?.value == 'rejected';
+          final status = log.callStatus?.toLowerCase() ?? '';
+          return status.contains('declined') ||
+              status.contains('failed') ||
+              status.contains('no_answer') ||
+              status.contains('busy') ||
+              status.contains('rejected') ||
+              status.contains('missed');
         }).toList();
         break;
       case 'followup':

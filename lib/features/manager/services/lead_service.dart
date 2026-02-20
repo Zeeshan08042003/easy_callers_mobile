@@ -10,8 +10,10 @@ import 'package:easy_callers_mobile/features/employee/models/daily_report_model.
 import 'package:easy_callers_mobile/features/employee/models/notification_model.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/lead_status_model.dart';
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for all lead-related database operations.
 /// Used by Super Admin, Manager, and Employee controllers.
@@ -224,20 +226,40 @@ class LeadService extends GetxService {
     }
   }
 
-  /// Get leads assigned to a specific employee
-  Future<List<LeadModel>> getLeadsByEmployee(String employeeId) async {
+  /// Get leads assigned to a specific employee with pagination support
+  Future<List<LeadModel>> getLeadsByEmployee(String employeeId, {int page = 1, int pageSize = 20}) async {
     try {
+      final from = (page - 1) * pageSize;
+      final to = from + pageSize - 1;
+
       final response = await _supabase.leadsTable
           .select()
           .eq('assigned_to', employeeId)
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .range(from, to);
 
       return (response as List)
           .map((json) => LeadModel.fromJson(json))
           .toList();
     } catch (e) {
-      print('Error fetching leads by employee: $e');
       return [];
+    }
+  }
+
+  Future<int> getLeadsCountByEmployee(String employeeId, {LeadStatus? status}) async {
+    try {
+      var query = _supabase.leadsTable
+          .select('id')
+          .eq('assigned_to', employeeId);
+      
+      if (status != null) {
+        query = query.eq('status', status.value);
+      }
+      
+      final response = await query;
+      return (response as List).length;
+    } catch (e) {
+      return 0;
     }
   }
 
@@ -482,7 +504,8 @@ class LeadService extends GetxService {
       final response = await _supabase.leadsTable
           .select('id')
           .eq('batch_id', batchId)
-          .eq('status', LeadStatus.newLead.value);
+          .eq('status', LeadStatus.newLead.value)
+          .limit(10000); // Increase limit to handle larger batches
 
       return (response as List).map((l) => l['id'] as String).toList();
     } catch (e) {
@@ -547,17 +570,38 @@ class LeadService extends GetxService {
 
         // Update in bulk for this employee
         if (assignedLeadIds.isNotEmpty) {
-          await _supabase.leadsTable.update({
+          await _updateLeadsInChunks(assignedLeadIds, {
             'assigned_to': employeeIds[i],
             'status': LeadStatus.assigned.value,
-          }).inFilter('id', assignedLeadIds);
+          });
         }
       }
 
       return true;
     } catch (e) {
-      print('Error splitting leads: $e');
+      print('LeadService Error splitting leads: $e');
+      if (e is PostgrestException) {
+        print('Postgrest Details: ${e.message}, ${e.details}, ${e.hint}');
+      }
       return false;
+    }
+  }
+
+  /// Helper to update leads in chunks to avoid URL length limits (400 Bad Request)
+  Future<void> _updateLeadsInChunks(List<String> leadIds, Map<String, dynamic> data) async {
+    const int chunkSize = 30; // Even smaller chunk size to be super safe
+    for (var i = 0; i < leadIds.length; i += chunkSize) {
+      final chunk = leadIds.sublist(
+        i, 
+        i + chunkSize > leadIds.length ? leadIds.length : i + chunkSize
+      );
+      
+      try {
+        await _supabase.leadsTable.update(data).inFilter('id', chunk);
+      } catch (e) {
+        print('Error updating chunk $i to ${i + chunk.length}: $e');
+        rethrow;
+      }
     }
   }
 
@@ -579,16 +623,20 @@ class LeadService extends GetxService {
 
         // Update in bulk for this employee
         if (assignedLeadIds.isNotEmpty) {
-          await _supabase.leadsTable.update({
+          // Update in chunks to avoid URL length issues
+          await _updateLeadsInChunks(assignedLeadIds, {
             'assigned_to': employeeId,
             'status': LeadStatus.assigned.value,
-          }).inFilter('id', assignedLeadIds);
+          });
         }
       }
 
       return true;
     } catch (e) {
-      print('Error custom splitting leads: $e');
+      print('LeadService Error custom splitting leads: $e');
+      if (e is PostgrestException) {
+        print('Postgrest Details: ${e.message}, ${e.details}, ${e.hint}');
+      }
       return false;
     }
   }
@@ -607,7 +655,9 @@ class LeadService extends GetxService {
 
       // Also update the lead status based on the call outcome
       if (callLog.leadStatus != null) {
-        final leadStatus = _mapCallLeadStatusToLeadStatus(callLog.leadStatus!);
+        // If it's a dynamic status (String), we need to find its mapping
+        // For backward compatibility, we still support the enum
+        final leadStatus = await _getLeadStatusMapping(callLog.leadStatus!);
         await updateLeadStatus(callLog.leadId, leadStatus);
       }
 
@@ -1097,6 +1147,91 @@ class LeadService extends GetxService {
     }
   }
 
+  /// Get dashboard statistics for a manager
+  Future<Map<String, dynamic>> getManagerDashboardStats(String managerId) async {
+    try {
+      // 1. Total leads uploaded by this manager
+      // Use .count() with CountOption.exact to bypass 1000 row limit
+      final totalLeads = await _supabase.leadsTable
+          .count(CountOption.exact)
+          .eq('uploaded_by', managerId);
+
+      // 2. Assigned leads
+      final assignedLeads = await _supabase.leadsTable
+          .count(CountOption.exact)
+          .eq('uploaded_by', managerId)
+          .not('assigned_to', 'is', null);
+
+      // 3. Performance (Converted leads / Total leads)
+      final convertedLeads = await _supabase.leadsTable
+          .count(CountOption.exact)
+          .eq('uploaded_by', managerId)
+          .eq('status', LeadStatus.converted.value);
+      
+      final performance = totalLeads > 0 
+          ? (convertedLeads / totalLeads) * 100 
+          : 0.0;
+
+      print('📊 Dashboard Stats for $managerId: total=$totalLeads, assigned=$assignedLeads, performance=$performance');
+
+      return {
+        'totalLeads': totalLeads,
+        'assignedLeads': assignedLeads,
+        'performance': performance,
+      };
+    } catch (e) {
+      print('Error fetching manager dashboard stats: $e');
+      return {
+        'totalLeads': 0,
+        'assignedLeads': 0,
+        'performance': 0.0,
+      };
+    }
+  }
+
+  /// Get simplified team performance for manager dashboard
+  Future<List<Map<String, dynamic>>> getManagerTeamStats(String managerId) async {
+    try {
+      final employees = await getEmployeesByManager(managerId);
+      final List<Map<String, dynamic>> teamStats = [];
+
+      for (final emp in employees) {
+        // Get today's report
+        final today = DateTime.now().toIso8601String().split('T')[0];
+        final reportResponse = await _supabase.client
+            .from('daily_reports')
+            .select()
+            .eq('employee_id', emp.id)
+            .eq('report_date', today)
+            .maybeSingle();
+
+        int callsCount = 0;
+        double progress = 0.0;
+        int statusColor = 0xFFF59E0B; // Orange (Away/Idle) by default
+
+        if (reportResponse != null) {
+          callsCount = reportResponse['total_calls'] ?? 0;
+          // Progress is calls / daily target (mocked target of 50)
+          progress = (callsCount / 50).clamp(0.0, 1.0);
+          if (callsCount > 0) statusColor = 0xFF10B981; // Green (Active)
+        }
+
+        teamStats.add({
+          'name': emp.fullName,
+          'calls': '$callsCount Calls',
+          'progress': progress,
+          'status': callsCount > 0 ? 'Active' : 'Idle',
+          'statusColor': statusColor,
+        });
+      }
+
+      return teamStats;
+    } catch (e) {
+      print('Error fetching team stats: $e');
+      return [];
+    }
+  }
+
   // ============================================
   // SUPER ADMIN QUERIES
   // ============================================
@@ -1223,6 +1358,54 @@ class LeadService extends GetxService {
   // HELPERS
   // ============================================
 
+  // ============================================
+  // DYNAMIC LEAD STATUSES
+  // ============================================
+
+  /// Get available lead statuses for a manager/employee
+  Future<List<LeadStatusModel>> getLeadStatuses(String? managerId) async {
+    try {
+      var query = _supabase.client.from('lead_statuses').select().eq('is_active', true);
+      
+      if (managerId != null) {
+        // Fetch global statuses (manager_id is null) OR statuses for this specific manager
+        query = query.or('manager_id.is.null,manager_id.eq.$managerId');
+      } else {
+        query = query.isFilter('manager_id', null);
+      }
+
+      final response = await query.order('created_at', ascending: true);
+      return (response as List).map((json) => LeadStatusModel.fromJson(json)).toList();
+    } catch (e) {
+      print('Error fetching lead statuses: $e');
+      return [];
+    }
+  }
+
+  Future<LeadStatus> _getLeadStatusMapping(dynamic callLeadStatus) async {
+    if (callLeadStatus is CallLeadStatus) {
+      return _mapCallLeadStatusToLeadStatus(callLeadStatus);
+    }
+    
+    // If it's a string, look it up in the database or use a fallback
+    final statusValue = callLeadStatus.toString();
+    try {
+      final response = await _supabase.client
+          .from('lead_statuses')
+          .select('lead_status_mapping')
+          .eq('value', statusValue)
+          .maybeSingle();
+      
+      if (response != null && response['lead_status_mapping'] != null) {
+        return LeadStatus.fromString(response['lead_status_mapping']);
+      }
+    } catch (e) {
+       print('Error getting lead status mapping for $statusValue: $e');
+    }
+
+    return LeadStatus.followUp; // Default fallback
+  }
+
   LeadStatus _mapCallLeadStatusToLeadStatus(CallLeadStatus callLeadStatus) {
     switch (callLeadStatus) {
       case CallLeadStatus.interested:
@@ -1233,7 +1416,7 @@ class LeadService extends GetxService {
         return LeadStatus.followUp;
       case CallLeadStatus.callback:
         return LeadStatus.followUp;
-      case CallLeadStatus.converted:
+      case CallLeadStatus.visiting:
         return LeadStatus.converted;
       case CallLeadStatus.closed:
         return LeadStatus.closed;

@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:easy_callers_mobile/features/auth/controllers/auth_controller.dart';
-import 'package:easy_callers_mobile/features/auth/views/manager_registration_view.dart';
-import 'package:easy_callers_mobile/app/routes/app_routes.dart';
+import 'package:easy_callers_mobile/features/auth/controllers/manager_registration_controller.dart';
 
-/// Login screen used by all roles (Super Admin, Manager, Employee)
-class NewLoginScreen extends StatelessWidget {
-  const NewLoginScreen({super.key});
+class ManagerRegistrationView extends StatelessWidget {
+  const ManagerRegistrationView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(AuthController());
+    final controller = Get.put(ManagerRegistrationController());
 
     return Scaffold(
       backgroundColor: const Color(0xffFFFFFF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xff2D201C)),
+          onPressed: () => Get.back(),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -21,11 +26,11 @@ class NewLoginScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 20),
 
                 // Title
                 const Text(
-                  "Welcome\nBack",
+                  "Manager\nRegistration",
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 36,
@@ -37,14 +42,37 @@ class NewLoginScreen extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 Text(
-                  "Login to continue managing your leads",
+                  "Create your organization account and start managing your team",
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
                   ),
                 ),
 
-                const SizedBox(height: 50),
+                const SizedBox(height: 40),
+
+                // Name fields in a row
+                Row(
+                  children: [
+                    Expanded(
+                      child: Obx(() => _buildTextField(
+                            label: "First Name",
+                            error: controller.firstNameError.value,
+                            onChanged: (val) => controller.firstName.value = val,
+                          )),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Obx(() => _buildTextField(
+                            label: "Last Name",
+                            error: controller.lastNameError.value,
+                            onChanged: (val) => controller.lastName.value = val,
+                          )),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
 
                 // Email field
                 Obx(() => _buildTextField(
@@ -56,6 +84,16 @@ class NewLoginScreen extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
+                // Phone field (optional)
+                _buildTextField(
+                  label: "Phone (Optional)",
+                  error: "",
+                  keyboardType: TextInputType.phone,
+                  onChanged: (val) => controller.phone.value = val,
+                ),
+
+                const SizedBox(height: 16),
+
                 // Password field
                 Obx(() => _buildTextField(
                       label: "Password",
@@ -64,35 +102,26 @@ class NewLoginScreen extends StatelessWidget {
                       onChanged: (val) => controller.password.value = val,
                     )),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
-                // Employee OTP link
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: () => controller.goToOTPScreen(),
-                    child: const Text(
-                      "First time employee? Verify OTP",
-                      style: TextStyle(
-                        color: Color(0xff2D201C),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ),
+                // Confirm Password field
+                Obx(() => _buildTextField(
+                      label: "Confirm Password",
+                      error: controller.confirmPasswordError.value,
+                      isPassword: true,
+                      onChanged: (val) => controller.confirmPassword.value = val,
+                    )),
 
                 const SizedBox(height: 40),
 
-                // Login button
+                // Register button
                 Obx(() => SizedBox(
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
                         onPressed: controller.isLoading.value
                             ? null
-                            : () => controller.login(),
+                            : () => controller.register(),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xff2D201C),
                           foregroundColor: Colors.white,
@@ -111,7 +140,7 @@ class NewLoginScreen extends StatelessWidget {
                                 ),
                               )
                             : const Text(
-                                "LOGIN",
+                                "REGISTER",
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -142,37 +171,8 @@ class NewLoginScreen extends StatelessWidget {
                         ),
                       )
                     : const SizedBox.shrink()),
-
-                const SizedBox(height: 30),
-
-                // Register link
-                Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Are you a company owner? ",
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Get.toNamed(AppRoutes.managerRegistration),
-                        child: const Text(
-                          "Register as Manager",
-                          style: TextStyle(
-                            color: Color(0xff2D201C),
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
+                
+                const SizedBox(height: 40),
               ],
             ),
           ),
@@ -193,14 +193,15 @@ class NewLoginScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xff2D201C),
+        if (label.isNotEmpty)
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xff2D201C),
+            ),
           ),
-        ),
         const SizedBox(height: 6),
         Obx(() => TextField(
               onChanged: onChanged,
@@ -209,7 +210,7 @@ class NewLoginScreen extends StatelessWidget {
               cursorColor: const Color(0xff2D201C),
               style: const TextStyle(fontSize: 15),
               decoration: InputDecoration(
-                hintText: isPassword ? '••••••' : 'Enter your $label',
+                hintText: isPassword ? '••••••' : (label.contains('Optional') ? 'Optional' : 'Enter $label'),
                 hintStyle: TextStyle(color: Colors.grey.shade400),
                 filled: true,
                 fillColor: Colors.grey.shade50,

@@ -3,6 +3,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String otpVerification = '/otp-verification';
   static const String setPassword = '/set-password';
+  static const String managerRegistration = '/manager-registration';
 
   // Super Admin
   static const String superAdminDashboard = '/super-admin/dashboard';
