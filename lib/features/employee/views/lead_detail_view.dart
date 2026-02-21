@@ -17,7 +17,8 @@ class LeadDetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(LeadDetailController(lead: lead));
+    // Use unique tag per lead so each lead gets a fresh controller
+    final controller = Get.put(LeadDetailController(lead: lead), tag: lead.id);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -69,6 +70,8 @@ class LeadDetailView extends StatelessWidget {
             _buildCallDynamicStatus(controller),
             const SizedBox(height: 32),
             _buildUpdateCallStatus(controller),
+            const SizedBox(height: 16),
+            _buildVisitingDateTimePicker(controller),
             const SizedBox(height: 32),
             _buildCallSummary(controller),
             const SizedBox(height: 32),
@@ -275,62 +278,286 @@ class LeadDetailView extends StatelessWidget {
 
   //will show proper call log report over here
   Widget _buildLeadInfo(LeadDetailController controller) {
-    return Visibility(
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildInfoCard(
-              label: 'LAST CONTACTED',
-              value: '2 days ago',
-              icon: Icons.access_time_rounded,
+    return Obx(() {
+      if (controller.isLoadingLastCall.value) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 20, height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
             ),
-          )
-        ],
-      ),
-    );
+          ),
+        );
+      }
+
+      final lastCall = controller.lastCallLog.value;
+      if (lastCall == null) {
+        // No previous call — hide the section
+        return const SizedBox.shrink();
+      }
+
+      // Calculate relative time
+      final diff = DateTime.now().difference(lastCall.createdAt);
+      String lastContactedStr;
+      if (diff.inMinutes < 1) {
+        lastContactedStr = 'Just now';
+      } else if (diff.inMinutes < 60) {
+        lastContactedStr = '${diff.inMinutes} min ago';
+      } else if (diff.inHours < 24) {
+        lastContactedStr = '${diff.inHours} hour${diff.inHours > 1 ? 's' : ''} ago';
+      } else if (diff.inDays < 7) {
+        lastContactedStr = '${diff.inDays} day${diff.inDays > 1 ? 's' : ''} ago';
+      } else {
+        lastContactedStr = DateFormat('dd MMM yyyy').format(lastCall.createdAt);
+      }
+
+      // Call status
+      final callStatusValue = (lastCall.callStatus ?? 'Unknown').toLowerCase();
+      String callStatusLabel;
+      Color callStatusColor;
+      if (callStatusValue.contains('completed') || callStatusValue.contains('connected')) {
+        callStatusLabel = 'Connected';
+        callStatusColor = AppColors.success;
+      } else if (callStatusValue.contains('declined') || callStatusValue.contains('failed')) {
+        callStatusLabel = 'Declined / Failed';
+        callStatusColor = const Color(0xFFFF6B6B);
+      } else if (callStatusValue.contains('busy')) {
+        callStatusLabel = 'Busy';
+        callStatusColor = const Color(0xFFFFB84D);
+      } else {
+        callStatusLabel = lastCall.callStatus ?? 'Unknown';
+        callStatusColor = AppColors.textSecondary;
+      }
+
+      // Lead status
+      final leadStatusStr = lastCall.leadStatus?.toString() ?? '';
+      String? leadStatusLabel;
+      Color? leadStatusColor;
+      if (leadStatusStr == 'visiting') {
+        leadStatusLabel = 'Visiting';
+        leadStatusColor = AppColors.success;
+      } else if (leadStatusStr == 'interested') {
+        leadStatusLabel = 'Interested';
+        leadStatusColor = AppColors.success;
+      } else if (leadStatusStr == 'not_interested') {
+        leadStatusLabel = 'Not Interested';
+        leadStatusColor = const Color(0xFFFF6B6B);
+      } else if (leadStatusStr == 'callback' || leadStatusStr == 'follow_up') {
+        leadStatusLabel = leadStatusStr == 'callback' ? 'Callback' : 'Follow-up';
+        leadStatusColor = const Color(0xFFFFB84D);
+      } else if (leadStatusStr == 'closed') {
+        leadStatusLabel = 'Closed';
+        leadStatusColor = AppColors.textSecondary;
+      } else if (leadStatusStr.isNotEmpty) {
+        leadStatusLabel = leadStatusStr;
+        leadStatusColor = AppColors.textSecondary;
+      }
+
+      // Duration
+      final durationSecs = lastCall.callDurationSeconds;
+      final durationStr = durationSecs > 0
+          ? '${durationSecs ~/ 60}m ${durationSecs % 60}s'
+          : '0s';
+
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header: "Last Connected" with time
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.history_rounded, color: AppColors.primary, size: 18),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'LAST CONNECTED',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                Text(
+                  lastContactedStr,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Divider(color: Colors.white.withOpacity(0.05), height: 1),
+            const SizedBox(height: 14),
+
+            // Call Status Row
+            Row(
+              children: [
+                _buildReportLabel('Call Status'),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: callStatusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    callStatusLabel,
+                    style: TextStyle(
+                      color: callStatusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Lead Status Row
+            if (leadStatusLabel != null) ...[
+              Row(
+                children: [
+                  _buildReportLabel('Lead Status'),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: leadStatusColor!.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      leadStatusLabel,
+                      style: TextStyle(
+                        color: leadStatusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // Duration Row
+            Row(
+              children: [
+                _buildReportLabel('Duration'),
+                const Spacer(),
+                Text(
+                  durationStr,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Date/Time Row
+            Row(
+              children: [
+                _buildReportLabel('Date & Time'),
+                const Spacer(),
+                Text(
+                  DateFormat('dd MMM yyyy, hh:mm a').format(lastCall.createdAt),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+
+            // Notes
+            if (lastCall.feedback != null && lastCall.feedback!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Divider(color: Colors.white.withOpacity(0.05), height: 1),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.note_rounded, size: 14, color: AppColors.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      lastCall.feedback!,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // Follow-up / Visiting date
+            if (lastCall.followUpDate != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(
+                    leadStatusStr == 'visiting' ? Icons.location_on_rounded : Icons.event_rounded,
+                    size: 14,
+                    color: leadStatusStr == 'visiting' ? AppColors.success : const Color(0xFFFFB84D),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    leadStatusStr == 'visiting'
+                        ? 'Visit: ${DateFormat('dd MMM yyyy, hh:mm a').format(lastCall.followUpDate!)}'
+                        : 'Follow-up: ${DateFormat('dd MMM yyyy').format(lastCall.followUpDate!)}',
+                    style: TextStyle(
+                      color: leadStatusStr == 'visiting' ? AppColors.success : const Color(0xFFFFB84D),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      );
+    });
   }
 
-  Widget _buildInfoCard({
-    required String label,
-    required String value,
-    required IconData icon,
-    Color? valueColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              Icon(icon, color: AppColors.textSecondary, size: 16),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor ?? Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+  Widget _buildReportLabel(String label) {
+    return Text(
+      label,
+      style: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 12,
       ),
     );
   }
@@ -360,23 +587,29 @@ class LeadDetailView extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemBuilder: (context, index) {
-                final status = controller.availableLeadStatuses[index];
-                Color chipColor = AppColors.primary;
-                
-                // Keep some default colors
-                if (status.value == 'interested') chipColor = AppColors.success;
-                if (status.value == 'not_interested') chipColor = const Color(0xFFFF6B6B);
-                if (status.value == 'follow_up') chipColor = AppColors.warning;
-                if (status.value == 'closed') chipColor = AppColors.danger;
-                if (status.value == 'visiting') chipColor = AppColors.success;
+            final status = controller.availableLeadStatuses[index];
 
-                return _buildStatusChip(
-                  label: status.displayName,
-                  isSelected: controller.selectedStatus.value == status.value,
-                  onTap: () => controller.selectedStatus.value = status.value,
-                  color: chipColor,
-                );
-              },
+            Color chipColor = AppColors.primary;
+
+            if (status.value == 'interested') chipColor = AppColors.success;
+            if (status.value == 'not_interested') chipColor = const Color(0xFFFF6B6B);
+            if (status.value == 'follow_up') chipColor = AppColors.warning;
+            if (status.value == 'closed') chipColor = AppColors.danger;
+            if (status.value == 'visiting') chipColor = AppColors.success;
+
+            // Each chip gets its own Obx to react to selectedStatus changes immediately
+            return Obx(() {
+              final isSelected = controller.selectedStatus.value == status.value;
+              return _buildStatusChip(
+                label: status.displayName,
+                isSelected: isSelected,
+                onTap: () {
+                  controller.selectedStatus.value = status.value;
+                },
+                color: chipColor,
+              );
+            });
+          },
             ))
       ],
     );
@@ -412,6 +645,168 @@ class LeadDetailView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildVisitingDateTimePicker(LeadDetailController controller) {
+    return Obx(() {
+      if (controller.selectedStatus.value != 'visiting') {
+        return const SizedBox.shrink();
+      }
+
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.success.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.success,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Visiting Date & Time',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                // Date picker
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _pickVisitingDate(controller),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: controller.visitingDate.value != null
+                              ? AppColors.success.withOpacity(0.4)
+                              : Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.date_range_rounded,
+                            size: 18,
+                            color: controller.visitingDate.value != null
+                                ? AppColors.success
+                                : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            controller.visitingDate.value != null
+                                ? '${controller.visitingDate.value!.day}/${controller.visitingDate.value!.month}/${controller.visitingDate.value!.year}'
+                                : 'Select Date',
+                            style: TextStyle(
+                              color: controller.visitingDate.value != null
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Time picker
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _pickVisitingTime(controller),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: controller.visitingTime.value != null
+                              ? AppColors.success.withOpacity(0.4)
+                              : Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 18,
+                            color: controller.visitingTime.value != null
+                                ? AppColors.success
+                                : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            controller.visitingTime.value != null
+                                ? controller.visitingTime.value!.format(Get.context!)
+                                : 'Select Time',
+                            style: TextStyle(
+                              color: controller.visitingTime.value != null
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  void _pickVisitingDate(LeadDetailController controller) async {
+    final date = await showDatePicker(
+      context: Get.context!,
+      initialDate: controller.visitingDate.value ?? DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (date != null) {
+      controller.visitingDate.value = date;
+    }
+  }
+
+  void _pickVisitingTime(LeadDetailController controller) async {
+    final time = await showTimePicker(
+      context: Get.context!,
+      initialTime: controller.visitingTime.value ?? const TimeOfDay(hour: 10, minute: 0),
+    );
+    if (time != null) {
+      controller.visitingTime.value = time;
+    }
   }
 
   Widget _buildCallSummary(LeadDetailController controller) {

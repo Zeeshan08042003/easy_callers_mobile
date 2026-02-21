@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dart';
+import 'package:easy_callers_mobile/features/employee/models/call_log_model.dart';
 import 'package:easy_callers_mobile/features/manager/leads/views/distribute_leads_view.dart';
 import 'package:easy_callers_mobile/features/manager/leads/bindings/distribute_leads_binding.dart';
 
@@ -22,6 +23,9 @@ class ManagerDashboardController extends GetxController {
   
   // Weekly distribution data (M, T, W, T, F, S)
   final weeklyDistribution = <double>[0.5, 0.7, 0.4, 1.0, 0.8, 0.3].obs;
+
+  // Last call activity across all team members
+  final Rx<CallLogModel?> lastCallLog = Rx<CallLogModel?>(null);
 
   @override
   void onInit() {
@@ -161,6 +165,24 @@ class ManagerDashboardController extends GetxController {
         final team = await _leadService.getManagerTeamStats(managerId);
         if (team.isNotEmpty) {
           teamMembers.value = team;
+        }
+
+        // Fetch last call activity across all employees
+        try {
+          final lastCall = await _leadService.getLastCallByManager(managerId);
+          lastCallLog.value = lastCall;
+        } catch (e) {
+          print('Error fetching last call: $e');
+        }
+
+        // Fetch real weekly distribution data
+        try {
+          final weeklyData = await _leadService.getWeeklyDistribution(managerId);
+          if (weeklyData.isNotEmpty) {
+            weeklyDistribution.value = weeklyData;
+          }
+        } catch (e) {
+          print('Error fetching weekly distribution: $e');
         }
       }
     } catch (e) {

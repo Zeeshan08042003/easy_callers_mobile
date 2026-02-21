@@ -209,6 +209,22 @@ class LeadService extends GetxService {
   // LEAD QUERIES
   // ============================================
 
+  /// Get a single lead by its ID
+  Future<LeadModel?> getLeadById(String leadId) async {
+    try {
+      final response = await _supabase.leadsTable
+          .select()
+          .eq('id', leadId)
+          .maybeSingle();
+      
+      if (response == null) return null;
+      return LeadModel.fromJson(response);
+    } catch (e) {
+      print('Error fetching lead by ID: $e');
+      return null;
+    }
+  }
+
   /// Get all leads uploaded by a specific manager
   Future<List<LeadModel>> getLeadsByManager(String managerId) async {
     try {
@@ -235,8 +251,9 @@ class LeadService extends GetxService {
       final response = await _supabase.leadsTable
           .select()
           .eq('assigned_to', employeeId)
-          .order('created_at', ascending: false)
-          .range(from, to);
+          .order('created_at', ascending: false).range(from, to);
+
+      print("getLeadsByEmployee: ${response.length}");
 
       return (response as List)
           .map((json) => LeadModel.fromJson(json))
@@ -257,6 +274,7 @@ class LeadService extends GetxService {
       }
       
       final response = await query;
+      print("response of getLeadsCountByEmployee :- ${response.length}");
       return (response as List).length;
     } catch (e) {
       return 0;
@@ -504,9 +522,11 @@ class LeadService extends GetxService {
       final response = await _supabase.leadsTable
           .select('id')
           .eq('batch_id', batchId)
-          .eq('status', LeadStatus.newLead.value)
+          .eq('status', LeadStatus.newLead.value.toLowerCase())
           .limit(10000); // Increase limit to handle larger batches
 
+      print("response is ${response.length}");
+      print("batch id : $batchId}");
       return (response as List).map((l) => l['id'] as String).toList();
     } catch (e) {
       print('Error fetching unassigned leads: $e');
@@ -670,15 +690,17 @@ class LeadService extends GetxService {
 
   /// Get call logs for a specific employee
   Future<List<CallLogModel>> getCallLogsByEmployee(String employeeId,
-      {int limit = 50}) async {
+      {int limit = 200}) async {
     try {
       final response = await _supabase.callLogsTable
-          .select('*, leads(name, phone)')
+          .select('*, leads!left(name, phone)')
           .eq('employee_id', employeeId)
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return (response as List)
+      print('getCallLogsByEmployee: fetched ${(response as List).length} logs for $employeeId');
+
+      return response
           .map((json) => CallLogModel.fromJson(json))
           .toList();
     } catch (e) {
@@ -718,6 +740,30 @@ class LeadService extends GetxService {
       return CallLogModel.fromJson(response);
     } catch (e) {
       print('Error fetching last call: $e');
+      return null;
+    }
+  }
+
+  /// Get the most recent call log across all employees under a manager
+  Future<CallLogModel?> getLastCallByManager(String managerId) async {
+    try {
+      // Get all employees for this manager
+      final employees = await getEmployeesByManager(managerId);
+      if (employees.isEmpty) return null;
+
+      final employeeIds = employees.map((e) => e.id).toList();
+
+      final response = await _supabase.callLogsTable
+          .select('*, leads!left(name, phone), employees!left(first_name, last_name)')
+          .inFilter('employee_id', employeeIds)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return CallLogModel.fromJson(response);
+    } catch (e) {
+      print('Error fetching last call for manager: $e');
       return null;
     }
   }
@@ -1162,17 +1208,21 @@ class LeadService extends GetxService {
           .eq('uploaded_by', managerId)
           .not('assigned_to', 'is', null);
 
-      // 3. Performance (Converted leads / Total leads)
-      final convertedLeads = await _supabase.leadsTable
+      // 3. Performance (Contacted leads / Assigned leads)
+      // Any lead assigned that is no longer 'new' or 'assigned' is considered contacted
+      final uncontactedLeads = await _supabase.leadsTable
           .count(CountOption.exact)
           .eq('uploaded_by', managerId)
-          .eq('status', LeadStatus.converted.value);
+          .not('assigned_to', 'is', null)
+          .inFilter('status', ['new', 'assigned']);
+          
+      final contactedLeads = assignedLeads - uncontactedLeads;
       
-      final performance = totalLeads > 0 
-          ? (convertedLeads / totalLeads) * 100 
+      final performance = assignedLeads > 0 
+          ? (contactedLeads / assignedLeads) * 100 
           : 0.0;
 
-      print('📊 Dashboard Stats for $managerId: total=$totalLeads, assigned=$assignedLeads, performance=$performance');
+      print('📊 Dashboard Stats for $managerId: total=$totalLeads, assigned=$assignedLeads, contacted=$contactedLeads, performance=$performance');
 
       return {
         'totalLeads': totalLeads,
@@ -1195,26 +1245,35 @@ class LeadService extends GetxService {
       final employees = await getEmployeesByManager(managerId);
       final List<Map<String, dynamic>> teamStats = [];
 
-      for (final emp in employees) {
-        // Get today's report
-        final today = DateTime.now().toIso8601String().split('T')[0];
-        final reportResponse = await _supabase.client
-            .from('daily_reports')
-            .select()
-            .eq('employee_id', emp.id)
-            .eq('report_date', today)
-            .maybeSingle();
+      if (employees.isEmpty) return [];
 
-        int callsCount = 0;
-        double progress = 0.0;
-        int statusColor = 0xFFF59E0B; // Orange (Away/Idle) by default
+      final employeeIds = employees.map((e) => e.id).toList();
+      
+      // Get today start
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
 
-        if (reportResponse != null) {
-          callsCount = reportResponse['total_calls'] ?? 0;
-          // Progress is calls / daily target (mocked target of 50)
-          progress = (callsCount / 50).clamp(0.0, 1.0);
-          if (callsCount > 0) statusColor = 0xFF10B981; // Green (Active)
+      final logsResponse = await _supabase.callLogsTable
+          .select('employee_id')
+          .inFilter('employee_id', employeeIds)
+          .gte('created_at', todayStart);
+
+      final Map<String, int> employeeCallCounts = {};
+      for (final e in employees) {
+        employeeCallCounts[e.id] = 0;
+      }
+      
+      for (final log in logsResponse as List) {
+        final empId = log['employee_id'] as String;
+        if (employeeCallCounts.containsKey(empId)) {
+          employeeCallCounts[empId] = employeeCallCounts[empId]! + 1;
         }
+      }
+
+      for (final emp in employees) {
+        final callsCount = employeeCallCounts[emp.id] ?? 0;
+        final progress = (callsCount / 50).clamp(0.0, 1.0);
+        final statusColor = callsCount > 0 ? 0xFF10B981 : 0xFFF59E0B;
 
         teamStats.add({
           'name': emp.fullName,
@@ -1229,6 +1288,50 @@ class LeadService extends GetxService {
     } catch (e) {
       print('Error fetching team stats: $e');
       return [];
+    }
+  }
+
+  /// Get weekly distribution data for the manager's team (Monday-Saturday)
+  Future<List<double>> getWeeklyDistribution(String managerId) async {
+    try {
+      final employees = await getEmployeesByManager(managerId);
+      if (employees.isEmpty) return List.filled(6, 0.0);
+      final employeeIds = employees.map((e) => e.id).toList();
+
+      final now = DateTime.now();
+      final currentDay = now.weekday; // 1 = Monday, 7 = Sunday
+      final monday = now.subtract(Duration(days: currentDay - 1));
+      final startOfWeek = DateTime(monday.year, monday.month, monday.day);
+      final sunday = startOfWeek.add(const Duration(days: 6));
+      final endOfWeek = DateTime(sunday.year, sunday.month, sunday.day, 23, 59, 59);
+
+      final response = await _supabase.callLogsTable
+          .select('created_at')
+          .inFilter('employee_id', employeeIds)
+          .gte('created_at', startOfWeek.toIso8601String())
+          .lte('created_at', endOfWeek.toIso8601String());
+
+      final List<int> dailyCounts = List.filled(6, 0);
+      for (final log in response as List) {
+        final date = DateTime.parse(log['created_at']);
+        if (date.weekday >= 1 && date.weekday <= 6) {
+          dailyCounts[date.weekday - 1]++;
+        }
+      }
+
+      int maxCount = 0;
+      for (final count in dailyCounts) {
+        if (count > maxCount) maxCount = count;
+      }
+
+      if (maxCount == 0) return List.filled(6, 0.0);
+
+      // Normalize to 0.0 ... 1.0
+      return dailyCounts.map((count) => count / maxCount).toList();
+
+    } catch (e) {
+      print('Error calculating weekly distribution: $e');
+      return List.filled(6, 0.0);
     }
   }
 

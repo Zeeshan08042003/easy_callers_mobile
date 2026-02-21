@@ -62,11 +62,11 @@ class CallHistoryView extends StatelessWidget {
                   );
                 }
 
-                if (controller.filteredCallLogs.isEmpty) {
+                if (controller.filteredLeads.isEmpty) {
                   return _buildEmptyState();
                 }
 
-                return _buildCallLogsList(controller);
+                return _buildLeadsList(controller);
               }),
             ),
           ),
@@ -113,26 +113,35 @@ class CallHistoryView extends StatelessWidget {
   Widget _buildFilterTabs(CallHistoryController controller) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Obx(() => Row(
-        children: [
-          _buildFilterTab(
-            label: 'All Calls',
-            isSelected: controller.selectedFilter.value == 'all',
-            onTap: () => controller.selectedFilter.value = 'all',
-          ),
-          const SizedBox(width: 12),
-          _buildFilterTab(
-            label: 'Missed',
-            isSelected: controller.selectedFilter.value == 'missed',
-            onTap: () => controller.selectedFilter.value = 'missed',
-          ),
-          const SizedBox(width: 12),
-          _buildFilterTab(
-            label: 'Follow-up',
-            isSelected: controller.selectedFilter.value == 'followup',
-            onTap: () => controller.selectedFilter.value = 'followup',
-          ),
-        ],
+      child: Obx(() => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildFilterTab(
+              label: 'All',
+              isSelected: controller.selectedFilter.value == 'all',
+              onTap: () => controller.selectedFilter.value = 'all',
+            ),
+            const SizedBox(width: 10),
+            _buildFilterTab(
+              label: 'Missed',
+              isSelected: controller.selectedFilter.value == 'missed',
+              onTap: () => controller.selectedFilter.value = 'missed',
+            ),
+            const SizedBox(width: 10),
+            _buildFilterTab(
+              label: 'Follow-up',
+              isSelected: controller.selectedFilter.value == 'followup',
+              onTap: () => controller.selectedFilter.value = 'followup',
+            ),
+            const SizedBox(width: 10),
+            _buildFilterTab(
+              label: 'Visiting',
+              isSelected: controller.selectedFilter.value == 'visiting',
+              onTap: () => controller.selectedFilter.value = 'visiting',
+            ),
+          ],
+        ),
       )),
     );
   }
@@ -166,206 +175,482 @@ class CallHistoryView extends StatelessWidget {
     );
   }
 
-  Widget _buildCallLogsList(CallHistoryController controller) {
+  /// Each item = 1 lead (latest call log), tappable to see full history
+  Widget _buildLeadsList(CallHistoryController controller) {
     return Obx(() {
-      final groupedLogs = controller.groupedCallLogs;
-      
-      return ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        itemCount: groupedLogs.length,
-        itemBuilder: (context, index) {
-          final dateKey = groupedLogs.keys.elementAt(index);
-          final logs = groupedLogs[dateKey]!;
+      final leads = controller.filteredLeads;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Text(
-                  dateKey,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              ...logs.map((log) => _buildCallLogCard(log)).toList(),
-            ],
-          );
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        itemCount: leads.length,
+        itemBuilder: (context, index) {
+          final latestLog = leads[index];
+          final callCount = controller.getCallCountForLead(latestLog.leadId);
+          return _buildLeadCard(controller, latestLog, callCount);
         },
       );
     });
   }
 
-  Widget _buildCallLogCard(CallLogModel log) {
-    // Determine icon and color based on call status
-    IconData icon;
-    Color iconColor;
-    Color bgColor;
-    String statusText;
+  Widget _buildLeadCard(CallHistoryController controller, CallLogModel latestLog, int callCount) {
+    // Determine lead status color and icon based on latest call
+    final leadStatusStr = latestLog.leadStatus?.toString() ?? '';
+    final callStatusValue = (latestLog.callStatus ?? 'unknown').toLowerCase();
 
-    final callStatusValue = (log.callStatus ?? 'unknown').toLowerCase();
-    if (callStatusValue.contains('completed') || callStatusValue.contains('connected')) {
-      icon = Icons.person_rounded;
-      iconColor = AppColors.primary;
-      bgColor = AppColors.primary.withOpacity(0.1);
-      statusText = 'Completed';
-    } else if (callStatusValue.contains('no_answer') || callStatusValue.contains('declined')) {
-      icon = Icons.person_outline_rounded;
-      iconColor = const Color(0xFFFF6B6B);
-      bgColor = const Color(0xFFFF6B6B).withOpacity(0.1);
-      statusText = 'No Answer';
-    } else if (callStatusValue.contains('busy')) {
+    IconData icon;
+    Color statusColor;
+    String statusLabel;
+
+    // Priority: lead status > call status
+    if (leadStatusStr == 'visiting') {
+      icon = Icons.location_on_rounded;
+      statusColor = AppColors.success;
+      statusLabel = 'Visiting';
+    } else if (leadStatusStr == 'interested') {
+      icon = Icons.thumb_up_rounded;
+      statusColor = AppColors.success;
+      statusLabel = 'Interested';
+    } else if (leadStatusStr == 'not_interested') {
+      icon = Icons.thumb_down_rounded;
+      statusColor = const Color(0xFFFF6B6B);
+      statusLabel = 'Not Interested';
+    } else if (leadStatusStr == 'callback' || leadStatusStr == 'follow_up') {
+      icon = Icons.access_time_rounded;
+      statusColor = const Color(0xFFFFB84D);
+      statusLabel = leadStatusStr == 'callback' ? 'Callback' : 'Follow-up';
+    } else if (leadStatusStr == 'closed') {
+      icon = Icons.check_circle_rounded;
+      statusColor = AppColors.textSecondary;
+      statusLabel = 'Closed';
+    } else if (callStatusValue.contains('completed') || callStatusValue.contains('connected')) {
+      icon = Icons.phone_rounded;
+      statusColor = AppColors.primary;
+      statusLabel = 'Completed';
+    } else if (callStatusValue.contains('declined') || callStatusValue.contains('failed') ||
+        callStatusValue.contains('missed') || callStatusValue.contains('no_answer')) {
       icon = Icons.phone_missed_rounded;
-      iconColor = const Color(0xFFFFB84D);
-      bgColor = const Color(0xFFFFB84D).withOpacity(0.1);
-      statusText = 'Busy';
-    } else if (callStatusValue.contains('failed')) {
-      icon = Icons.error_outline_rounded;
-      iconColor = const Color(0xFFFF6B6B);
-      bgColor = const Color(0xFFFF6B6B).withOpacity(0.1);
-      statusText = 'Failed';
+      statusColor = const Color(0xFFFF6B6B);
+      statusLabel = 'Missed';
     } else {
       icon = Icons.phone_callback_rounded;
-      iconColor = AppColors.textSecondary;
-      bgColor = AppColors.cardBg;
-      statusText = log.callStatus ?? 'Follow-up';
+      statusColor = AppColors.textSecondary;
+      statusLabel = latestLog.callStatus ?? 'Unknown';
     }
 
-    // Check if it's a follow-up
-    final isFollowUp = log.followUpDate != null;
-    if (isFollowUp) {
-      icon = Icons.access_time_rounded;
-      iconColor = const Color(0xFFFFB84D);
-      bgColor = const Color(0xFFFFB84D).withOpacity(0.1);
-      statusText = 'Follow-up';
-    }
-
-    // Format time
-    final timeStr = DateFormat('HH:mm').format(log.createdAt);
-    
-    // Calculate duration
-    final duration = _formatDuration(log.callDurationSeconds ?? 0);
+    // Time
+    final timeAgo = _getRelativeTime(latestLog.createdAt);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: () => _showLeadCallHistory(controller, latestLog),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: Row(
+            children: [
+              // Status icon
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: statusColor, size: 22),
               ),
-              child: Icon(icon, color: iconColor, size: 22),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    log.leadName ?? 'Unknown Lead',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 14),
+              // Lead info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      latestLog.leadName ?? 'Unknown Lead',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          timeAgo,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Call count badge + chevron
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (callCount > 1)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$callCount calls',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        timeStr,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        ' • ',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        statusText,
-                        style: TextStyle(
-                          color: _getStatusColor(log),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
+                    size: 20,
                   ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  duration,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.phone_rounded,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                    onPressed: () {
-                      // Call again
-                    },
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Color _getStatusColor(CallLogModel log) {
-    if (log.leadStatus != null) {
-      switch (log.leadStatus!.value) {
-        case 'interested':
-          return AppColors.success;
-        case 'not_interested':
-          return const Color(0xFFFF6B6B);
-        case 'callback':
-        case 'follow_up':
-          return const Color(0xFFFFB84D);
-        default:
-          return AppColors.textSecondary;
-      }
+  /// Show bottom sheet with all call history for a specific lead
+  void _showLeadCallHistory(CallHistoryController controller, CallLogModel latestLog) {
+    final allLogs = controller.getLogsForLead(latestLog.leadId);
+
+    Get.bottomSheet(
+      Container(
+        constraints: BoxConstraints(
+          maxHeight: Get.height * 0.75,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          latestLog.leadName ?? 'Unknown Lead',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${latestLog.leadPhone ?? ''} • ${allLogs.length} call${allLogs.length != 1 ? 's' : ''}',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.history_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: Colors.white.withOpacity(0.05), height: 1),
+            // Call logs list
+            Flexible(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shrinkWrap: true,
+                itemCount: allLogs.length,
+                itemBuilder: (context, index) {
+                  return _buildCallLogDetailItem(allLogs[index], index == 0);
+                },
+              ),
+            ),
+            // Call Client Button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () => controller.navigateToLeadDetail(latestLog.leadId),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.phone_rounded, size: 22),
+                      SizedBox(width: 10),
+                      Text(
+                        'Call Client',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  Widget _buildCallLogDetailItem(CallLogModel log, bool isLatest) {
+    final callStatusValue = (log.callStatus ?? 'unknown').toLowerCase();
+    final leadStatusStr = log.leadStatus?.toString() ?? '';
+    final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(log.createdAt);
+    final duration = _formatDuration(log.callDurationSeconds);
+
+    // Determine call status display
+    String callStatusLabel;
+    Color callStatusColor;
+    IconData callIcon;
+
+    if (callStatusValue.contains('completed') || callStatusValue.contains('connected')) {
+      callStatusLabel = 'Connected';
+      callStatusColor = AppColors.success;
+      callIcon = Icons.call_made_rounded;
+    } else if (callStatusValue.contains('declined') || callStatusValue.contains('failed')) {
+      callStatusLabel = 'Declined / Failed';
+      callStatusColor = const Color(0xFFFF6B6B);
+      callIcon = Icons.call_missed_rounded;
+    } else if (callStatusValue.contains('no_answer') || callStatusValue.contains('no answer')) {
+      callStatusLabel = 'No Answer';
+      callStatusColor = const Color(0xFFFF6B6B);
+      callIcon = Icons.call_missed_outgoing_rounded;
+    } else if (callStatusValue.contains('busy')) {
+      callStatusLabel = 'Busy';
+      callStatusColor = const Color(0xFFFFB84D);
+      callIcon = Icons.phone_paused_rounded;
+    } else {
+      callStatusLabel = log.callStatus ?? 'Unknown';
+      callStatusColor = AppColors.textSecondary;
+      callIcon = Icons.phone_rounded;
     }
-    return AppColors.textSecondary;
+
+    // Lead status badge
+    String? leadStatusLabel;
+    Color? leadStatusColor;
+    if (leadStatusStr == 'visiting') {
+      leadStatusLabel = 'VISITING';
+      leadStatusColor = AppColors.success;
+    } else if (leadStatusStr == 'interested') {
+      leadStatusLabel = 'INTERESTED';
+      leadStatusColor = AppColors.success;
+    } else if (leadStatusStr == 'not_interested') {
+      leadStatusLabel = 'NOT INTERESTED';
+      leadStatusColor = const Color(0xFFFF6B6B);
+    } else if (leadStatusStr == 'callback' || leadStatusStr == 'follow_up') {
+      leadStatusLabel = leadStatusStr == 'callback' ? 'CALLBACK' : 'FOLLOW-UP';
+      leadStatusColor = const Color(0xFFFFB84D);
+    } else if (leadStatusStr == 'closed') {
+      leadStatusLabel = 'CLOSED';
+      leadStatusColor = AppColors.textSecondary;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isLatest ? AppColors.primary.withOpacity(0.05) : AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isLatest ? AppColors.primary.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(callIcon, color: callStatusColor, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                callStatusLabel,
+                style: TextStyle(
+                  color: callStatusColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              if (isLatest)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'LATEST',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 13, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                dateStr,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(width: 16),
+              Icon(Icons.timer_outlined, size: 13, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                duration,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+            ],
+          ),
+          if (leadStatusLabel != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: leadStatusColor!.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                leadStatusLabel,
+                style: TextStyle(
+                  color: leadStatusColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+          if (log.feedback != null && log.feedback!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              log.feedback!,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (log.followUpDate != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  leadStatusStr == 'visiting' ? Icons.location_on : Icons.event_rounded,
+                  size: 13,
+                  color: leadStatusStr == 'visiting' ? AppColors.success : const Color(0xFFFFB84D),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  leadStatusStr == 'visiting'
+                      ? 'Visit: ${DateFormat('dd MMM yyyy, hh:mm a').format(log.followUpDate!)}'
+                      : 'Follow-up: ${DateFormat('dd MMM yyyy').format(log.followUpDate!)}',
+                  style: TextStyle(
+                    color: leadStatusStr == 'visiting' ? AppColors.success : const Color(0xFFFFB84D),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getRelativeTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}w ago';
+    return DateFormat('dd MMM').format(dateTime);
   }
 
   String _formatDuration(int seconds) {

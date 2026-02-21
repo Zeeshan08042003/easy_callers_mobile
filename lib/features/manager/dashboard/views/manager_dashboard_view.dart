@@ -8,6 +8,7 @@ import 'package:easy_callers_mobile/features/manager/reports/views/manager_repor
 import 'package:easy_callers_mobile/features/manager/reports/bindings/manager_reports_binding.dart';
 import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
+import 'package:intl/intl.dart';
 
 class ManagerDashboardView extends GetView<ManagerDashboardController> {
   const ManagerDashboardView({super.key});
@@ -34,6 +35,7 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                 const SizedBox(height: 25),
                 _buildPerformanceCard(),
                 const SizedBox(height: 30),
+                _buildLastCallActivity(),
                 _buildWeeklyDistribution(),
                 const SizedBox(height: 30),
                 _buildTeamStatusSection(),
@@ -310,20 +312,21 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                   )),
                 ],
               ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _buildMiniBar(40, 0.4),
-                  const SizedBox(width: 6),
-                  _buildMiniBar(40, 0.7),
-                  const SizedBox(width: 6),
-                  _buildMiniBar(40, 0.5),
-                  const SizedBox(width: 6),
-                  _buildMiniBar(40, 0.8),
-                  const SizedBox(width: 6),
-                  _buildMiniBar(40, 1.0, isHigh: true),
-                ],
-              ),
+              Obx(() {
+                final dist = controller.weeklyDistribution;
+                if (dist.isEmpty) return const SizedBox.shrink();
+                final bars = dist.length >= 5 ? dist.sublist(dist.length - 5) : dist;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(bars.length, (index) {
+                    final factor = bars[index] == 0.0 ? 0.05 : bars[index];
+                    return Padding(
+                      padding: EdgeInsets.only(left: index == 0 ? 0 : 6),
+                      child: _buildMiniBar(40, factor, isHigh: index == bars.length - 1),
+                    );
+                  }),
+                );
+              }),
             ],
           ),
           const SizedBox(height: 20),
@@ -337,8 +340,9 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              FractionallySizedBox(
-                widthFactor: 0.92,
+              Obx(() =>
+                  FractionallySizedBox(
+                widthFactor: (controller.teamPerformance.value / 100).clamp(0.02, 1.0),
                 child: Container(
                   height: 8,
                   decoration: BoxDecoration(
@@ -353,7 +357,7 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                     ],
                   ),
                 ),
-              ),
+              ),)
             ],
           ),
         ],
@@ -468,6 +472,179 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
             fontWeight: FontWeight.bold,
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildLastCallActivity() {
+    return Obx(() {
+      final lastCall = controller.lastCallLog.value;
+      if (lastCall == null) return const SizedBox.shrink();
+
+      // Lead status
+      final leadStatusStr = lastCall.leadStatus?.toString() ?? '';
+      String statusLabel = leadStatusStr.isNotEmpty
+          ? leadStatusStr.replaceAll('_', ' ').capitalize!
+          : 'Unknown';
+      Color statusColor;
+      if (leadStatusStr == 'interested' || leadStatusStr == 'visiting') {
+        statusColor = const Color(0xFF10B981);
+      } else if (leadStatusStr == 'not_interested') {
+        statusColor = const Color(0xFFFF6B6B);
+      } else if (leadStatusStr == 'callback' || leadStatusStr == 'follow_up') {
+        statusColor = const Color(0xFFFFB84D);
+      } else {
+        statusColor = AppColors.textSecondary;
+      }
+
+      // Duration
+      final durationSecs = lastCall.callDurationSeconds;
+      final durationStr = durationSecs > 0
+          ? '${durationSecs ~/ 60}m ${durationSecs % 60}s'
+          : '0s';
+
+      // Time & Date
+      final timeStr = DateFormat('h:mm a').format(lastCall.createdAt);
+      final dateStr = DateFormat('dd MMM').format(lastCall.createdAt);
+
+      // Call status
+      final callStatusValue = (lastCall.callStatus ?? 'Unknown').toLowerCase();
+      String callStatusLabel;
+      Color callStatusColor;
+      if (callStatusValue.contains('completed') || callStatusValue.contains('connected')) {
+        callStatusLabel = 'Connected';
+        callStatusColor = const Color(0xFF10B981);
+      } else if (callStatusValue.contains('declined') || callStatusValue.contains('failed')) {
+        callStatusLabel = 'Declined';
+        callStatusColor = const Color(0xFFFF6B6B);
+      } else if (callStatusValue.contains('busy')) {
+        callStatusLabel = 'Busy';
+        callStatusColor = const Color(0xFFFFB84D);
+      } else {
+        callStatusLabel = lastCall.callStatus ?? 'Unknown';
+        callStatusColor = AppColors.textSecondary;
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'LAST CALL ACTIVITY',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 15),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161C28),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: callStatusColor.withOpacity(0.1),
+                      child: Icon(
+                        callStatusValue.contains('completed') || callStatusValue.contains('connected')
+                            ? Icons.call_made_rounded
+                            : Icons.call_missed_rounded,
+                        color: callStatusColor,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            lastCall.leadName ?? 'Unknown Lead',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          if (lastCall.employeeName != null && lastCall.employeeName!.isNotEmpty)
+                            Text(
+                              'Caller: ${lastCall.employeeName}',
+                              style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 12),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildCallMeta('Status', callStatusLabel, callStatusColor),
+                    _buildCallMeta('Duration', durationStr, Colors.white),
+                    _buildCallMeta('Time', timeStr, Colors.white),
+                    _buildCallMeta('Date', dateStr, Colors.white),
+                  ],
+                ),
+                if (lastCall.feedback != null && lastCall.feedback!.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.note_rounded, size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          lastCall.feedback!,
+                          style: TextStyle(
+                            color: AppColors.textSecondary.withOpacity(0.7),
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+        ],
+      );
+    });
+  }
+
+  Widget _buildCallMeta(String label, String value, Color valueColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: AppColors.textSecondary.withOpacity(0.6), fontSize: 11)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(color: valueColor, fontSize: 13, fontWeight: FontWeight.bold)),
       ],
     );
   }

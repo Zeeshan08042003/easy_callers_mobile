@@ -19,6 +19,13 @@ class EmployeeDetailController extends GetxController {
   final RxInt unattendedLeadsCount = 0.obs;
   final RxBool isReassigning = false.obs;
 
+  // Pagination state for assigned leads
+  static const int _pageSize = 20;
+  int _currentPage = 1;
+  final RxBool isLoadingMore = false.obs;
+  final RxBool hasMoreLeads = true.obs;
+  final RxInt totalLeadsCount = 0.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -36,18 +43,32 @@ class EmployeeDetailController extends GetxController {
       final empId = employee.value!.id;
       final managerId = _authService.currentManager.value?.id;
 
-      // Fetch in parallel
+      // Reset pagination state
+      _currentPage = 1;
+      assignedLeads.clear();
+      hasMoreLeads.value = true;
+
+      // Fetch in parallel: first page of leads + stats + other data
       final results = await Future.wait([
         _leadService.getCallLogsByEmployee(empId, limit: 1),
-        _leadService.getLeadsByEmployee(empId),
+        _leadService.getLeadsByEmployee(empId, page: 1, pageSize: _pageSize),
         _leadService.getEmployeeStats(empId),
         if (managerId != null) _leadService.getUnattendedLeadsCount(managerId),
       ]);
 
       recentCalls.value = results[0] as List<CallLogModel>;
-      assignedLeads.value = (results[1] as List<LeadModel>).reversed.take(5).toList();
+
+      final firstPageLeads = results[1] as List<LeadModel>;
+      assignedLeads.value = firstPageLeads;
+
       stats.value = results[2] as Map<String, dynamic>;
-      
+
+      // Get total count from stats (already fetched by getEmployeeStats)
+      totalLeadsCount.value = (stats['total_leads'] as int?) ?? 0;
+
+      // Check if there are more leads to load
+      hasMoreLeads.value = firstPageLeads.length >= _pageSize;
+
       if (managerId != null && results.length > 3) {
         unattendedLeadsCount.value = results[3] as int;
       }
@@ -56,6 +77,32 @@ class EmployeeDetailController extends GetxController {
       Get.snackbar('Error', 'Failed to load performance data: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Load more leads (next page)
+  Future<void> loadMoreLeads() async {
+    if (employee.value == null || isLoadingMore.value || !hasMoreLeads.value) return;
+
+    try {
+      isLoadingMore.value = true;
+      _currentPage++;
+
+      final moreLeads = await _leadService.getLeadsByEmployee(
+        employee.value!.id,
+        page: _currentPage,
+        pageSize: _pageSize,
+      );
+
+      assignedLeads.addAll(moreLeads);
+
+      // If we got fewer leads than the page size, there are no more to load
+      hasMoreLeads.value = moreLeads.length >= _pageSize;
+    } catch (e) {
+      _currentPage--; // Revert page on error
+      Get.snackbar('Error', 'Failed to load more leads: $e');
+    } finally {
+      isLoadingMore.value = false;
     }
   }
 

@@ -148,23 +148,28 @@ class EmployeeDashboardController extends GetxController {
       );
 
       final totalCalls = callLogs.length;
+      
+      // Count unique leads that have been attended (contacted)
+      // 1 lead = 1 count, even if called multiple times
+      final uniqueContactedLeadIds = <String>{};
+      for (final log in callLogs) {
+        uniqueContactedLeadIds.add(log.leadId);
+      }
+      final contactedCount = uniqueContactedLeadIds.length;
+      
       final connectedCalls = callLogs.where((log) {
         final status = log.callStatus?.toLowerCase() ?? '';
         return status.contains('completed') || status.contains('connected');
       }).length;
       final interestedLeads = callLogs.where((log) {
         if (log.leadStatus == null) return false;
-        if (log.leadStatus is String) {
-          return log.leadStatus == 'interested';
-        }
-        if (log.leadStatus is CallLeadStatus) {
-          return (log.leadStatus as CallLeadStatus).value == 'interested';
-        }
-        return false;
+        final statusStr = log.leadStatus.toString();
+        return statusStr == 'interested';
       }).length;
 
       return {
         'calls_today': totalCalls,
+        'contacted_today': contactedCount, // unique leads contacted
         'connected_today': connectedCalls,
         'interested_today': interestedLeads,
         'goal': 24, // This should come from settings or be configurable
@@ -173,6 +178,7 @@ class EmployeeDashboardController extends GetxController {
     } catch (e) {
       return {
         'calls_today': 0,
+        'contacted_today': 0,
         'connected_today': 0,
         'interested_today': 0,
         'goal': 24,
@@ -182,8 +188,8 @@ class EmployeeDashboardController extends GetxController {
   }
 
   void _updateStats() {
-    // Count contacted leads (from today's stats)
-    contactedLeadsCount.value = todayStats['calls_today'] ?? 0;
+    // Count contacted leads (unique leads attended today)
+    contactedLeadsCount.value = todayStats['contacted_today'] ?? 0;
 
     // Calculate daily progress
     final goal = todayStats['goal'] ?? 24;
