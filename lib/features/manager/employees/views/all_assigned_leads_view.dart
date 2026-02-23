@@ -106,10 +106,10 @@ class AllAssignedLeadsView extends StatelessWidget {
                             children: [
                               Icon(Icons.phone_outlined, size: 12, color: AppColors.textSecondary.withOpacity(0.6)),
                               const SizedBox(width: 4),
-                              Text(
-                                lead.phone,
-                                style: TextStyle(color: AppColors.textSecondary.withOpacity(0.6), fontSize: 12),
-                              ),
+                                Text(
+                                  lead.phone.isNotEmpty ? lead.phone.first : 'No Phone',
+                                  style: TextStyle(color: AppColors.textSecondary.withOpacity(0.6), fontSize: 12),
+                                ),
                               const SizedBox(width: 12),
                               Icon(Icons.access_time, size: 12, color: AppColors.textSecondary.withOpacity(0.6)),
                               const SizedBox(width: 4),

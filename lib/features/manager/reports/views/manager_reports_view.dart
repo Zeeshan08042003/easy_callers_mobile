@@ -23,10 +23,6 @@ class ManagerReportsView extends GetView<ManagerReportsController> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Get.back(),
-        ),
         title: Column(
           children: [
             Text(
@@ -76,7 +72,6 @@ class ManagerReportsView extends GetView<ManagerReportsController> {
           ),
         );
       }),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -262,55 +257,5 @@ class ManagerReportsView extends GetView<ManagerReportsController> {
     }
   }
 
-  Widget _buildBottomNav() {
-    return Theme(
-      data: ThemeData(
-        canvasColor: const Color(0xFF0F172A),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: 2,
-        backgroundColor: const Color(0xFF0F172A),
-        selectedItemColor: const Color(0xFF3B82F6),
-        unselectedItemColor: const Color(0xFF64748B),
-        type: BottomNavigationBarType.fixed,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        onTap: (index) {
-          if (index == 0) Get.offAll(() => const ManagerDashboardView(), binding: ManagerDashboardBinding());
-          if (index == 1) Get.offAll(() => const ManagerTeamView(), binding: ManagerTeamBinding());
-          if (index == 3) Get.to(() => const ProfileView(), binding: ProfileBinding());
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.grid_view_rounded, size: 26),
-            ),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.people_rounded, size: 26),
-            ),
-            label: 'Agents',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.bar_chart_rounded, size: 26),
-            ),
-            label: 'Stats',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.settings_rounded, size: 26),
-            ),
-            label: 'Admin',
-          ),
-        ],
-      ),
-    );
-  }
+
 }

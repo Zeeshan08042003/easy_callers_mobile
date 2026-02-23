@@ -152,7 +152,12 @@ class LeadUploadService extends GetxService {
               if (cellValue != null && cellValue.isNotEmpty) {
                 // Clean phone numbers before storing
                 if (entry.key == 'phone') {
-                  lead[entry.key] = _cleanPhoneNumber(cellValue);
+                  final phones = _extractPhoneNumbers(cellValue);
+                  if (phones.isNotEmpty) {
+                    lead['phone'] = phones;
+                  } else {
+                    lead['phone'] = [];
+                  }
                 } else {
                   lead[entry.key] = cellValue;
                 }
@@ -189,8 +194,10 @@ class LeadUploadService extends GetxService {
           }
 
           // Only add if we have at least a name or phone
-          if ((lead['name'] as String? ?? '').isNotEmpty ||
-              (lead['phone'] as String? ?? '').isNotEmpty) {
+          final hasName = (lead['name'] as String? ?? '').isNotEmpty;
+          final hasPhone = (lead['phone'] as List? ?? []).isNotEmpty;
+          
+          if (hasName || hasPhone) {
             leads.add(lead);
           }
         }
@@ -287,6 +294,30 @@ class LeadUploadService extends GetxService {
   bool _matchesRegex(String header, String pattern) {
     final regex = RegExp(pattern, caseSensitive: false);
     return regex.hasMatch(header);
+  }
+
+  /// Extract multiple clean phone numbers from a string
+  List<String> _extractPhoneNumbers(String rawPhone) {
+    // Split by common delimiters like comma, slash, pipe, or spaces
+    final parts = rawPhone.split(RegExp(r'[,/|]|(\s+-\s+)|(\s*,\s*)'));
+    final results = <String>[];
+    for (var part in parts) {
+      if (part.trim().isEmpty) continue;
+      
+      // Some excel sheets use space between numbers e.g. "1234567890 0987654321" 
+      // where split above might not catch. Try secondary split if length is suspicious
+      if (part.length > 15 && part.contains(' ')) {
+        final subParts = part.split(' ');
+        for (var sub in subParts) {
+          final cleaned = _cleanPhoneNumber(sub);
+          if (cleaned.length >= 7) results.add(cleaned);
+        }
+      } else {
+        final cleaned = _cleanPhoneNumber(part);
+        if (cleaned.length >= 7) results.add(cleaned);
+      }
+    }
+    return results.toSet().toList(); // Remove duplicates
   }
 
   /// Clean and normalize phone numbers
@@ -495,7 +526,7 @@ class LeadUploadService extends GetxService {
       final leadInserts = parsedLeads.map((lead) {
         final insert = <String, dynamic>{
           'name': lead['name'] ?? 'Unknown',
-          'phone': lead['phone'] ?? '',
+          'phone': lead['phone'] ?? [],
           'email': lead['email'],
           'location': lead['location'],
           'project_name': lead['project_name'],

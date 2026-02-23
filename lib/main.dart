@@ -5,6 +5,7 @@ import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/services/storage_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/features/employee/services/notification_service.dart';
+import 'package:easy_callers_mobile/features/project/services/project_service.dart';
 import 'package:easy_callers_mobile/app/routes/app_pages.dart';
 import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 import 'package:easy_callers_mobile/app/bindings/initial_binding.dart';
@@ -49,6 +50,9 @@ void main() async {
 
   // Register CallController (platform channel for calls)
   Get.put(CallController());
+
+  // Register ProjectService
+  Get.put(ProjectService());
 
   runApp(MyApp(initialRoute: initialRoute));
 }

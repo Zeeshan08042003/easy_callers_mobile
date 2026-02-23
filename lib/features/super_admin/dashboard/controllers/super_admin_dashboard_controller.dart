@@ -6,6 +6,12 @@ import 'package:easy_callers_mobile/core/services/auth_service.dart';
 class SuperAdminDashboardController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();
   final AuthService _authService = Get.find<AuthService>();
+  
+  final RxInt currentTabIndex = 0.obs;
+  
+  void switchTab(int index) {
+    currentTabIndex.value = index;
+  }
 
   final RxInt totalManagers = 0.obs;
   final RxInt totalEmployees = 0.obs;

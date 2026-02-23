@@ -75,7 +75,7 @@ class CallFeedbackView extends GetView<CallFeedbackController> {
                   style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  controller.lead.phone,
+                  controller.lead.phone.isNotEmpty ? controller.lead.phone.first : 'No Phone',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
               ],

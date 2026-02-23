@@ -64,17 +64,13 @@ class LeadDetailView extends StatelessWidget {
             _buildActionButtons(controller),
             const SizedBox(height: 32),
             _buildCallButton(controller),
-            const SizedBox(height: 32),
             _buildLeadInfo(controller),
-            const SizedBox(height: 32),
             _buildCallDynamicStatus(controller),
-            const SizedBox(height: 32),
             _buildUpdateCallStatus(controller),
-            const SizedBox(height: 16),
+
             _buildVisitingDateTimePicker(controller),
-            const SizedBox(height: 32),
             _buildCallSummary(controller),
-            const SizedBox(height: 32),
+
             _buildFollowUpReminder(controller),
             const SizedBox(height: 100),
           ],
@@ -165,7 +161,11 @@ class LeadDetailView extends StatelessWidget {
           child: _buildActionButton(
             icon: Icons.message_rounded,
             label: 'MESSAGE',
-            onTap: () => controller.sendMobileSMS(),
+            onTap: () => _handleActionWithMultiplePhones(
+              controller,
+              'Send SMS To',
+              (phone) => controller.sendMobileSMS(phoneNumber: phone),
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -193,7 +193,11 @@ class LeadDetailView extends StatelessWidget {
           child: _buildActionButton(
             icon: Icons.phone_android_rounded,
             label: 'WHATSAPP',
-            onTap: () => controller.whatsappMsg(),
+            onTap: () => _handleActionWithMultiplePhones(
+              controller,
+              'WhatsApp To',
+              (phone) => controller.whatsappMsg(phoneNumber: phone),
+            ),
           ),
         ),
       ],
@@ -238,7 +242,11 @@ class LeadDetailView extends StatelessWidget {
       width: double.infinity,
       height: 60,
       child: ElevatedButton(
-        onPressed: () => controller.makeCall(),
+        onPressed: () => _handleActionWithMultiplePhones(
+          controller,
+          'Call Number',
+          (phone) => controller.makeCall(phoneNumber: phone),
+        ),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -276,11 +284,112 @@ class LeadDetailView extends StatelessWidget {
     );
   }
 
+  void _handleActionWithMultiplePhones(
+    LeadDetailController controller, 
+    String title, 
+    Function(String) onSelected
+  ) {
+    if (lead.phone.isEmpty) return;
+    
+    final allPhones = lead.phone.where((p) => p.isNotEmpty).toList();
+    if (allPhones.length <= 1) {
+      if (allPhones.isNotEmpty) onSelected(allPhones.first);
+      return;
+    }
+
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A2030),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...allPhones.map((phone) {
+              final isPrimary = phone == lead.phone.first;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () {
+                    Get.back();
+                    onSelected(phone);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          title.contains('SMS') 
+                            ? Icons.message_rounded 
+                            : title.contains('WhatsApp') 
+                              ? Icons.phone_android_rounded 
+                              : Icons.phone_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          phone,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (isPrimary)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'PRIMARY',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   //will show proper call log report over here
   Widget _buildLeadInfo(LeadDetailController controller) {
     return Obx(() {
       if (controller.isLoadingLastCall.value) {
         return Container(
+          margin: EdgeInsets.only(top: 32),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: AppColors.cardBg,
@@ -566,6 +675,7 @@ class LeadDetailView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 5),
         const Text(
           'UPDATE CALL STATUS',
           style: TextStyle(
@@ -654,6 +764,7 @@ class LeadDetailView extends StatelessWidget {
       }
 
       return Container(
+        margin: EdgeInsets.only(top: 16,bottom: 10),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
@@ -813,6 +924,7 @@ class LeadDetailView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 12),
         const Text(
           'CALL SUMMARY & NOTES',
           style: TextStyle(
@@ -870,6 +982,7 @@ class LeadDetailView extends StatelessWidget {
       if (!needsFollowUp) return const SizedBox.shrink();
 
       return Container(
+        margin: EdgeInsets.only(top: 20),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
@@ -987,7 +1100,7 @@ class LeadDetailView extends StatelessWidget {
 
       return Container(
         padding: const EdgeInsets.all(14),
-        margin: const EdgeInsets.symmetric(vertical: 10),
+        margin: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
           color: session.statusBackgroundColor,
           borderRadius: BorderRadius.circular(10),
@@ -1036,7 +1149,7 @@ class LeadDetailView extends StatelessWidget {
   Widget _buildEmptyCallState() {
     return Container(
       padding: const EdgeInsets.all(14),
-      margin: const EdgeInsets.symmetric(vertical: 10),
+      margin: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(10),

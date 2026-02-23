@@ -412,6 +412,7 @@ class AuthService extends GetxService {
         'first_name': firstName,
         'last_name': lastName,
         'is_active': true,
+        'created_by_super_admin_id': currentSuperAdmin.value!.id,
       };
       if (phone != null) insertData['phone'] = phone;
 
@@ -519,29 +520,28 @@ class AuthService extends GetxService {
   /// Check if there's an existing session and load user profile
   Future<UserRole?> restoreSession() async {
     try {
-      if (!_supabase.isLoggedIn) {
-        await _storage.clear();
-        return null;
-      }
-
-      // 1. Try to load from local storage first for speed
+      // 1. Check local storage first
       final cachedRoleStr = _storage.getString(StorageService.keyUserRole);
       final cachedProfile = _storage.getJson(StorageService.keyUserProfile);
 
       if (cachedRoleStr != null && cachedProfile != null) {
         final role = UserRole.fromString(cachedRoleStr);
+        final profile = _parseProfile(role, cachedProfile);
         
         // Populate reactive variables
-        _setCurrentUser(role, _parseProfile(role, cachedProfile), saveToStorage: false);
+        _setCurrentUser(role, profile, saveToStorage: false);
         return role;
       }
 
-      // 2. Fallback to server discovery if local cache missing
-      final result = await _supabase.detectCurrentUser();
-      if (result != null) {
-        _setCurrentUser(result.role, result.profile);
-        return result.role;
+      // 2. If nothing in storage, check Supabase
+      if (_supabase.isLoggedIn) {
+        final result = await _supabase.detectCurrentUser();
+        if (result != null) {
+          _setCurrentUser(result.role, result.profile);
+          return result.role;
+        }
       }
+      
       return null;
     } catch (e) {
       print('Error restoring session: $e');

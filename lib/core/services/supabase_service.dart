@@ -72,6 +72,16 @@ class SupabaseService extends GetxService {
   SupabaseQueryBuilder get activityLogTable =>
       _client.from(SupabaseConstants.activityLogTable);
 
+  /// Project tables
+  SupabaseQueryBuilder get projectsTable =>
+      _client.from(SupabaseConstants.projectsTable);
+
+  SupabaseQueryBuilder get projectMembersTable =>
+      _client.from(SupabaseConstants.projectMembersTable);
+
+  SupabaseQueryBuilder get projectCallersTable =>
+      _client.from(SupabaseConstants.projectCallersTable);
+
   /// Storage
   SupabaseStorageClient get storage => _client.storage;
 

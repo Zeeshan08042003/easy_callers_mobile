@@ -34,6 +34,9 @@ import 'package:easy_callers_mobile/features/employee/dashboard/bindings/employe
 import 'package:easy_callers_mobile/features/support/views/support_view.dart';
 import 'package:easy_callers_mobile/features/employee/feedback/views/call_feedback_view.dart';
 import 'package:easy_callers_mobile/features/employee/feedback/bindings/call_feedback_binding.dart';
+import 'package:easy_callers_mobile/features/project/views/project_list_view.dart';
+import 'package:easy_callers_mobile/features/project/views/create_project_view.dart';
+import 'package:easy_callers_mobile/features/project/views/project_detail_view.dart';
 // import 'package:easy_callers_mobile/features/employee/views/employee_dashboard.dart';
 
 class AppPages {
@@ -125,6 +128,20 @@ class AppPages {
       name: AppRoutes.managerDashboard,
       page: () => const ManagerDashboardView(),
       binding: ManagerDashboardBinding(),
+    ),
+
+    // Projects (shared between Super Admin and Manager)
+    GetPage(
+      name: AppRoutes.projectList,
+      page: () => const ProjectListView(),
+    ),
+    GetPage(
+      name: AppRoutes.createProject,
+      page: () => const CreateProjectView(),
+    ),
+    GetPage(
+      name: AppRoutes.projectDetail,
+      page: () => const ProjectDetailView(),
     ),
 
     // Employee

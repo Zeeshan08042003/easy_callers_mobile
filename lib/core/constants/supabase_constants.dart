@@ -16,6 +16,11 @@ class SupabaseConstants {
   static const String notificationsTable = 'notifications';
   static const String activityLogTable = 'activity_log';
 
+  // Project tables
+  static const String projectsTable = 'projects';
+  static const String projectMembersTable = 'project_members';
+  static const String projectCallersTable = 'project_callers';
+
   // Storage buckets
   static const String leadFilesBucket = 'lead-files';
 }

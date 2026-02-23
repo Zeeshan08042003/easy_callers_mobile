@@ -51,7 +51,6 @@ class ManagerTeamView extends GetView<ManagerTeamController> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -298,55 +297,5 @@ class ManagerTeamView extends GetView<ManagerTeamController> {
     );
   }
 
-  Widget _buildBottomNav() {
-    return Theme(
-      data: ThemeData(
-        canvasColor: const Color(0xFF0F172A),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: 1,
-        backgroundColor: const Color(0xFF0F172A),
-        selectedItemColor: const Color(0xFF3B82F6),
-        unselectedItemColor: const Color(0xFF64748B),
-        type: BottomNavigationBarType.fixed,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        onTap: (index) {
-          if (index == 0) Get.offAll(() => const ManagerDashboardView(), binding: ManagerDashboardBinding());
-          if (index == 2) Get.to(() => const ManagerReportsView(), binding: ManagerReportsBinding());
-          if (index == 3) Get.to(() => const ProfileView(), binding: ProfileBinding());
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.grid_view_rounded, size: 26),
-            ),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.people_rounded, size: 26),
-            ),
-            label: 'Agents',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.bar_chart_rounded, size: 26),
-            ),
-            label: 'Stats',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 6),
-              child: Icon(Icons.settings_rounded, size: 26),
-            ),
-            label: 'Admin',
-          ),
-        ],
-      ),
-    );
-  }
+
 }

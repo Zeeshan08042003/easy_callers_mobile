@@ -85,6 +85,95 @@ class LeadService extends GetxService {
     }
   }
 
+  /// Delete a lead batch and all its associated leads
+  Future<bool> deleteLeadBatch(String batchId) async {
+    try {
+      // 1. Delete all leads associated with this batch
+      // We do this first because the FK is ON DELETE SET NULL, 
+      // but we want the leads GONE when the batch is deleted.
+      await _supabase.leadsTable
+          .delete()
+          .eq('batch_id', batchId);
+
+      // 2. Delete the batch record
+      await _supabase.client
+          .from('lead_batches')
+          .delete()
+          .eq('id', batchId);
+
+      return true;
+    } catch (e) {
+      print('Error deleting lead batch: $e');
+      return false;
+    }
+  }
+
+  /// Pick a file, parse leads, and upload to a specific project
+  Future<LeadBatchModel?> pickAndUploadLeadsToProject({
+    required String managerId,
+    required String projectId,
+  }) async {
+    try {
+      // 1. Pick File
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+      );
+
+      if (result == null || result.files.single.path == null) return null;
+
+      final filePath = result.files.single.path!;
+      final fileName = result.files.single.name;
+      final file = File(filePath);
+
+      // 2. Parse Excel
+      final leadsData = await _parseExcelLeads(file);
+      if (leadsData.isEmpty) {
+        throw 'No valid leads found in the file. Ensure you have "Name" and "Phone" columns.';
+      }
+
+      // 3. Create Lead Batch record WITH project_id
+      final batchResponse = await _supabase.client.from('lead_batches').insert({
+        'file_name': fileName,
+        'total_leads': leadsData.length,
+        'uploaded_by': managerId,
+        'project_id': projectId,
+      }).select().single();
+
+      final batch = LeadBatchModel.fromJson(batchResponse);
+
+      // 4. Upload File to Storage
+      final fileUrl = await _uploadToStorage(file, batch.id);
+      
+      // Update batch with file URL
+      if (fileUrl != null) {
+        await _supabase.client
+            .from('lead_batches')
+            .update({'file_url': fileUrl})
+            .eq('id', batch.id);
+      }
+
+      // 5. Bulk Insert Leads WITH project_id
+      final List<Map<String, dynamic>> finalLeads = leadsData.map((lead) {
+        return {
+          ...lead,
+          'uploaded_by': managerId,
+          'batch_id': batch.id,
+          'project_id': projectId,
+          'status': LeadStatus.newLead.value,
+        };
+      }).toList();
+
+      // Supabase supports bulk insert via list
+      await _supabase.leadsTable.insert(finalLeads);
+
+      return batch;
+    } catch (e) {
+      print('Error picking/uploading leads to project: $e');
+      rethrow;
+    }
+  }
+
   /// Parse Excel file and return list of lead maps
   /// Uses intelligent column detection and phone cleaning
   Future<List<Map<String, dynamic>>> _parseExcelLeads(File file) async {
@@ -135,9 +224,9 @@ class LeadService extends GetxService {
           if (entry.value != null && entry.value! < row.length) {
             final cellValue = row[entry.value!]?.value?.toString().trim();
             if (cellValue != null && cellValue.isNotEmpty) {
-              // Clean phone numbers before storing
+              // Extract multiple phone numbers if it's the phone column
               if (entry.key == 'phone') {
-                lead[entry.key] = _cleanPhoneNumber(cellValue);
+                lead[entry.key] = _extractPhoneNumbers(cellValue);
               } else {
                 lead[entry.key] = cellValue;
               }
@@ -161,7 +250,8 @@ class LeadService extends GetxService {
 
         // Database requires BOTH name AND phone (NOT NULL constraints)
         final hasName = (lead['name'] as String? ?? '').isNotEmpty;
-        final hasPhone = (lead['phone'] as String? ?? '').isNotEmpty;
+        final phones = lead['phone'] as List<String>? ?? [];
+        final hasPhone = phones.isNotEmpty;
 
         // Only add if we have BOTH name AND phone
         if (hasName && hasPhone) {
@@ -243,15 +333,20 @@ class LeadService extends GetxService {
   }
 
   /// Get leads assigned to a specific employee with pagination support
-  Future<List<LeadModel>> getLeadsByEmployee(String employeeId, {int page = 1, int pageSize = 20}) async {
+  Future<List<LeadModel>> getLeadsByEmployee(String employeeId, {int page = 1, int pageSize = 20, String? projectId}) async {
     try {
       final from = (page - 1) * pageSize;
       final to = from + pageSize - 1;
 
-      final response = await _supabase.leadsTable
+      var query = _supabase.leadsTable
           .select()
-          .eq('assigned_to', employeeId)
-          .order('created_at', ascending: false).range(from, to);
+          .eq('assigned_to', employeeId);
+      
+      if (projectId != null) {
+        query = query.eq('project_id', projectId);
+      }
+          
+      final response = await query.order('created_at', ascending: false).range(from, to);
 
       print("getLeadsByEmployee: ${response.length}");
 
@@ -263,7 +358,7 @@ class LeadService extends GetxService {
     }
   }
 
-  Future<int> getLeadsCountByEmployee(String employeeId, {LeadStatus? status}) async {
+  Future<int> getLeadsCountByEmployee(String employeeId, {LeadStatus? status, String? projectId}) async {
     try {
       var query = _supabase.leadsTable
           .select('id')
@@ -271,6 +366,9 @@ class LeadService extends GetxService {
       
       if (status != null) {
         query = query.eq('status', status.value);
+      }
+      if (projectId != null) {
+        query = query.eq('project_id', projectId);
       }
       
       final response = await query;
@@ -319,7 +417,7 @@ class LeadService extends GetxService {
   }
 
   /// Get today's follow-up leads for an employee
-  Future<List<LeadModel>> getTodayFollowUps(String employeeId) async {
+  Future<List<LeadModel>> getTodayFollowUps(String employeeId, {String? projectId}) async {
     try {
       final now = DateTime.now();
       final todayStart = DateTime(now.year, now.month, now.day);
@@ -336,10 +434,16 @@ class LeadService extends GetxService {
           (callLogs as List).map((log) => log['lead_id'] as String).toSet();
 
       if (leadIds.isEmpty) return [];
-
-      final response = await _supabase.leadsTable
+      
+      var query = _supabase.leadsTable
           .select()
           .inFilter('id', leadIds.toList());
+          
+      if (projectId != null) {
+        query = query.eq('project_id', projectId);
+      }
+
+      final response = await query;
 
       return (response as List)
           .map((json) => LeadModel.fromJson(json))
@@ -567,6 +671,81 @@ class LeadService extends GetxService {
     }
   }
 
+  /// Get the latest batch with unassigned leads for a specific project
+  Future<LeadBatchModel?> getLatestBatchWithUnassignedLeadsForProject({
+    required String managerId,
+    required String projectId,
+  }) async {
+    try {
+      final batchesResponse = await _supabase.client
+          .from('lead_batches')
+          .select()
+          .eq('project_id', projectId)
+          .order('created_at', ascending: false)
+          .limit(10);
+
+      final batches = (batchesResponse as List)
+          .map((json) => LeadBatchModel.fromJson(json))
+          .toList();
+
+      for (final batch in batches) {
+        final unassignedLeads = await getUnassignedLeadsFromBatch(batch.id);
+        if (unassignedLeads.isNotEmpty) {
+          return batch;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching latest batch for project: $e');
+      return null;
+    }
+  }
+
+  /// Get dashboard statistics for a specific project
+  Future<Map<String, dynamic>> getProjectDashboardStats({
+    required String managerId,
+    required String projectId,
+  }) async {
+    try {
+      // 1. Total leads in this project
+      final totalLeads = await _supabase.leadsTable
+          .count(CountOption.exact)
+          .eq('project_id', projectId);
+
+      // 2. Assigned leads in this project
+      final assignedLeads = await _supabase.leadsTable
+          .count(CountOption.exact)
+          .eq('project_id', projectId)
+          .not('assigned_to', 'is', null);
+
+      // 3. Performance (Contacted / Assigned)
+      final uncontactedLeads = await _supabase.leadsTable
+          .count(CountOption.exact)
+          .eq('project_id', projectId)
+          .not('assigned_to', 'is', null)
+          .inFilter('status', ['new', 'assigned']);
+
+      final contactedLeads = assignedLeads - uncontactedLeads;
+      final performance = assignedLeads > 0
+          ? (contactedLeads / assignedLeads) * 100
+          : 0.0;
+
+      return {
+        'totalLeads': totalLeads,
+        'assignedLeads': assignedLeads,
+        'performance': performance,
+      };
+    } catch (e) {
+      print('Error fetching project dashboard stats: $e');
+      return {
+        'totalLeads': 0,
+        'assignedLeads': 0,
+        'performance': 0.0,
+      };
+    }
+  }
+
   /// Bulk assign leads equally among employees
   Future<bool> splitLeadsEqually({
     required List<String> leadIds,
@@ -773,14 +952,25 @@ class LeadService extends GetxService {
     required String employeeId,
     required DateTime startDate,
     required DateTime endDate,
+    String? projectId,
   }) async {
     try {
-      final response = await _supabase.callLogsTable
-          .select('*, leads(name, phone)')
+      var selectQuery = '*, leads!inner(name, phone)';
+      if (projectId != null) {
+        selectQuery = '*, leads!inner(name, phone, project_id)';
+      }
+
+      var query = _supabase.callLogsTable
+          .select(selectQuery)
           .eq('employee_id', employeeId)
           .gte('created_at', startDate.toIso8601String())
-          .lte('created_at', endDate.toIso8601String())
-          .order('created_at', ascending: false);
+          .lte('created_at', endDate.toIso8601String());
+
+      if (projectId != null) {
+        query = query.eq('leads.project_id', projectId);
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       return (response as List)
           .map((json) => CallLogModel.fromJson(json))
@@ -1371,6 +1561,7 @@ class LeadService extends GetxService {
     try {
       final response = await _supabase.managersTable
           .select()
+          .eq('is_active', true)
           .order('created_at', ascending: false);
 
       return (response as List)
@@ -1627,6 +1818,24 @@ class LeadService extends GetxService {
     }
     
     return cleaned;
+  }
+
+  /// Extract multiple phone numbers from a string
+  List<String> _extractPhoneNumbers(String value) {
+    if (value.isEmpty) return [];
+    
+    // Split by common delimiters (comma, semicolon, slash, pipe)
+    final parts = value.split(RegExp(r'[,;/|]'));
+    final List<String> cleanedPhones = [];
+    
+    for (var part in parts) {
+      final cleaned = _cleanPhoneNumber(part.trim());
+      if (cleaned.isNotEmpty && _isPhoneNumber(cleaned)) {
+        cleanedPhones.add(cleaned);
+      }
+    }
+    
+    return cleanedPhones;
   }
 
   /// Intelligent content detection for Excel files without clear headers

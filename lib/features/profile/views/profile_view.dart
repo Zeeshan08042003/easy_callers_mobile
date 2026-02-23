@@ -40,10 +40,6 @@ class ProfileView extends GetView<ProfileController> {
       backgroundColor: Colors.transparent,
       elevation: 0,
       pinned: true,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-        onPressed: () => Get.back(),
-      ),
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: const Text(

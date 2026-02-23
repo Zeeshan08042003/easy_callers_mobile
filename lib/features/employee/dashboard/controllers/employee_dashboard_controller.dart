@@ -6,16 +6,24 @@ import 'package:easy_callers_mobile/features/employee/views/lead_detail_view.dar
 import 'package:easy_callers_mobile/features/employee/views/call_history_view.dart';
 import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
+import 'package:easy_callers_mobile/features/project/models/project_model.dart';
+import 'package:easy_callers_mobile/features/project/services/project_service.dart';
 
 import '../../../../core/utils/enums.dart';
 
 class EmployeeDashboardController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();
   final AuthService _authService = Get.find<AuthService>();
+  final ProjectService _projectService = Get.find<ProjectService>();
 
   final RxList<LeadModel> assignedLeads = <LeadModel>[].obs;
   final RxList<LeadModel> pendingFollowups = <LeadModel>[].obs;
   final RxMap<String, dynamic> todayStats = <String, dynamic>{}.obs;
+  
+  // Projects
+  final RxList<ProjectModel> projects = <ProjectModel>[].obs;
+  final Rx<ProjectModel?> selectedProject = Rx<ProjectModel?>(null);
+  
   final RxBool isLoading = false.obs;
   final RxBool isLoadingMore = false.obs;
   final RxBool hasMoreLeads = true.obs;
@@ -57,7 +65,35 @@ class EmployeeDashboardController extends GetxController {
   void onInit() {
     super.onInit();
     _loadEmployeeProfile();
+    _initDashboard();
+  }
+
+  Future<void> _initDashboard() async {
+    await _loadProjects();
     refreshData();
+  }
+
+  Future<void> _loadProjects() async {
+    final employeeId = _authService.currentEmployee.value?.id;
+    if (employeeId == null) return;
+
+    try {
+      final fetchedProjects = await _projectService.getProjectsForEmployee(employeeId);
+      projects.value = fetchedProjects;
+      
+      if (projects.isNotEmpty && selectedProject.value == null) {
+        selectedProject.value = projects.first;
+      }
+    } catch (e) {
+      print('Error fetching projects for employee: $e');
+    }
+  }
+
+  void selectProject(ProjectModel project) {
+    if (selectedProject.value?.id != project.id) {
+      selectedProject.value = project;
+      refreshData();
+    }
   }
 
   void _loadEmployeeProfile() {
@@ -76,13 +112,14 @@ class EmployeeDashboardController extends GetxController {
       final employeeId = _authService.currentEmployee.value?.id;
       if (employeeId == null) return;
 
-      // Parallel fetch
+      // Parallel fetch, passing selected project ID
+      final pId = selectedProject.value?.id;
       final results = await Future.wait([
-        _leadService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize),
-        _leadService.getTodayFollowUps(employeeId),
-        _getEmployeeStats(employeeId),
-        _leadService.getLeadsCountByEmployee(employeeId),
-        _leadService.getLeadsCountByEmployee(employeeId, status: LeadStatus.assigned),
+        _leadService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize, projectId: pId),
+        _leadService.getTodayFollowUps(employeeId, projectId: pId),
+        _getEmployeeStats(employeeId, pId),
+        _leadService.getLeadsCountByEmployee(employeeId, projectId: pId),
+        _leadService.getLeadsCountByEmployee(employeeId, status: LeadStatus.assigned, projectId: pId),
       ]);
 
       assignedLeads.value = results[0] as List<LeadModel>;
@@ -112,11 +149,13 @@ class EmployeeDashboardController extends GetxController {
       final employeeId = _authService.currentEmployee.value?.id;
       if (employeeId == null) return;
 
+      final pId = selectedProject.value?.id;
       _currentPage++;
       final moreLeads = await _leadService.getLeadsByEmployee(
         employeeId, 
         page: _currentPage, 
-        pageSize: _pageSize
+        pageSize: _pageSize,
+        projectId: pId,
       );
 
       if (moreLeads.isEmpty) {
@@ -134,7 +173,7 @@ class EmployeeDashboardController extends GetxController {
     }
   }
 
-  Future<Map<String, dynamic>> _getEmployeeStats(String employeeId) async {
+  Future<Map<String, dynamic>> _getEmployeeStats(String employeeId, String? projectId) async {
     try {
       // Get today's call logs to calculate stats
       final now = DateTime.now();
@@ -145,6 +184,7 @@ class EmployeeDashboardController extends GetxController {
         employeeId: employeeId,
         startDate: todayStart,
         endDate: todayEnd,
+        projectId: projectId,
       );
 
       final totalCalls = callLogs.length;

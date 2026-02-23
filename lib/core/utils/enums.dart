@@ -157,7 +157,10 @@ enum NotificationType {
   general('general'),
   superAdminChange('super_admin_change'),
   leadReassigned('lead_reassigned'),
-  employeeDeactivated('employee_deactivated');
+  employeeDeactivated('employee_deactivated'),
+  projectInvitation('project_invitation'),
+  projectInvitationAccepted('project_invitation_accepted'),
+  projectInvitationDeclined('project_invitation_declined');
 
   final String value;
   const NotificationType(this.value);
@@ -166,6 +169,59 @@ enum NotificationType {
     return NotificationType.values.firstWhere(
       (e) => e.value == value,
       orElse: () => NotificationType.general,
+    );
+  }
+}
+
+/// Role of a manager within a project
+enum ProjectMemberRole {
+  owner('owner'),
+  member('member');
+
+  final String value;
+  const ProjectMemberRole(this.value);
+
+  String get displayName {
+    switch (this) {
+      case ProjectMemberRole.owner:
+        return 'Owner';
+      case ProjectMemberRole.member:
+        return 'Member';
+    }
+  }
+
+  static ProjectMemberRole fromString(String value) {
+    return ProjectMemberRole.values.firstWhere(
+      (e) => e.value == value,
+      orElse: () => ProjectMemberRole.member,
+    );
+  }
+}
+
+/// Status of a project membership/invitation
+enum ProjectMemberStatus {
+  pending('pending'),
+  accepted('accepted'),
+  declined('declined');
+
+  final String value;
+  const ProjectMemberStatus(this.value);
+
+  String get displayName {
+    switch (this) {
+      case ProjectMemberStatus.pending:
+        return 'Pending';
+      case ProjectMemberStatus.accepted:
+        return 'Accepted';
+      case ProjectMemberStatus.declined:
+        return 'Declined';
+    }
+  }
+
+  static ProjectMemberStatus fromString(String value) {
+    return ProjectMemberStatus.values.firstWhere(
+      (e) => e.value == value,
+      orElse: () => ProjectMemberStatus.pending,
     );
   }
 }

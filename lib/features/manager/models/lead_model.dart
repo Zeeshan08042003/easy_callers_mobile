@@ -3,7 +3,7 @@ import 'package:easy_callers_mobile/core/utils/enums.dart';
 class LeadModel {
   final String id;
   final String name;
-  final String phone;
+  final List<String> phone;
   final String? email;
   final String? location;
   final String? projectName;
@@ -25,7 +25,7 @@ class LeadModel {
   LeadModel({
     required this.id,
     required this.name,
-    required this.phone,
+    this.phone = const [],
     this.email,
     this.location,
     this.projectName,
@@ -71,7 +71,7 @@ class LeadModel {
     return LeadModel(
       id: json['id'] as String,
       name: json['name'] as String,
-      phone: json['phone'] as String,
+      phone: (json['phone'] as List?)?.map((e) => e.toString()).toList() ?? [],
       email: json['email'] as String?,
       location: json['location'] as String?,
       projectName: json['project_name'] as String?,
@@ -133,7 +133,7 @@ class LeadModel {
   LeadModel copyWith({
     String? id,
     String? name,
-    String? phone,
+    List<String>? phone,
     String? email,
     String? location,
     String? projectName,

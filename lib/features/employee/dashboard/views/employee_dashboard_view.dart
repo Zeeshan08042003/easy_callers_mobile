@@ -22,6 +22,7 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
           child: CustomScrollView(
             slivers: [
               _buildHeader(),
+              _buildProjectSelector(),
               _buildStatsCards(),
               _buildProgressBar(),
               _buildStartCallingButton(),
@@ -88,6 +89,227 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
                   )),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProjectSelector() {
+    return SliverToBoxAdapter(
+      child: Obx(() {
+        final selected = controller.selectedProject.value;
+        if (selected == null) {
+          return const SizedBox.shrink();
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+          child: GestureDetector(
+            onTap: () => _showProjectPicker(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E2432),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.folder_rounded,
+                        color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          selected.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (selected.subtitle != null &&
+                            selected.subtitle!.isNotEmpty)
+                          Text(
+                            selected.subtitle!,
+                            style: TextStyle(
+                              color: AppColors.textSecondary.withOpacity(0.5),
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (controller.projects.length > 1) ...[
+                    Text(
+                      '${controller.projects.length}',
+                      style: TextStyle(
+                        color: AppColors.primary.withOpacity(0.7),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.textSecondary.withOpacity(0.5), size: 20),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  void _showProjectPicker() {
+    Get.bottomSheet(
+      Container(
+        constraints: BoxConstraints(
+          maxHeight: Get.height * 0.6,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A2030),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Text(
+                    'Switch Project',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(left: 20, right: 20, bottom: 30),
+                itemCount: controller.projects.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final project = controller.projects[index];
+                  final isSelected =
+                      project.id == controller.selectedProject.value?.id;
+                  return GestureDetector(
+                    onTap: () {
+                      controller.selectProject(project);
+                      Get.back();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary.withOpacity(0.1)
+                            : const Color(0xFF232B3E),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary.withOpacity(0.4)
+                              : Colors.white.withOpacity(0.03),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary.withOpacity(0.2)
+                                  : Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.folder_rounded,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  project.name,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                                if (project.subtitle != null &&
+                                    project.subtitle!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    project.subtitle!,
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary
+                                          .withOpacity(0.6),
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check_rounded,
+                                  color: Colors.white, size: 14),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -397,7 +619,7 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    lead.phone,
+                    lead.phone.isNotEmpty ? lead.phone.first : 'No Phone',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,

@@ -41,8 +41,12 @@ class SuperAdminModel {
       phone: json['phone'] as String?,
       profileImageUrl: json['profile_image_url'] as String?,
       isActive: json['is_active'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'] as String) 
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'] as String) 
+          : DateTime.now(),
     );
   }
 
@@ -56,6 +60,8 @@ class SuperAdminModel {
       'phone': phone,
       'profile_image_url': profileImageUrl,
       'is_active': isActive,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 

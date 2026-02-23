@@ -38,4 +38,5 @@ class StorageService extends GetxService {
   static const String keyUserRole = 'user_role';
   static const String keyUserProfile = 'user_profile';
   static const String keyIsLoggedIn = 'is_logged_in';
+  static const String keyLastProjectID = 'last_project_id';
 }

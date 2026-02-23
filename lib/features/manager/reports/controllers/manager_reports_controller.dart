@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show DateTimeRange;
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class ManagerReportsController extends GetxController {
@@ -12,6 +13,9 @@ class ManagerReportsController extends GetxController {
   final RxList activityStats = <Map<String, dynamic>>[].obs;
   
   final RxBool isLoading = true.obs;
+  
+  // Optional manager ID for Super Admin oversight
+  String? oversightManagerId;
   final Rx<DateTimeRange> selectedDateRange = DateTimeRange(
     start: DateTime.now().subtract(const Duration(days: 7)),
     end: DateTime.now(),
@@ -20,13 +24,21 @@ class ManagerReportsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    
+    // Check for oversight mode
+    if (Get.arguments is String) {
+      oversightManagerId = Get.arguments as String;
+    } else if (Get.arguments is ManagerModel) {
+      oversightManagerId = (Get.arguments as ManagerModel).id;
+    }
+
     fetchAllData();
   }
 
   Future<void> fetchAllData() async {
     try {
       isLoading.value = true;
-      final managerId = _authService.currentManager.value?.id;
+      final managerId = oversightManagerId ?? _authService.currentManager.value?.id;
       if (managerId == null) return;
 
       // Run in parallel

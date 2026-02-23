@@ -84,17 +84,18 @@ class LeadDetailController extends GetxController {
   }
 
 
-  Future<void> makeCall() async {
+  Future<void> makeCall({String? phoneNumber}) async {
     try {
       CallSession? session;
+      final numberToCall = phoneNumber ?? (lead.phone.isNotEmpty ? lead.phone.first : '');
 
       if (Platform.isIOS) {
         session = await callController.makeCallForIos(
-          phoneNumber: lead.phone,
+          phoneNumber: numberToCall,
         );
       } else {
         session = await callController.makeCall(
-          phoneNumber: lead.phone,
+          phoneNumber: numberToCall,
         );
       }
 
@@ -127,19 +128,21 @@ class LeadDetailController extends GetxController {
 
 
 
-  whatsappMsg() {
+  whatsappMsg({String? phoneNumber}) {
+    final numberToCall = phoneNumber ?? (lead.phone.isNotEmpty ? lead.phone.first : '');
     if (Platform.isIOS) {
-      callController.launchWhatsAppChatForIos(lead.phone);
+      callController.launchWhatsAppChatForIos(numberToCall);
     } else {
-      callController.sendWhatsAppMessage([lead.phone], "Hello");
+      callController.sendWhatsAppMessage([numberToCall], "Hello");
     }
   }
 
-  sendMobileSMS(){
+  sendMobileSMS({String? phoneNumber}) {
+    final numberToCall = phoneNumber ?? (lead.phone.isNotEmpty ? lead.phone.first : '');
     if (Platform.isIOS) {
-      callController.sendSMS(lead.phone,"Hello");
+      callController.sendSMS(numberToCall, "Hello");
     } else {
-      callController.sendSMS(lead.phone, "Hello");
+      callController.sendSMS(numberToCall, "Hello");
     }
   }
 

@@ -89,6 +89,8 @@ class EmployeeModel {
       'profile_image_url': profileImageUrl,
       'is_active': isActive,
       'manager_id': managerId,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 

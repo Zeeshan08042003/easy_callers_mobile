@@ -7,8 +7,10 @@ import 'package:easy_callers_mobile/features/manager/models/employee_model.dart'
 class DistributeLeadsView extends GetView<DistributeLeadsController> {
   const DistributeLeadsView({super.key});
 
+
   @override
   Widget build(BuildContext context) {
+    Get.put(DistributeLeadsController());
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

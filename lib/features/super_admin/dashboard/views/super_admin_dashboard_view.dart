@@ -12,6 +12,9 @@ import 'package:easy_callers_mobile/features/super_admin/reports/views/system_re
 import 'package:easy_callers_mobile/features/super_admin/reports/bindings/system_reports_binding.dart';
 import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
+import 'package:easy_callers_mobile/features/project/views/project_list_view.dart';
+import 'package:easy_callers_mobile/features/manager/dashboard/views/manager_dashboard_view.dart';
+import 'package:easy_callers_mobile/features/manager/dashboard/bindings/manager_dashboard_binding.dart';
 import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 
 import '../../../manager/leads/bindings/lead_controller_binding.dart';
@@ -25,40 +28,53 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: controller.refreshDashboard,
-          color: AppColors.primary,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 30),
-                _buildTotalVisitsCard(),
-                const SizedBox(height: 20),
-                _buildSmallStatsGrid(),
-                const SizedBox(height: 30),
-                _buildSearchField(),
-                const SizedBox(height: 30),
-                _buildRecentManagersHeader(),
-                const SizedBox(height: 15),
-                _buildRecentManagersList(),
-                const SizedBox(height: 80), // Space for bottom nav or FAB
-              ],
-            ),
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
+      body: Obx(() => IndexedStack(
+        index: controller.currentTabIndex.value,
+        children: [
+          _buildDashboardHome(),
+          const ProjectListView(),
+          const SystemReportsView(),
+          const ManagerListView(),
+          const SystemSettingsView(),
+        ],
+      )),
+      floatingActionButton: Obx(() => controller.currentTabIndex.value == 0 ? FloatingActionButton(
         onPressed: () => Get.to(() => const AddManagerView(), binding: AddManagerBinding()),
         backgroundColor: AppColors.primary,
         shape: const CircleBorder(),
         child: const Icon(Icons.add, color: Colors.white, size: 30),
+      ) : const SizedBox.shrink()),
+      bottomNavigationBar: Obx(() => _buildBottomNav()),
+    );
+  }
+
+  Widget _buildDashboardHome() {
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: controller.refreshDashboard,
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 30),
+              _buildTotalVisitsCard(),
+              const SizedBox(height: 20),
+              _buildSmallStatsGrid(),
+              const SizedBox(height: 30),
+              _buildSearchField(),
+              const SizedBox(height: 30),
+              _buildRecentManagersHeader(),
+              const SizedBox(height: 15),
+              _buildRecentManagersList(),
+              const SizedBox(height: 80), // Space for bottom nav or FAB
+            ],
+          ),
+        ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -303,7 +319,7 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
           ),
         ),
         TextButton(
-          onPressed: () => Get.to(() => const ManagerListView(), binding: ManagerListBinding()),
+          onPressed: () => controller.switchTab(3),
           child: const Text(
             'See All',
             style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 15),
@@ -379,7 +395,11 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
             ),
           ),
           ElevatedButton(
-            onPressed: () => Get.to(() => const ManagerOversightView(), arguments: manager),
+            onPressed: () => Get.to(
+              () => const ManagerDashboardView(), 
+              binding: ManagerDashboardBinding(),
+              arguments: manager.id,
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E2432),
               foregroundColor: const Color(0xFF3B82F6),
@@ -418,24 +438,15 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
     return Theme(
       data: ThemeData(canvasColor: AppColors.background),
       child: BottomNavigationBar(
-        currentIndex: 0,
+        currentIndex: controller.currentTabIndex.value,
         backgroundColor: AppColors.background,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
-        onTap: (index) {
-          if (index == 1) {
-            Get.to(() => const SystemReportsView(), binding: SystemReportsBinding());
-          }
-          if (index == 2) {
-            Get.to(() => const ManagerListView(), binding: ManagerListBinding());
-          }
-          if (index == 3) {
-            Get.to(() => const SystemSettingsView(), binding: SystemSettingsBinding());
-          }
-        },
+        onTap: controller.switchTab,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.folder_outlined), label: 'Projects'),
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: 'Reports'),
           BottomNavigationBarItem(icon: Icon(Icons.apartment_rounded), label: 'Agencies'),
           BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), label: 'System'),

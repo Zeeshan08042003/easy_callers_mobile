@@ -8,6 +8,9 @@ import 'package:easy_callers_mobile/features/manager/reports/views/manager_repor
 import 'package:easy_callers_mobile/features/manager/reports/bindings/manager_reports_binding.dart';
 import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
+import 'package:easy_callers_mobile/features/project/views/project_list_view.dart';
+import 'package:easy_callers_mobile/features/project/views/create_project_view.dart';
+import 'package:easy_callers_mobile/features/project/models/project_model.dart';
 import 'package:intl/intl.dart';
 
 class ManagerDashboardView extends GetView<ManagerDashboardController> {
@@ -15,20 +18,43 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Obx(() => IndexedStack(
+        index: controller.currentTabIndex.value,
+        children: [
+          _buildDashboardHome(),
+          const ProjectListView(),
+          const ManagerTeamView(),
+          const ManagerReportsView(),
+          const ProfileView(),
+        ],
+      )),
+      bottomNavigationBar: Obx(() => _buildBottomNav()),
+    );
+  }
+
+  Widget _buildDashboardHome() {
     return RefreshIndicator(
       onRefresh: () { 
         return controller.fetchDashboardData();
       },
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: SingleChildScrollView(
+      child: SafeArea(
+        child: Obx(() {
+          // Show create project prompt if no projects exist
+          if (controller.hasNoProjects.value && !controller.isLoadingProjects.value) {
+            return _buildNoProjectsState();
+          }
+
+          return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
-                const SizedBox(height: 30),
+                const SizedBox(height: 16),
+                _buildProjectSelector(),
+                const SizedBox(height: 24),
                 _buildActionRow(),
                 const SizedBox(height: 30),
                 _buildStatsRow(),
@@ -41,9 +67,8 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                 _buildTeamStatusSection(),
               ],
             ),
-          ),
-        ),
-        bottomNavigationBar: _buildBottomNav(),
+          );
+        }),
       ),
     );
   }
@@ -104,7 +129,7 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
             ),
             const SizedBox(width: 15),
             GestureDetector(
-              onTap: () => Get.to(() => const ProfileView(), binding: ProfileBinding()),
+              onTap: () => controller.switchTab(4),
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -122,10 +147,333 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
     );
   }
 
+  // ============================================
+  // NO PROJECTS STATE
+  // ============================================
+
+  Widget _buildNoProjectsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.folder_open_rounded,
+                  color: Colors.white, size: 44),
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'Create Your First Project',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Projects organize your leads and callers.\nCreate a project to start uploading excel sheets and distributing leads.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary.withOpacity(0.7),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 36),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Get.to(() => const CreateProjectView());
+                  if (result != null && result is ProjectModel) {
+                    controller.onProjectCreated(result);
+                  }
+                },
+                icon: const Icon(Icons.add_rounded, size: 22),
+                label: const Text(
+                  'Create Project',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  elevation: 4,
+                  shadowColor: AppColors.primary.withOpacity(0.4),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================
+  // PROJECT SELECTOR
+  // ============================================
+
+  Widget _buildProjectSelector() {
+    return Obx(() {
+      final selected = controller.selectedProject.value;
+      if (selected == null) {
+        return const SizedBox.shrink();
+      }
+
+      return GestureDetector(
+        onTap: () => _showProjectPicker(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2432),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.folder_rounded,
+                    color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      selected.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (selected.subtitle != null &&
+                        selected.subtitle!.isNotEmpty)
+                      Text(
+                        selected.subtitle!,
+                        style: TextStyle(
+                          color: AppColors.textSecondary.withOpacity(0.5),
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              if (controller.projects.length > 1) ...[
+                Text(
+                  '${controller.projects.length}',
+                  style: TextStyle(
+                    color: AppColors.primary.withOpacity(0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textSecondary.withOpacity(0.5), size: 20),
+              ],
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  void _showProjectPicker() {
+    Get.bottomSheet(
+      Container(
+        constraints: BoxConstraints(
+          maxHeight: Get.height * 0.6,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A2030),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const Text(
+                    'Switch Project',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      Get.back();
+                      final result =
+                          await Get.to(() => const CreateProjectView());
+                      if (result != null && result is ProjectModel) {
+                        controller.onProjectCreated(result);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.add_rounded,
+                              color: AppColors.primary, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'New',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding:
+                    const EdgeInsets.only(left: 20, right: 20, bottom: 30),
+                itemCount: controller.projects.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final project = controller.projects[index];
+                  final isSelected =
+                      project.id == controller.selectedProject.value?.id;
+                  return GestureDetector(
+                    onTap: () {
+                      controller.selectProject(project);
+                      Get.back();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary.withOpacity(0.1)
+                            : const Color(0xFF232B3E),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary.withOpacity(0.4)
+                              : Colors.white.withOpacity(0.03),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary.withOpacity(0.2)
+                                  : Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.folder_rounded,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  project.name,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (project.subtitle != null &&
+                                    project.subtitle!.isNotEmpty)
+                                  Text(
+                                    project.subtitle!,
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary
+                                          .withOpacity(0.5),
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(Icons.check_circle_rounded,
+                                color: AppColors.primary, size: 20),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionRow() {
     return Obx(() {
       final hasLastBatch = controller.lastUploadedBatch.value != null;
-      final batchLeads = controller.lastUploadedBatch.value?.totalLeads ?? 0;
       
       return Column(
         children: [
@@ -825,18 +1173,14 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
         canvasColor: const Color(0xFF0F172A),
       ),
       child: BottomNavigationBar(
-        currentIndex: 0,
+        currentIndex: controller.currentTabIndex.value,
         backgroundColor: const Color(0xFF0F172A),
         selectedItemColor: const Color(0xFF3B82F6),
         unselectedItemColor: const Color(0xFF64748B),
         type: BottomNavigationBarType.fixed,
         selectedFontSize: 12,
         unselectedFontSize: 12,
-        onTap: (index) {
-          if (index == 1) Get.to(() => const ManagerTeamView(), binding: ManagerTeamBinding());
-          if (index == 2) Get.to(() => const ManagerReportsView(), binding: ManagerReportsBinding());
-          if (index == 3) Get.to(() => const ProfileView(), binding: ProfileBinding());
-        },
+        onTap: controller.switchTab,
         items: const [
           BottomNavigationBarItem(
             icon: Padding(
@@ -844,6 +1188,13 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
               child: Icon(Icons.grid_view_rounded, size: 26),
             ),
             label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Padding(
+              padding: EdgeInsets.only(bottom: 6),
+              child: Icon(Icons.folder_outlined, size: 26),
+            ),
+            label: 'Projects',
           ),
           BottomNavigationBarItem(
             icon: Padding(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
@@ -12,6 +13,9 @@ class ManagerTeamController extends GetxController {
 
   final RxList<EmployeeModel> employees = <EmployeeModel>[].obs;
   final RxBool isLoading = false.obs;
+  
+  // Optional manager ID for Super Admin oversight
+  String? oversightManagerId;
 
   // Add Employee State
   final firstNameController = TextEditingController();
@@ -27,13 +31,21 @@ class ManagerTeamController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    
+    // Check for oversight mode
+    if (Get.arguments is String) {
+      oversightManagerId = Get.arguments as String;
+    } else if (Get.arguments is ManagerModel) {
+      oversightManagerId = (Get.arguments as ManagerModel).id;
+    }
+
     fetchEmployees();
   }
 
   Future<void> fetchEmployees() async {
     try {
       isLoading.value = true;
-      final managerId = _authService.currentManager.value?.id;
+      final managerId = oversightManagerId ?? _authService.currentManager.value?.id;
       if (managerId == null) return;
 
       final result = await _leadService.getEmployeesByManager(managerId);

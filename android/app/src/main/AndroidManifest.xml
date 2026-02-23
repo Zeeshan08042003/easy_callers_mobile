@@ -4,6 +4,7 @@
         android:name="android.hardware.telephony"
         android:required="false" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.READ_CALL_LOG"/>
     <uses-permission android:name="android.permission.CALL_PHONE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
@@ -11,7 +12,7 @@
         <package android:name="com.whatsapp" />
     </queries>
     <application
-        android:label="easy_callers_mobile"
+        android:label="Easy Caller"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

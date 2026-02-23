@@ -38,4 +38,9 @@ class AppRoutes {
   static const String leadDetail = '/lead-detail';
   static const String notifications = '/notifications';
   static const String support = '/support';
+
+  // Projects
+  static const String projectList = '/projects';
+  static const String createProject = '/projects/create';
+  static const String projectDetail = '/projects/detail';
 }

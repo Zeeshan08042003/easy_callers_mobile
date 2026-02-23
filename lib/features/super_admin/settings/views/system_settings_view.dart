@@ -13,10 +13,6 @@ class SystemSettingsView extends GetView<SystemSettingsController> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Get.back(),
-        ),
         title: const Text(
           'System Settings',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),

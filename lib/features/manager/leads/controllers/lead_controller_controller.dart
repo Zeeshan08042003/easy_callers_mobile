@@ -99,7 +99,7 @@ class LeadControllerController extends GetxController {
       final query = searchQuery.value.toLowerCase();
       result = result.where((l) {
         return l.name.toLowerCase().contains(query) ||
-               (l.phone.contains(query)) ||
+               (l.phone.any((p) => p.contains(query))) ||
                (l.projectName?.toLowerCase().contains(query) ?? false);
       }).toList();
     }

@@ -10,6 +10,7 @@ class ManagerModel {
   final int? maxEmployees;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? createdBySuperAdminId;
 
   // Computed / joined data
   final int? employeeCount;
@@ -26,6 +27,7 @@ class ManagerModel {
     this.maxEmployees,
     required this.createdAt,
     required this.updatedAt,
+    this.createdBySuperAdminId,
     this.employeeCount,
   });
 
@@ -48,8 +50,13 @@ class ManagerModel {
       profileImageUrl: json['profile_image_url'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       maxEmployees: json['max_employees'] as int?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'] as String) 
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'] as String) 
+          : DateTime.now(),
+      createdBySuperAdminId: json['created_by_super_admin_id'] as String?,
     );
   }
 
@@ -64,6 +71,9 @@ class ManagerModel {
       'profile_image_url': profileImageUrl,
       'is_active': isActive,
       'max_employees': maxEmployees,
+      'created_by_super_admin_id': createdBySuperAdminId,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 
@@ -78,6 +88,7 @@ class ManagerModel {
     if (phone != null) map['phone'] = phone;
     if (profileImageUrl != null) map['profile_image_url'] = profileImageUrl;
     if (maxEmployees != null) map['max_employees'] = maxEmployees;
+    if (createdBySuperAdminId != null) map['created_by_super_admin_id'] = createdBySuperAdminId;
     return map;
   }
 
@@ -93,6 +104,8 @@ class ManagerModel {
     int? maxEmployees,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? createdBySuperAdminId,
+    int? employeeCount,
   }) {
     return ManagerModel(
       id: id ?? this.id,
@@ -106,6 +119,8 @@ class ManagerModel {
       maxEmployees: maxEmployees ?? this.maxEmployees,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      createdBySuperAdminId: createdBySuperAdminId ?? this.createdBySuperAdminId,
+      employeeCount: employeeCount ?? this.employeeCount,
     );
   }
 
