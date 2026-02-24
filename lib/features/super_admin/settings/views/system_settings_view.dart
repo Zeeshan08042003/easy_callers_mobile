@@ -8,6 +8,7 @@ class SystemSettingsView extends GetView<SystemSettingsController> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(SystemSettingsController());
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

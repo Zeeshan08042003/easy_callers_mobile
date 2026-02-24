@@ -9,6 +9,7 @@ class SystemReportsView extends GetView<SystemReportsController> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(SystemReportsController());
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -29,6 +30,8 @@ class SystemReportsView extends GetView<SystemReportsController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildProjectSelector(),
+              const SizedBox(height: 30),
               _buildSectionTitle('GLOBAL KPIs'),
               const SizedBox(height: 16),
               _buildGlobalStatsGrid(),
@@ -45,6 +48,44 @@ class SystemReportsView extends GetView<SystemReportsController> {
           ),
         );
       }),
+    );
+  }
+
+  Widget _buildProjectSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: controller.selectedProject.value?.id,
+          hint: const Text('All Projects', style: TextStyle(color: Colors.white, fontSize: 14)),
+          dropdownColor: AppColors.cardBg,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('All Projects', style: TextStyle(color: Colors.white, fontSize: 14)),
+            ),
+            ...controller.availableProjects.map((p) => DropdownMenuItem<String>(
+              value: p.id,
+              child: Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 14)),
+            )),
+          ],
+          onChanged: (val) {
+            if (val == null) {
+              controller.onProjectSelected(null);
+            } else {
+              final project = controller.availableProjects.firstWhere((p) => p.id == val);
+              controller.onProjectSelected(project);
+            }
+          },
+        ),
+      ),
     );
   }
 

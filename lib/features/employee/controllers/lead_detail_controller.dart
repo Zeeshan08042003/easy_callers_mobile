@@ -23,8 +23,6 @@ class LeadDetailController extends GetxController {
 
   final RxString selectedStatus = ''.obs;
   final RxList<LeadStatusModel> availableLeadStatuses = <LeadStatusModel>[].obs;
-  final RxBool followUpEnabled = false.obs;
-  final Rx<DateTime?> followUpDate = Rx<DateTime?>(null);
   final RxBool isLoading = false.obs;
   final RxInt callDurationSeconds = 0.obs;
   final TextEditingController notesController = TextEditingController();
@@ -150,15 +148,17 @@ class LeadDetailController extends GetxController {
     try {
       isLoading.value = true;
 
-      // Validate status is selected
-      if (selectedStatus.value.isEmpty) {
+      final String statusValue = selectedStatus.value;
+      final bool requiresDateTime = statusValue == 'visiting' || statusValue == 'follow_up' || statusValue == 'callback';
+
+      if (requiresDateTime && (visitingDate.value == null || visitingTime.value == null)) {
         Get.snackbar(
-          'Select Status',
-          'Please select a lead status before saving',
+          'Date & Time Required',
+          'Please select a date and time for ${statusValue == 'visiting' ? 'Visiting' : 'Follow-up'}',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.orange.withOpacity(0.9),
           colorText: Colors.white,
-          duration: const Duration(seconds: 2),
+          duration: const Duration(seconds: 3),
         );
         isLoading.value = false;
         return;
@@ -173,17 +173,15 @@ class LeadDetailController extends GetxController {
 
       final session = callController.callSession.value;
 
-      // Build visiting DateTime if status is visiting
+      // Build follow-up DateTime
       DateTime? resolvedFollowUpDate;
       String? resolvedFollowUpNotes;
 
-      if (selectedStatus.value == 'visiting' && visitingDate.value != null) {
+      if (requiresDateTime && visitingDate.value != null) {
         final date = visitingDate.value!;
         final time = visitingTime.value ?? const TimeOfDay(hour: 10, minute: 0);
         resolvedFollowUpDate = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-        resolvedFollowUpNotes = 'Visiting';
-      } else if (followUpEnabled.value && followUpDate.value != null) {
-        resolvedFollowUpDate = followUpDate.value;
+        resolvedFollowUpNotes = statusValue.capitalizeFirst;
       }
 
       final callLog = CallLogModel(
@@ -191,7 +189,7 @@ class LeadDetailController extends GetxController {
         leadId: lead.id,
         employeeId: employeeId,
         callStatus: session?.status ?? (lastCallSession.value?.status ?? 'Completed'),
-        leadStatus: selectedStatus.value,
+        leadStatus: statusValue,
         callDurationSeconds: callDurationSeconds.value,
         feedback: notesController.text.trim().isNotEmpty 
             ? notesController.text.trim() 

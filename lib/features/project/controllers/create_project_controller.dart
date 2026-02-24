@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/project/services/project_service.dart';
 import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
+import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/features/manager/dashboard/controllers/manager_dashboard_controller.dart';
+import 'package:easy_callers_mobile/features/super_admin/dashboard/controllers/super_admin_dashboard_controller.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
@@ -25,11 +27,44 @@ class CreateProjectController extends GetxController {
   final RxSet<String> selectedEmployeeIds = <String>{}.obs;
   final RxBool isLoadingEmployees = false.obs;
 
+  // Manager selection (for Super Admin)
+  final RxList<ManagerModel> allManagers = <ManagerModel>[].obs;
+  final RxSet<String> selectedManagerIds = <String>{}.obs;
+  final RxBool isLoadingManagers = false.obs;
+  final RxString managerAssignment = 'all'.obs; // 'all' or 'selected'
+
   @override
   void onInit() {
     super.onInit();
     if (isManager) {
       fetchEmployees();
+    } else if (isSuperAdmin) {
+      fetchManagers();
+    }
+  }
+
+  /// Fetch managers (for Super Admin)
+  Future<void> fetchManagers() async {
+    try {
+      isLoadingManagers.value = true;
+      final saId = _authService.currentSuperAdmin.value?.id;
+      
+      // We use the same service method that filters for own + independent managers
+      final managers = await _projectService.getAllManagers(currentSuperAdminId: saId);
+      allManagers.assignAll(managers);
+    } catch (e) {
+      print('Error fetching managers: $e');
+    } finally {
+      isLoadingManagers.value = false;
+    }
+  }
+
+  /// Toggle selection of a manager
+  void toggleManager(String managerId) {
+    if (selectedManagerIds.contains(managerId)) {
+      selectedManagerIds.remove(managerId);
+    } else {
+      selectedManagerIds.add(managerId);
     }
   }
 
@@ -56,6 +91,16 @@ class CreateProjectController extends GetxController {
     } else {
       selectedEmployeeIds.add(employeeId);
     }
+  }
+
+  /// Select all managers
+  void selectAllManagers() {
+    selectedManagerIds.assignAll(allManagers.map((m) => m.id).toSet());
+  }
+
+  /// Deselect all managers
+  void deselectAllManagers() {
+    selectedManagerIds.clear();
   }
 
   /// Select all employees
@@ -99,12 +144,23 @@ class CreateProjectController extends GetxController {
       return;
     }
 
-    // Validate selected callers
-    if (callerAssignment.value == 'selected' &&
+    // Validate selected callers (Manager only)
+    if (isManager && callerAssignment.value == 'selected' &&
         selectedEmployeeIds.isEmpty) {
       _showSafeSnackbar(
         'Required',
         'Please select at least one caller',
+        isError: true,
+      );
+      return;
+    }
+
+    // Validate selected managers (Super Admin only)
+    if (isSuperAdmin && managerAssignment.value == 'selected' &&
+        selectedManagerIds.isEmpty) {
+      _showSafeSnackbar(
+        'Required',
+        'Please select at least one manager',
         isError: true,
       );
       return;
@@ -145,8 +201,22 @@ class CreateProjectController extends GetxController {
           subtitle: subtitleText,
           instruction: instructionText,
           superAdminId: saId,
-          callerAssignment: callerAssignment.value,
+          callerAssignment: 'all', // Super Admin doesn't manage specific callers
         );
+
+        if (project != null) {
+          final targetManagers = managerAssignment.value == 'selected'
+              ? allManagers.where((m) => selectedManagerIds.contains(m.id)).toList()
+              : allManagers;
+
+          for (final manager in targetManagers) {
+            await _projectService.inviteManagerToProject(
+              projectId: project.id,
+              managerId: manager.id,
+              superAdminId: saId,
+            );
+          }
+        }
       }
 
       // ==============================
@@ -198,6 +268,9 @@ class CreateProjectController extends GetxController {
         try {
           Get.find<ManagerDashboardController>().fetchProjects();
         } catch (_) {}
+        try {
+          Get.find<SuperAdminDashboardController>().refreshDashboard();
+        } catch (_) {}
 
         FocusManager.instance.primaryFocus?.unfocus();
 
@@ -220,6 +293,7 @@ class CreateProjectController extends GetxController {
 
 
   bool get isManager => _authService.currentRole.value == UserRole.manager;
+  bool get isSuperAdmin => _authService.currentRole.value == UserRole.superAdmin;
 
   @override
   void onClose() {

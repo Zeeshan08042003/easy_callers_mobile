@@ -13,8 +13,8 @@ import 'package:easy_callers_mobile/features/super_admin/reports/bindings/system
 import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
 import 'package:easy_callers_mobile/features/project/views/project_list_view.dart';
-import 'package:easy_callers_mobile/features/manager/dashboard/views/manager_dashboard_view.dart';
-import 'package:easy_callers_mobile/features/manager/dashboard/bindings/manager_dashboard_binding.dart';
+import 'package:easy_callers_mobile/features/project/views/project_detail_view.dart';
+import 'package:easy_callers_mobile/features/project/models/project_model.dart';
 import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 
 import '../../../manager/leads/bindings/lead_controller_binding.dart';
@@ -26,6 +26,7 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(SuperAdminDashboardController());
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Obx(() => IndexedStack(
@@ -39,7 +40,8 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
         ],
       )),
       floatingActionButton: Obx(() => controller.currentTabIndex.value == 0 ? FloatingActionButton(
-        onPressed: () => Get.to(() => const AddManagerView(), binding: AddManagerBinding()),
+        heroTag: 'sa_dashboard_fab',
+        onPressed: () => Get.to(() => const AddManagerView()),
         backgroundColor: AppColors.primary,
         shape: const CircleBorder(),
         child: const Icon(Icons.add, color: Colors.white, size: 30),
@@ -66,6 +68,10 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
               _buildSmallStatsGrid(),
               const SizedBox(height: 30),
               _buildSearchField(),
+              const SizedBox(height: 30),
+              _buildProjectsHeader(),
+              const SizedBox(height: 15),
+              _buildProjectsList(),
               const SizedBox(height: 30),
               _buildRecentManagersHeader(),
               const SizedBox(height: 15),
@@ -135,7 +141,7 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
             ),
             const SizedBox(width: 15),
             GestureDetector(
-              onTap: () => Get.to(() => const ProfileView(), binding: ProfileBinding()),
+              onTap: () => Get.to(() => const ProfileView()),
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -396,9 +402,8 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
           ),
           ElevatedButton(
             onPressed: () => Get.to(
-              () => const ManagerDashboardView(), 
-              binding: ManagerDashboardBinding(),
-              arguments: manager.id,
+              () => const ManagerOversightView(), 
+              arguments: manager,
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E2432),
@@ -427,6 +432,134 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
             Text(
               'No managers found',
               style: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProjectsHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Your Projects',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        TextButton(
+          onPressed: () => controller.switchTab(1),
+          child: const Text(
+            'See All',
+            style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProjectsList() {
+    return Obx(() {
+      if (controller.isLoading.value && controller.recentProjects.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      if (controller.recentProjects.isEmpty) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.folder_open_rounded, color: AppColors.textSecondary.withOpacity(0.2), size: 40),
+              const SizedBox(height: 12),
+              Text(
+                'Create your first project to organize managers',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 13),
+              ),
+            ],
+          ),
+        );
+      }
+      return SizedBox(
+        height: 160,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: controller.recentProjects.length,
+          separatorBuilder: (context, index) => const SizedBox(width: 16),
+          itemBuilder: (context, index) {
+            final project = controller.recentProjects[index];
+            return _buildProjectMiniCard(project);
+          },
+        ),
+      );
+    });
+  }
+
+  Widget _buildProjectMiniCard(ProjectModel project) {
+    return GestureDetector(
+      onTap: () => Get.to(() => const ProjectDetailView(), arguments: project),
+      child: Container(
+        width: 240,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161C28),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.folder_rounded, color: AppColors.primary, size: 20),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${project.memberCount ?? 0} MGRS',
+                    style: const TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  project.name,
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  project.subtitle ?? 'Project Workspace',
+                  style: TextStyle(color: AppColors.textSecondary.withOpacity(0.6), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ],
         ),

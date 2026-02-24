@@ -5,6 +5,8 @@ import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dar
 import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 
+import '../../../../core/utils/enums.dart';
+
 class DistributionDetailsController extends GetxController {
   final SupabaseService _supabase = Get.find<SupabaseService>();
   final LeadService _leadService = Get.find<LeadService>();
@@ -29,9 +31,18 @@ class DistributionDetailsController extends GetxController {
       isLoading.value = true;
       
       final managerId = _authService.currentManager.value?.id;
-      if (managerId == null) return;
+      final isSuperAdmin = _authService.currentRole.value == UserRole.superAdmin;
+
+      List<EmployeeModel> employees;
+      if (isSuperAdmin && batch.projectId != null) {
+        employees = await _leadService.getEmployeesByProject(batch.projectId!);
+      } else if (managerId != null) {
+        employees = await _leadService.getEmployeesByManager(managerId);
+      } else {
+        isLoading.value = false;
+        return;
+      }
       
-      final employees = await _leadService.getEmployeesByManager(managerId);
       final employeeMap = {for (var e in employees) e.id: e};
 
       // Fetch all leads for this batch to get counts

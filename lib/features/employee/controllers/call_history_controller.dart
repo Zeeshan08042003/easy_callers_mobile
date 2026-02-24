@@ -139,22 +139,6 @@ class CallHistoryController extends GetxController {
     var filtered = latestPerLead;
 
     switch (selectedFilter.value) {
-      case 'missed':
-        filtered = filtered.where((log) {
-          final status = log.callStatus?.toLowerCase() ?? '';
-          return status.contains('declined') ||
-              status.contains('failed') ||
-              status.contains('no_answer') ||
-              status.contains('no answer') ||
-              status.contains('busy') ||
-              status.contains('rejected') ||
-              status.contains('missed') ||
-              status.contains('not_connected') ||
-              status.contains('not_reachable') ||
-              status.contains('switched_off') ||
-              status.contains('cancelled');
-        }).toList();
-        break;
       case 'followup':
         filtered = filtered.where((log) {
           final leadStatusStr = log.leadStatus?.toString() ?? '';
@@ -216,7 +200,6 @@ class CallHistoryController extends GetxController {
             ),
             const SizedBox(height: 24),
             _buildFilterOption('All Calls', 'all'),
-            _buildFilterOption('Missed Calls', 'missed'),
             _buildFilterOption('Follow-ups', 'followup'),
             _buildFilterOption('Visiting', 'visiting'),
             const SizedBox(height: 24),

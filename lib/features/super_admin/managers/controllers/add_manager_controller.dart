@@ -29,15 +29,17 @@ class AddManagerController extends GetxController {
       );
 
       if (manager != null) {
-        // Since Supabase auto-logs-in the new user on signUp,
-        // we must log out the manager account to let the Super Admin log back in.
-        await _authService.logout();
+        // Refresh the manager list if it exists
+        if (Get.isRegistered<ManagerListController>()) {
+          Get.find<ManagerListController>().fetchManagers();
+        }
         
-        Get.offAll(() => const NewLoginScreen());
+        Get.back(); // Simply go back to the manager list
         Get.snackbar(
           'Success', 
-          'Manager created! You have been logged out. Please log back in as Super Admin.',
-          duration: const Duration(seconds: 5),
+          'Manager created successfully!',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.white,
         );
       } else {
         print("manager creating error: ${_authService.error.value}");

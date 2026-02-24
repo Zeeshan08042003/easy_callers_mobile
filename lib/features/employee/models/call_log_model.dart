@@ -57,11 +57,21 @@ class CallLogModel {
     if (json['leads'] != null && json['leads'] is Map) {
       final lead = json['leads'] as Map<String, dynamic>;
       lName = lead['name'] as String?;
-      lPhone = lead['phone'] as String?;
+      if (lead['phone'] is List) {
+        final phones = lead['phone'] as List;
+        lPhone = phones.isNotEmpty ? phones.first.toString() : null;
+      } else {
+        lPhone = lead['phone'] as String?;
+      }
     } else if (json['lead'] != null && json['lead'] is Map) {
       final lead = json['lead'] as Map<String, dynamic>;
       lName = lead['name'] as String?;
-      lPhone = lead['phone'] as String?;
+      if (lead['phone'] is List) {
+        final phones = lead['phone'] as List;
+        lPhone = phones.isNotEmpty ? phones.first.toString() : null;
+      } else {
+        lPhone = lead['phone'] as String?;
+      }
     }
 
     // Handle joined employee data

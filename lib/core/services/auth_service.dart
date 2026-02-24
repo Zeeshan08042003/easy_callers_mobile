@@ -9,6 +9,7 @@ import 'package:easy_callers_mobile/features/employee/services/notification_serv
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/services/storage_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
+import 'package:easy_callers_mobile/core/constants/supabase_constants.dart';
 import 'dart:convert';
 
 /// Handles all authentication logic with separate role tables:
@@ -391,9 +392,14 @@ class AuthService extends GetxService {
         return null;
       }
 
-      // 1. Create auth account
+      // 1. Create auth account using a temporary client to avoid session swap
       final normalizedEmail = email.toLowerCase().trim();
-      final tempAuth = await _supabase.client.auth.signUp(
+      final tempClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl, 
+        SupabaseConstants.supabaseAnonKey,
+      );
+      
+      final tempAuth = await tempClient.auth.signUp(
         email: normalizedEmail,
         password: password,
       );

@@ -110,7 +110,7 @@ class LeadService extends GetxService {
 
   /// Pick a file, parse leads, and upload to a specific project
   Future<LeadBatchModel?> pickAndUploadLeadsToProject({
-    required String managerId,
+    String? managerId,
     required String projectId,
   }) async {
     try {
@@ -333,7 +333,7 @@ class LeadService extends GetxService {
   }
 
   /// Get leads assigned to a specific employee with pagination support
-  Future<List<LeadModel>> getLeadsByEmployee(String employeeId, {int page = 1, int pageSize = 20, String? projectId}) async {
+  Future<List<LeadModel>> getLeadsByEmployee(String employeeId, {int page = 1, int pageSize = 20, String? projectId, LeadStatus? status}) async {
     try {
       final from = (page - 1) * pageSize;
       final to = from + pageSize - 1;
@@ -344,6 +344,10 @@ class LeadService extends GetxService {
       
       if (projectId != null) {
         query = query.eq('project_id', projectId);
+      }
+
+      if (status != null) {
+        query = query.eq('status', status.value);
       }
           
       final response = await query.order('created_at', ascending: false).range(from, to);
@@ -423,29 +427,43 @@ class LeadService extends GetxService {
       final todayStart = DateTime(now.year, now.month, now.day);
       final todayEnd = todayStart.add(const Duration(days: 1));
 
-      // Get call logs with follow-up dates for today
+      // Get call logs with follow-up dates up to today (includes overdue)
       final callLogs = await _supabase.callLogsTable
           .select('lead_id')
           .eq('employee_id', employeeId)
-          .gte('follow_up_date', todayStart.toIso8601String())
           .lt('follow_up_date', todayEnd.toIso8601String());
 
       final leadIds =
-          (callLogs as List).map((log) => log['lead_id'] as String).toSet();
+          (callLogs as List).map((log) => log['lead_id'] as String).toSet().toList();
 
-      if (leadIds.isEmpty) return [];
+      final List<String> followUpStatuses = [
+        LeadStatus.followUp.value,
+        'callback',
+        'visiting',
+      ];
+
+      // Build query for leads
+      var query = _supabase.leadsTable.select();
       
-      var query = _supabase.leadsTable
-          .select()
-          .inFilter('id', leadIds.toList());
+      if (leadIds.isNotEmpty) {
+        // Leads that have a scheduled date OR are in a follow-up status
+        // and belong to this employee
+        query = query.or('id.in.(${leadIds.join(",")}),status.in.(${followUpStatuses.join(",")})');
+      } else {
+        // Only leads in follow-up statuses
+        query = query.inFilter('status', followUpStatuses);
+      }
+
+      query = query.eq('assigned_to', employeeId);
           
       if (projectId != null) {
         query = query.eq('project_id', projectId);
       }
 
       final response = await query;
+      print('getTodayFollowUps: found ${(response as List).length} follow-ups for $employeeId');
 
-      return (response as List)
+      return response
           .map((json) => LeadModel.fromJson(json))
           .toList();
     } catch (e) {
@@ -1223,6 +1241,34 @@ class LeadService extends GetxService {
     }
   }
 
+  /// Get only the active callers (employees) who are assigned to a specific project
+  /// by a specific manager. Used when distributing leads in project context.
+  Future<List<EmployeeModel>> getProjectCallersByManager({
+    required String projectId,
+    required String managerId,
+  }) async {
+    try {
+      // Query project_callers table for this project + manager combo
+      final response = await _supabase.client
+          .from('project_callers')
+          .select('''
+            employee:employee_id(*)
+          ''')
+          .eq('project_id', projectId)
+          .eq('added_by_manager_id', managerId);
+
+      final list = response as List;
+      return list
+          .where((row) => row['employee'] != null && row['employee'] is Map)
+          .map((row) => EmployeeModel.fromJson(row['employee'] as Map<String, dynamic>))
+          .where((emp) => emp.isActive)
+          .toList();
+    } catch (e) {
+      print('Error fetching project callers by manager: $e');
+      return [];
+    }
+  }
+
   /// Deactivate an employee and notify the manager
   Future<bool> deactivateEmployee(String employeeId) async {
     try {
@@ -1530,8 +1576,29 @@ class LeadService extends GetxService {
   // ============================================
 
   /// Get global system stats for Super Admin
-  Future<Map<String, dynamic>> getGlobalStats() async {
+  Future<Map<String, dynamic>> getGlobalStats({String? projectId}) async {
     try {
+      if (projectId != null) {
+        // Stats for a specific project
+        final results = await Future.wait([
+          // In a project, we count unique managers from project_members
+          _supabase.projectMembersTable.select('manager_id').eq('project_id', projectId),
+          // Unique employees from project_callers
+          _supabase.projectCallersTable.select('employee_id').eq('project_id', projectId),
+          // Leads for this project
+          _supabase.leadsTable.select('id').eq('project_id', projectId),
+          // Call logs for this project
+          _supabase.callLogsTable.select('id').eq('project_id', projectId),
+        ]);
+
+        return {
+          'manager_count': (results[0] as List).map((m) => m['manager_id']).toSet().length,
+          'employee_count': (results[1] as List).map((e) => e['employee_id']).toSet().length,
+          'lead_count': (results[2] as List).length,
+          'call_count': (results[3] as List).length,
+        };
+      }
+
       final results = await Future.wait([
         _supabase.managersTable.select('id'),
         _supabase.employeesTable.select('id'),
@@ -1556,13 +1623,16 @@ class LeadService extends GetxService {
     }
   }
 
-  /// Get all managers (for Super Admin)
-  Future<List<ManagerModel>> getAllManagers() async {
+  /// Get all managers (optionally filtered for Super Admin: own + independent)
+  Future<List<ManagerModel>> getAllManagers({String? currentSuperAdminId}) async {
     try {
-      final response = await _supabase.managersTable
-          .select()
-          .eq('is_active', true)
-          .order('created_at', ascending: false);
+      var query = _supabase.managersTable.select().eq('is_active', true);
+      
+      if (currentSuperAdminId != null) {
+        query = query.or('created_by_super_admin_id.eq.$currentSuperAdminId,created_by_super_admin_id.is.null');
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       return (response as List)
           .map((json) => ManagerModel.fromJson(json))
@@ -1589,6 +1659,23 @@ class LeadService extends GetxService {
     }
   }
 
+  /// Get all employees assigned to a project across all managers
+  Future<List<EmployeeModel>> getEmployeesByProject(String projectId) async {
+    try {
+      final response = await _supabase.projectCallersTable
+          .select('*, employee:employee_id(*, manager:manager_id(first_name, last_name))')
+          .eq('project_id', projectId);
+      
+      return (response as List)
+          .where((pc) => pc['employee'] != null)
+          .map((pc) => EmployeeModel.fromJson(pc['employee']))
+          .toList();
+    } catch (e) {
+      print('Error fetching project employees: $e');
+      return [];
+    }
+  }
+
   /// Get all leads across the system (for Super Admin)
   Future<List<LeadModel>> getAllLeads({int limit = 100}) async {
     try {
@@ -1608,17 +1695,37 @@ class LeadService extends GetxService {
   }
 
   /// Get cross-agency performance comparison (for Super Admin)
-  Future<List<Map<String, dynamic>>> getRegionalPerformance() async {
+  Future<List<Map<String, dynamic>>> getRegionalPerformance({
+    String? projectId,
+    String? currentSuperAdminId,
+  }) async {
     try {
-      final managers = await getAllManagers();
+      List<ManagerModel> managers;
+      if (projectId != null) {
+        // ... (existing project logic)
+        final memberData = await _supabase.projectMembersTable
+            .select('manager:manager_id(*)')
+            .eq('project_id', projectId)
+            .eq('status', 'accepted');
+        
+        managers = (memberData as List)
+            .where((m) => m['manager'] != null)
+            .map((m) => ManagerModel.fromJson(m['manager']))
+            .toList();
+      } else {
+        managers = await getAllManagers(currentSuperAdminId: currentSuperAdminId);
+      }
+
       final List<Map<String, dynamic>> regionalData = [];
 
       for (var manager in managers) {
         // Fetch stats for each manager branch
-        final leadsResponse = await _supabase.leadsTable
-            .select('id')
-            .eq('uploaded_by', manager.id);
+        var leadsQuery = _supabase.leadsTable.select('id').eq('uploaded_by', manager.id);
+        if (projectId != null) {
+          leadsQuery = leadsQuery.eq('project_id', projectId);
+        }
         
+        final leadsResponse = await leadsQuery;
         final leads = leadsResponse as List;
         
         final employees = await getEmployeesByManager(manager.id);
@@ -1626,9 +1733,11 @@ class LeadService extends GetxService {
 
         int totalCalls = 0;
         if (employeeIds.isNotEmpty) {
-           final callsResponse = await _supabase.callLogsTable
-              .select('id')
-              .inFilter('employee_id', employeeIds);
+           var callsQuery = _supabase.callLogsTable.select('id').inFilter('employee_id', employeeIds);
+           if (projectId != null) {
+             callsQuery = callsQuery.eq('project_id', projectId);
+           }
+           final callsResponse = await callsQuery;
            totalCalls = (callsResponse as List).length;
         }
 

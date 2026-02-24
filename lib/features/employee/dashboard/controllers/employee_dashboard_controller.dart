@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:easy_callers_mobile/core/services/storage_service.dart';
 import 'package:easy_callers_mobile/features/manager/models/lead_model.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
@@ -8,6 +9,7 @@ import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
 import 'package:easy_callers_mobile/features/project/models/project_model.dart';
 import 'package:easy_callers_mobile/features/project/services/project_service.dart';
+import 'package:easy_callers_mobile/features/employee/controllers/call_controller.dart';
 
 import '../../../../core/utils/enums.dart';
 
@@ -28,6 +30,7 @@ class EmployeeDashboardController extends GetxController {
   final RxBool isLoadingMore = false.obs;
   final RxBool hasMoreLeads = true.obs;
   final RxInt currentNavIndex = 0.obs;
+  final RxInt selectedQueueTab = 0.obs;
   
   int _currentPage = 1;
   final int _pageSize = 15;
@@ -71,6 +74,8 @@ class EmployeeDashboardController extends GetxController {
   Future<void> _initDashboard() async {
     await _loadProjects();
     refreshData();
+    // Check for SIM selection if on Android
+    Get.find<CallController>().checkAndPromptSimSelection();
   }
 
   Future<void> _loadProjects() async {
@@ -81,8 +86,21 @@ class EmployeeDashboardController extends GetxController {
       final fetchedProjects = await _projectService.getProjectsForEmployee(employeeId);
       projects.value = fetchedProjects;
       
-      if (projects.isNotEmpty && selectedProject.value == null) {
-        selectedProject.value = projects.first;
+      if (projects.isNotEmpty) {
+        // Load persist project ID
+        final storage = Get.find<StorageService>();
+        final savedProjectId = storage.getString('last_project_id_$employeeId');
+        
+        if (savedProjectId != null) {
+          final savedProject = projects.firstWhereOrNull((p) => p.id == savedProjectId);
+          if (savedProject != null) {
+            selectedProject.value = savedProject;
+          } else {
+            selectedProject.value = projects.first;
+          }
+        } else {
+          selectedProject.value = projects.first;
+        }
       }
     } catch (e) {
       print('Error fetching projects for employee: $e');
@@ -92,6 +110,14 @@ class EmployeeDashboardController extends GetxController {
   void selectProject(ProjectModel project) {
     if (selectedProject.value?.id != project.id) {
       selectedProject.value = project;
+      
+      // Save for persistence
+      final employeeId = _authService.currentEmployee.value?.id;
+      if (employeeId != null) {
+        final storage = Get.find<StorageService>();
+        storage.setString('last_project_id_$employeeId', project.id);
+      }
+      
       refreshData();
     }
   }
@@ -115,7 +141,7 @@ class EmployeeDashboardController extends GetxController {
       // Parallel fetch, passing selected project ID
       final pId = selectedProject.value?.id;
       final results = await Future.wait([
-        _leadService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize, projectId: pId),
+        _leadService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize, projectId: pId, status: LeadStatus.assigned),
         _leadService.getTodayFollowUps(employeeId, projectId: pId),
         _getEmployeeStats(employeeId, pId),
         _leadService.getLeadsCountByEmployee(employeeId, projectId: pId),
@@ -156,6 +182,7 @@ class EmployeeDashboardController extends GetxController {
         page: _currentPage, 
         pageSize: _pageSize,
         projectId: pId,
+        status: LeadStatus.assigned,
       );
 
       if (moreLeads.isEmpty) {

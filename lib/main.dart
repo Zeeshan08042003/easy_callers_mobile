@@ -28,25 +28,8 @@ void main() async {
   final storageService = await StorageService.init();
   Get.put(storageService);
 
-  // Initialize Auth service and restore session
-  final authService = Get.put(AuthService(), permanent: true);
-  final role = await authService.restoreSession();
-
-  // Determine initial route
-  String initialRoute = AppRoutes.login;
-  if (role != null) {
-    switch (role) {
-      case UserRole.superAdmin:
-        initialRoute = AppRoutes.superAdminDashboard;
-        break;
-      case UserRole.manager:
-        initialRoute = AppRoutes.managerDashboard;
-        break;
-      case UserRole.employee:
-        initialRoute = AppRoutes.employeeDashboard;
-        break;
-    }
-  }
+  // Initialize Auth service
+  Get.put(AuthService(), permanent: true);
 
   // Register CallController (platform channel for calls)
   Get.put(CallController());
@@ -54,12 +37,11 @@ void main() async {
   // Register ProjectService
   Get.put(ProjectService());
 
-  runApp(MyApp(initialRoute: initialRoute));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final String initialRoute;
-  const MyApp({super.key, required this.initialRoute});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +55,7 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.light,
       ),
       initialBinding: InitialBinding(),
-      initialRoute: initialRoute,
+      initialRoute: AppRoutes.splash,
       getPages: AppPages.pages,
     );
   }

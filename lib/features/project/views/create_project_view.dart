@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 import 'package:easy_callers_mobile/features/project/controllers/create_project_controller.dart';
 import 'package:easy_callers_mobile/features/project/views/caller_selection_view.dart';
+import 'package:easy_callers_mobile/features/project/views/manager_selection_view.dart';
 
 class CreateProjectView extends StatelessWidget {
   const CreateProjectView({super.key});
@@ -123,11 +124,11 @@ class CreateProjectView extends StatelessWidget {
               textCapitalization: TextCapitalization.sentences,
             ),
 
-            // Caller Assignment
+            // Assignment Section (Managers for SA, Callers for Manager)
             const SizedBox(height: 24),
-            const Text(
-              'Caller Assignment',
-              style: TextStyle(
+            Text(
+              controller.isSuperAdmin ? 'Manager Assignment' : 'Caller Assignment',
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -135,7 +136,9 @@ class CreateProjectView extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Choose which callers are part of this project',
+              controller.isSuperAdmin 
+                ? 'Choose which managers are part of this project' 
+                : 'Choose which callers are part of this project',
               style: TextStyle(
                 color: AppColors.textSecondary.withOpacity(0.5),
                 fontSize: 12,
@@ -146,18 +149,22 @@ class CreateProjectView extends StatelessWidget {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () =>
-                            controller.callerAssignment.value = 'all',
+                        onTap: () {
+                          if (controller.isSuperAdmin) {
+                            controller.managerAssignment.value = 'all';
+                          } else {
+                            controller.callerAssignment.value = 'all';
+                          }
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color: controller.callerAssignment.value == 'all'
+                            color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
                                 ? AppColors.primary
                                 : AppColors.cardBg,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color:
-                                  controller.callerAssignment.value == 'all'
+                              color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
                                       ? AppColors.primary
                                       : Colors.white.withOpacity(0.05),
                             ),
@@ -165,19 +172,17 @@ class CreateProjectView extends StatelessWidget {
                           child: Column(
                             children: [
                               Icon(
-                                Icons.groups_rounded,
-                                color:
-                                    controller.callerAssignment.value == 'all'
+                                controller.isSuperAdmin ? Icons.apartment_rounded : Icons.groups_rounded,
+                                color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
                                         ? Colors.white
                                         : AppColors.textSecondary,
                                 size: 24,
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'All Callers',
+                                controller.isSuperAdmin ? 'All Managers' : 'All Callers',
                                 style: TextStyle(
-                                  color: controller.callerAssignment.value ==
-                                          'all'
+                                  color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
                                       ? Colors.white
                                       : AppColors.textSecondary,
                                   fontSize: 13,
@@ -192,19 +197,22 @@ class CreateProjectView extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () =>
-                            controller.callerAssignment.value = 'selected',
+                        onTap: () {
+                          if (controller.isSuperAdmin) {
+                            controller.managerAssignment.value = 'selected';
+                          } else {
+                            controller.callerAssignment.value = 'selected';
+                          }
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color:
-                                controller.callerAssignment.value == 'selected'
+                            color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
                                     ? AppColors.primary
                                     : AppColors.cardBg,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: controller.callerAssignment.value ==
-                                      'selected'
+                              color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
                                   ? AppColors.primary
                                   : Colors.white.withOpacity(0.05),
                             ),
@@ -213,20 +221,18 @@ class CreateProjectView extends StatelessWidget {
                             children: [
                               Icon(
                                 Icons.person_search_rounded,
-                                color: controller.callerAssignment.value ==
-                                        'selected'
+                                color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
                                     ? Colors.white
                                     : AppColors.textSecondary,
                                 size: 24,
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Select Callers',
+                                controller.isSuperAdmin ? 'Select Agencies' : 'Select Callers',
                                 style: TextStyle(
-                                  color: controller.callerAssignment.value ==
-                                          'selected'
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
+                                  color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
+                                          ? Colors.white
+                                          : AppColors.textSecondary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -241,7 +247,11 @@ class CreateProjectView extends StatelessWidget {
 
             // Employee preview (when "selected" mode) or info text (when "all")
             Obx(() {
-              if (controller.callerAssignment.value == 'all') {
+              final isAll = controller.isSuperAdmin 
+                  ? controller.managerAssignment.value == 'all'
+                  : controller.callerAssignment.value == 'all';
+
+              if (isAll) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: Container(
@@ -257,7 +267,9 @@ class CreateProjectView extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'All your callers will be included in this project',
+                            controller.isSuperAdmin 
+                              ? 'All available managers will be invited to this project'
+                              : 'All your callers will be included in this project',
                             style: TextStyle(
                               color: AppColors.primary.withOpacity(0.9),
                               fontSize: 12,
@@ -270,8 +282,10 @@ class CreateProjectView extends StatelessWidget {
                 );
               }
 
-              // "selected" mode
-              if (controller.isLoadingEmployees.value) {
+              // Selected mode
+              final isLoading = controller.isSuperAdmin ? controller.isLoadingManagers.value : controller.isLoadingEmployees.value;
+              
+              if (isLoading) {
                 return const Padding(
                   padding: EdgeInsets.only(top: 20),
                   child: Center(
@@ -281,7 +295,9 @@ class CreateProjectView extends StatelessWidget {
                 );
               }
 
-              if (controller.allEmployees.isEmpty) {
+              final list = controller.isSuperAdmin ? controller.allManagers : controller.allEmployees;
+
+              if (list.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: Container(
@@ -293,11 +309,11 @@ class CreateProjectView extends StatelessWidget {
                     child: Center(
                       child: Column(
                         children: [
-                          Icon(Icons.person_off_outlined,
-                              color: Colors.white.withOpacity(0.1), size: 36),
+                          Icon(controller.isSuperAdmin ? Icons.business_center_outlined : Icons.person_off_outlined,
+                               color: Colors.white.withOpacity(0.1), size: 36),
                           const SizedBox(height: 8),
                           Text(
-                            'No employees found',
+                            controller.isSuperAdmin ? 'No managers found' : 'No employees found',
                             style: TextStyle(
                                 color:
                                     AppColors.textSecondary.withOpacity(0.6)),
@@ -309,16 +325,15 @@ class CreateProjectView extends StatelessWidget {
                 );
               }
 
-              // Show first 3 employees + "View All" button
-              final previewList = controller.allEmployees.take(3).toList();
-              final totalCount = controller.allEmployees.length;
-              final selectedCount = controller.selectedEmployeeIds.length;
+              // Preview
+              final previewList = list.take(3).toList();
+              final totalCount = list.length;
+              final selectedCount = controller.isSuperAdmin ? controller.selectedManagerIds.length : controller.selectedEmployeeIds.length;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
-                  // Selection counter
                   Row(
                     children: [
                       Text(
@@ -329,33 +344,22 @@ class CreateProjectView extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      if (selectedCount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '$selectedCount',
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                   const SizedBox(height: 10),
 
-                  // Preview cards (max 3)
-                  ...previewList.map((emp) {
-                    final isSelected =
-                        controller.selectedEmployeeIds.contains(emp.id);
+                  ...previewList.map((item) {
+                    final id = controller.isSuperAdmin ? (item as dynamic).id : (item as dynamic).id;
+                    final isSelected = controller.isSuperAdmin 
+                        ? controller.selectedManagerIds.contains(id)
+                        : controller.selectedEmployeeIds.contains(id);
+                    
+                    final name = controller.isSuperAdmin ? (item as dynamic).fullName : (item as dynamic).fullName;
+                    final email = controller.isSuperAdmin ? (item as dynamic).email : (item as dynamic).email;
+                    final initials = controller.isSuperAdmin ? (item as dynamic).initials : (item as dynamic).initials;
+
                     return GestureDetector(
-                      onTap: () => controller.toggleEmployee(emp.id),
+                      onTap: () => controller.isSuperAdmin ? controller.toggleManager(id) : controller.toggleEmployee(id),
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.symmetric(
@@ -384,7 +388,7 @@ class CreateProjectView extends StatelessWidget {
                               ),
                               child: Center(
                                 child: Text(
-                                  emp.initials,
+                                  initials,
                                   style: TextStyle(
                                     color: isSelected
                                         ? AppColors.primary
@@ -402,7 +406,7 @@ class CreateProjectView extends StatelessWidget {
                                     CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    emp.fullName,
+                                    name,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,
@@ -410,7 +414,7 @@ class CreateProjectView extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    emp.email,
+                                    email,
                                     style: TextStyle(
                                       color: AppColors.textSecondary
                                           .withOpacity(0.5),
@@ -436,29 +440,32 @@ class CreateProjectView extends StatelessWidget {
                     );
                   }),
 
-                  // "View All" button
+                  // VIEW ALL BUTTON
                   if (totalCount > 3) ...[
                     const SizedBox(height: 4),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () =>
-                            Get.to(() => const CallerSelectionView()),
-                        icon: const Icon(Icons.people_outline_rounded,
-                            size: 18),
+                        onPressed: () => Get.to(
+                          () => controller.isSuperAdmin 
+                              ? const ManagerSelectionView() 
+                              : const CallerSelectionView(),
+                        ),
+                        icon: Icon(
+                          controller.isSuperAdmin ? Icons.apartment_rounded : Icons.people_outline_rounded,
+                          size: 18,
+                        ),
                         label: Text(
-                          'View All $totalCount Callers',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 13),
+                          controller.isSuperAdmin 
+                              ? 'View All Agencies' 
+                              : 'View All $totalCount Callers',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          side: BorderSide(
-                              color: AppColors.primary.withOpacity(0.3)),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
+                          side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
                     ),
@@ -468,62 +475,62 @@ class CreateProjectView extends StatelessWidget {
             }),
 
             // Visibility toggle (only for managers)
-            if (controller.isManager) ...[
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
-                ),
-                child: Obx(() => Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.visibility_outlined,
-                              color: AppColors.warning, size: 22),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Visible to Super Admin',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Allow super admin to see this project',
-                                style: TextStyle(
-                                  color:
-                                      AppColors.textSecondary.withOpacity(0.6),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch.adaptive(
-                          value: controller.visibleToSuperAdmin.value,
-                          onChanged: (val) =>
-                              controller.visibleToSuperAdmin.value = val,
-                          activeColor: AppColors.success,
-                        ),
-                      ],
-                    )),
-              ),
-            ],
-
-            const SizedBox(height: 40),
+            // if (controller.isManager) ...[
+            //   const SizedBox(height: 24),
+            //   Container(
+            //     padding: const EdgeInsets.all(16),
+            //     decoration: BoxDecoration(
+            //       color: AppColors.cardBg,
+            //       borderRadius: BorderRadius.circular(16),
+            //       border: Border.all(color: Colors.white.withOpacity(0.05)),
+            //     ),
+            //     child: Obx(() => Row(
+            //           children: [
+            //             Container(
+            //               padding: const EdgeInsets.all(10),
+            //               decoration: BoxDecoration(
+            //                 color: AppColors.warning.withOpacity(0.1),
+            //                 borderRadius: BorderRadius.circular(12),
+            //               ),
+            //               child: const Icon(Icons.visibility_outlined,
+            //                   color: AppColors.warning, size: 22),
+            //             ),
+            //             const SizedBox(width: 14),
+            //             Expanded(
+            //               child: Column(
+            //                 crossAxisAlignment: CrossAxisAlignment.start,
+            //                 children: [
+            //                   const Text(
+            //                     'Visible to Super Admin',
+            //                     style: TextStyle(
+            //                       color: Colors.white,
+            //                       fontSize: 14,
+            //                       fontWeight: FontWeight.w600,
+            //                     ),
+            //                   ),
+            //                   Text(
+            //                     'Allow super admin to see this project',
+            //                     style: TextStyle(
+            //                       color:
+            //                           AppColors.textSecondary.withOpacity(0.6),
+            //                       fontSize: 12,
+            //                     ),
+            //                   ),
+            //                 ],
+            //               ),
+            //             ),
+            //             Switch.adaptive(
+            //               value: controller.visibleToSuperAdmin.value,
+            //               onChanged: (val) =>
+            //                   controller.visibleToSuperAdmin.value = val,
+            //               activeColor: AppColors.success,
+            //             ),
+            //           ],
+            //         )),
+            //   ),
+            // ],
+            //
+            const SizedBox(height: 20),
 
             // Create button
             Obx(() => SizedBox(

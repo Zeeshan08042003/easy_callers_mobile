@@ -12,7 +12,13 @@ class ProjectListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<ProjectListController>();
+    final controller = Get.put(ProjectListController());
+
+    // Refresh data whenever this tab is shown (not just on first init).
+    // The controller's internal debounce prevents rapid duplicate calls.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.refreshIfNeeded();
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -77,6 +83,7 @@ class ProjectListView extends StatelessWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'project_list_fab',
         onPressed: () async {
           final result = await Get.to(() => const CreateProjectView());
           if (result != null) {
@@ -286,11 +293,13 @@ class ProjectListView extends StatelessWidget {
                     Icons.upload_file_rounded,
                     '${project.batchCount ?? 0} sheets',
                     AppColors.primary),
-                const SizedBox(width: 12),
-                _buildStatChip(
-                    Icons.people_outline_rounded,
-                    '${project.memberCount ?? 0} members',
-                    AppColors.success),
+                if (project.isCreatedBySuperAdmin) ...[
+                  const SizedBox(width: 12),
+                  _buildStatChip(
+                      Icons.people_outline_rounded,
+                      '${project.memberCount ?? 0} members',
+                      AppColors.success),
+                ],
                 const Spacer(),
                 Text(
                   _formatDate(project.createdAt),

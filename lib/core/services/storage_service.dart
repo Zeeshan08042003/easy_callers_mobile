@@ -18,6 +18,9 @@ class StorageService extends GetxService {
   Future<bool> setBool(String key, bool value) => _prefs.setBool(key, value);
   bool? getBool(String key) => _prefs.getBool(key);
 
+  Future<bool> setInt(String key, int value) => _prefs.setInt(key, value);
+  int? getInt(String key) => _prefs.getInt(key);
+
   Future<bool> setJson(String key, Map<String, dynamic> value) => 
       _prefs.setString(key, jsonEncode(value));
       

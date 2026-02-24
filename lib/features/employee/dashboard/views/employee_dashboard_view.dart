@@ -8,6 +8,8 @@ import 'package:easy_callers_mobile/features/profile/views/profile_view.dart';
 import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.dart';
 import 'package:intl/intl.dart';
 
+import '../../../manager/models/lead_model.dart';
+
 class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
   const EmployeeDashboardView({super.key});
 
@@ -26,7 +28,7 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
               _buildStatsCards(),
               _buildProgressBar(),
               _buildStartCallingButton(),
-              _buildUpcomingQueue(),
+              _buildQueueAndFollowupSection(),
             ],
           ),
         ),
@@ -478,76 +480,30 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
     );
   }
 
-  Widget _buildUpcomingQueue() {
+  Widget _buildQueueAndFollowupSection() {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Upcoming Queue',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // Navigate to full leads list
-                  },
-                  child: const Text(
-                    'View All',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+            const Text(
+              'My Schedule',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
+            _buildCustomTabBar(),
+            const SizedBox(height: 16),
             Obx(() {
-              if (controller.assignedLeads.isEmpty) {
-                return _buildEmptyQueue();
+              if (controller.selectedQueueTab.value == 0) {
+                return _buildQueueList();
+              } else {
+                return _buildFollowUpList();
               }
-              return Column(
-                children: [
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: controller.assignedLeads.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final lead = controller.assignedLeads[index];
-                      return _buildLeadQueueCard(lead);
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  if (controller.hasMoreLeads.value)
-                    controller.isLoadingMore.value
-                        ? const Center(child: CircularProgressIndicator())
-                        : SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton(
-                              onPressed: controller.loadMoreLeads,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.primary,
-                                side: const BorderSide(color: AppColors.primary),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 15),
-                              ),
-                              child: const Text('Load More Leads'),
-                            ),
-                          ),
-                ],
-              );
             }),
             const SizedBox(height: 100),
           ],
@@ -556,7 +512,135 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
     );
   }
 
-  Widget _buildLeadQueueCard(dynamic lead) {
+  Widget _buildCustomTabBar() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _buildTabItem(0, 'QUEUE', controller.assignedLeads.length),
+          _buildTabItem(1, 'FOLLOW-UPS', controller.pendingFollowups.length),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabItem(int index, String label, int count) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => controller.selectedQueueTab.value = index,
+        child: Obx(() {
+          final isSelected = controller.selectedQueueTab.value == index;
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                )
+              ] : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    fontSize: 12,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                if (count > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.white.withOpacity(0.2) : AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      count.toString(),
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : AppColors.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildQueueList() {
+    if (controller.assignedLeads.isEmpty) {
+      return _buildEmptyQueue('No pending leads in queue');
+    }
+    return Column(
+      children: [
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: controller.assignedLeads.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final lead = controller.assignedLeads[index];
+            return _buildLeadQueueCard(lead);
+          },
+        ),
+        const SizedBox(height: 20),
+        if (controller.hasMoreLeads.value)
+          Obx(() => controller.isLoadingMore.value
+              ? const Center(child: CircularProgressIndicator())
+              : SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: controller.loadMoreLeads,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
+                    child: const Text('Load More Leads'),
+                  ),
+                )),
+      ],
+    );
+  }
+
+  Widget _buildFollowUpList() {
+    if (controller.pendingFollowups.isEmpty) {
+      return _buildEmptyQueue('No follow-ups scheduled for today');
+    }
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: controller.pendingFollowups.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final lead = controller.pendingFollowups[index];
+        return _buildLeadQueueCard(lead, isFollowUp: true);
+      },
+    );
+  }
+
+  Widget _buildLeadQueueCard(LeadModel lead, {bool isFollowUp = false}) {
     // Get initials from name
     final nameParts = lead.name.split(' ');
     final initials = nameParts.length >= 2
@@ -571,7 +655,7 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
       const Color(0xFFFFB84D),
       const Color(0xFF9B59B6),
     ];
-    final colorIndex = lead.name.hashCode % colors.length;
+    final colorIndex = lead.name.hashCode.abs() % colors.length;
 
     return GestureDetector(
       onTap: () => Get.to(
@@ -609,13 +693,37 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    lead.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          lead.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isFollowUp)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'DUE',
+                            style: TextStyle(
+                              color: AppColors.warning,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -635,15 +743,10 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.phone_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-                onPressed: () => Get.to(
-                  () => LeadDetailView(lead: lead),
-                ),
+              child: const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.primary,
+                size: 24,
               ),
             ),
           ],
@@ -652,7 +755,7 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
     );
   }
 
-  Widget _buildEmptyQueue() {
+  Widget _buildEmptyQueue(String message) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 40),
@@ -679,7 +782,7 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
           ),
           const SizedBox(height: 4),
           Text(
-            'No pending leads at the moment',
+            message,
             style: TextStyle(
               color: AppColors.textSecondary.withOpacity(0.6),
               fontSize: 13,

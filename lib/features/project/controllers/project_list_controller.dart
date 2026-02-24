@@ -6,6 +6,8 @@ import 'package:easy_callers_mobile/features/project/services/project_service.da
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 
+import '../../../core/theme/app_colors.dart';
+
 /// Controller for the project list view.
 /// Handles fetching, searching, and filtering projects.
 class ProjectListController extends GetxController {
@@ -23,6 +25,19 @@ class ProjectListController extends GetxController {
   
   // Optional manager ID for Super Admin oversight
   String? oversightManagerId;
+
+  // Debounce: avoid rapid refetching when tab switches quickly
+  DateTime? _lastRefresh;
+
+  /// Called by the view every time it becomes visible (tab switch).
+  /// Only re-fetches if at least 3 seconds have passed since the last fetch.
+  void refreshIfNeeded() {
+    final now = DateTime.now();
+    if (_lastRefresh == null || now.difference(_lastRefresh!).inSeconds >= 3) {
+      _lastRefresh = now;
+      fetchProjects();
+    }
+  }
 
   @override
   void onInit() {
@@ -61,6 +76,11 @@ class ProjectListController extends GetxController {
       }
 
       _applySearch();
+
+      // Also refresh pending invitations for managers
+      if (role == UserRole.manager || oversightManagerId != null) {
+        fetchPendingInvitations();
+      }
     } catch (e) {
       Get.snackbar('Error', 'Failed to load projects: $e');
     } finally {
@@ -87,6 +107,10 @@ class ProjectListController extends GetxController {
         Get.snackbar('Success', 'Invitation accepted! You are now a member of "${invitation.projectName}"');
         await fetchPendingInvitations();
         await fetchProjects();
+      } else {
+        Get.snackbar('Error', 'Failed to accept invitation. Please try again.',
+            backgroundColor: AppColors.danger.withOpacity(0.1),
+            colorText: AppColors.danger);
       }
     } catch (e) {
       Get.snackbar('Error', 'Failed to accept invitation: $e');
@@ -99,6 +123,10 @@ class ProjectListController extends GetxController {
       if (success) {
         Get.snackbar('Done', 'Invitation declined');
         await fetchPendingInvitations();
+      } else {
+        Get.snackbar('Error', 'Failed to decline invitation. Please try again.',
+            backgroundColor: AppColors.danger.withOpacity(0.1),
+            colorText: AppColors.danger);
       }
     } catch (e) {
       Get.snackbar('Error', 'Failed to decline invitation: $e');

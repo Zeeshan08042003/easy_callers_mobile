@@ -48,6 +48,7 @@ class CallHistoryView extends StatelessWidget {
         ],
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSearchBar(controller),
           _buildFilterTabs(controller),
@@ -116,17 +117,12 @@ class CallHistoryView extends StatelessWidget {
       child: Obx(() => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
             _buildFilterTab(
               label: 'All',
               isSelected: controller.selectedFilter.value == 'all',
               onTap: () => controller.selectedFilter.value = 'all',
-            ),
-            const SizedBox(width: 10),
-            _buildFilterTab(
-              label: 'Missed',
-              isSelected: controller.selectedFilter.value == 'missed',
-              onTap: () => controller.selectedFilter.value = 'missed',
             ),
             const SizedBox(width: 10),
             _buildFilterTab(
@@ -155,7 +151,7 @@ class CallHistoryView extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.cardBg,
           borderRadius: BorderRadius.circular(10),

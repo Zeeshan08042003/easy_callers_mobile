@@ -274,6 +274,7 @@ class ProjectService extends GetxService {
     required String projectId,
     required String managerId,
     required String superAdminId,
+    bool canUpload = false,
   }) async {
     try {
       final data = {
@@ -283,6 +284,7 @@ class ProjectService extends GetxService {
         'status': 'pending',
         'invited_by_super_admin_id': superAdminId,
         'visible_to_super_admin': true,
+        'can_upload': canUpload,
       };
 
       final response = await _supabase.projectMembersTable
@@ -328,16 +330,38 @@ class ProjectService extends GetxService {
       
       // If invited by super admin, notify them
       if (member.invitedBySuperAdminId != null) {
-        await _supabase.notificationsTable.insert({
-          'super_admin_id': member.invitedBySuperAdminId,
-          'title': 'Invitation Accepted',
-          'body': '${member.managerName ?? 'A manager'} accepted the invitation to project "${member.projectName}"',
-          'type': 'project_invitation_accepted',
-          'metadata': {
-            'project_id': member.projectId,
-            'manager_id': member.managerId,
-          },
-        });
+        try {
+          await _supabase.notificationsTable.insert({
+            'super_admin_id': member.invitedBySuperAdminId,
+            'title': 'Invitation Accepted',
+            'body': '${member.managerName ?? 'A manager'} accepted the invitation to project "${member.projectName}"',
+            'type': 'project_invitation_accepted',
+            'metadata': {
+              'project_id': member.projectId,
+              'manager_id': member.managerId,
+            },
+          });
+        } catch (e) {
+          print('Error sending acceptance notification to SA: $e');
+        }
+      }
+
+      // If invited by another manager, notify them
+      if (member.invitedByManagerId != null) {
+        try {
+          await _supabase.notificationsTable.insert({
+            'manager_id': member.invitedByManagerId,
+            'title': 'Invitation Accepted',
+            'body': '${member.managerName ?? 'A manager'} accepted the invitation to project "${member.projectName}"',
+            'type': 'project_invitation_accepted',
+            'metadata': {
+              'project_id': member.projectId,
+              'manager_id': member.managerId,
+            },
+          });
+        } catch (e) {
+          print('Error sending acceptance notification to Manager: $e');
+        }
       }
 
       return true;
@@ -367,16 +391,37 @@ class ProjectService extends GetxService {
       final member = ProjectMemberModel.fromJson(membership);
       
       if (member.invitedBySuperAdminId != null) {
-        await _supabase.notificationsTable.insert({
-          'super_admin_id': member.invitedBySuperAdminId,
-          'title': 'Invitation Declined',
-          'body': '${member.managerName ?? 'A manager'} declined the invitation to project "${member.projectName}"',
-          'type': 'project_invitation_declined',
-          'metadata': {
-            'project_id': member.projectId,
-            'manager_id': member.managerId,
-          },
-        });
+        try {
+          await _supabase.notificationsTable.insert({
+            'super_admin_id': member.invitedBySuperAdminId,
+            'title': 'Invitation Declined',
+            'body': '${member.managerName ?? 'A manager'} declined the invitation to project "${member.projectName}"',
+            'type': 'project_invitation_declined',
+            'metadata': {
+              'project_id': member.projectId,
+              'manager_id': member.managerId,
+            },
+          });
+        } catch (e) {
+          print('Error sending decline notification to SA: $e');
+        }
+      }
+
+      if (member.invitedByManagerId != null) {
+        try {
+          await _supabase.notificationsTable.insert({
+            'manager_id': member.invitedByManagerId,
+            'title': 'Invitation Declined',
+            'body': '${member.managerName ?? 'A manager'} declined the invitation to project "${member.projectName}"',
+            'type': 'project_invitation_declined',
+            'metadata': {
+              'project_id': member.projectId,
+              'manager_id': member.managerId,
+            },
+          });
+        } catch (e) {
+          print('Error sending decline notification to Manager: $e');
+        }
       }
 
       return true;
@@ -398,6 +443,22 @@ class ProjectService extends GetxService {
       return true;
     } catch (e) {
       print('Error toggling visibility: $e');
+      return false;
+    }
+  }
+
+  /// Toggle upload permission for a manager in a project (by Super Admin)
+  Future<bool> toggleUploadPermission({
+    required String membershipId,
+    required bool canUpload,
+  }) async {
+    try {
+      await _supabase.projectMembersTable
+          .update({'can_upload': canUpload})
+          .eq('id', membershipId);
+      return true;
+    } catch (e) {
+      print('Error toggling upload permission: $e');
       return false;
     }
   }
@@ -448,6 +509,33 @@ class ProjectService extends GetxService {
     }
   }
 
+  /// Get a single manager's own membership record for a project.
+  /// Safe to call even on SA-created projects because RLS only returns
+  /// rows where manager_id = your own ID.
+  Future<ProjectMemberModel?> getMyMembershipForProject({
+    required String projectId,
+    required String managerId,
+  }) async {
+    try {
+      final response = await _supabase.projectMembersTable
+          .select('''
+            *,
+            manager:manager_id(first_name, last_name, email, is_active),
+            inviter_super_admin:invited_by_super_admin_id(first_name, last_name),
+            inviter_manager:invited_by_manager_id(first_name, last_name)
+          ''')
+          .eq('project_id', projectId)
+          .eq('manager_id', managerId)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return ProjectMemberModel.fromJson(response);
+    } catch (e) {
+      print('Error fetching my membership: $e');
+      return null;
+    }
+  }
+
   /// Remove a member from a project
   Future<bool> removeMember(String membershipId) async {
     try {
@@ -459,15 +547,14 @@ class ProjectService extends GetxService {
     }
   }
 
-  /// Get all managers (optionally filtered by super admin creator)
-  Future<List<ManagerModel>> getAllManagers({String? superAdminId}) async {
+  /// Get all managers (optionally filtered to own + independent for Super Admin)
+  Future<List<ManagerModel>> getAllManagers({String? currentSuperAdminId}) async {
     try {
-      var query = _supabase.managersTable
-          .select()
-          .eq('is_active', true);
+      var query = _supabase.managersTable.select().eq('is_active', true);
           
-      if (superAdminId != null) {
-        query = query.eq('created_by_super_admin_id', superAdminId);
+      if (currentSuperAdminId != null) {
+        // Show managers created by THIS super admin OR managers not created by any super admin
+        query = query.or('created_by_super_admin_id.eq.$currentSuperAdminId,created_by_super_admin_id.is.null');
       }
       
       final response = await query.order('first_name');
@@ -482,7 +569,7 @@ class ProjectService extends GetxService {
   }
 
   /// Get managers not yet in a specific project (optionally filtered by super admin creator)
-  Future<List<ManagerModel>> getAvailableManagersForProject(String projectId, {String? superAdminId}) async {
+  Future<List<ManagerModel>> getAvailableManagersForProject(String projectId, {String? currentSuperAdminId}) async {
     try {
       // Get managers already in this project
       final existingMembers = await _supabase.projectMembersTable
@@ -494,7 +581,7 @@ class ProjectService extends GetxService {
           .toList();
 
       // Get active managers (filtered by creator if provided)
-      final allManagers = await getAllManagers(superAdminId: superAdminId);
+      final allManagers = await getAllManagers(currentSuperAdminId: currentSuperAdminId);
 
       // Filter out already-invited managers
       return allManagers

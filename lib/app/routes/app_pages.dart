@@ -37,10 +37,17 @@ import 'package:easy_callers_mobile/features/employee/feedback/bindings/call_fee
 import 'package:easy_callers_mobile/features/project/views/project_list_view.dart';
 import 'package:easy_callers_mobile/features/project/views/create_project_view.dart';
 import 'package:easy_callers_mobile/features/project/views/project_detail_view.dart';
-// import 'package:easy_callers_mobile/features/employee/views/employee_dashboard.dart';
+import 'package:easy_callers_mobile/features/splash/views/splash_view.dart';
+import 'package:easy_callers_mobile/features/splash/bindings/splash_binding.dart';
 
 class AppPages {
   static final pages = <GetPage>[
+    // Splash
+    GetPage(
+      name: AppRoutes.splash,
+      page: () => const SplashView(),
+      binding: SplashBinding(),
+    ),
     // Auth
     GetPage(
       name: AppRoutes.login,

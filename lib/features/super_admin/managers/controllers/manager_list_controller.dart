@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
+import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class ManagerListController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();
+  final AuthService _authService = Get.find<AuthService>();
 
   final RxList<ManagerModel> managers = <ManagerModel>[].obs;
   final RxList<ManagerModel> filteredManagers = <ManagerModel>[].obs;
@@ -18,7 +20,8 @@ class ManagerListController extends GetxController {
   Future<void> fetchManagers() async {
     try {
       isLoading.value = true;
-      final result = await _leadService.getAllManagers();
+      final saId = _authService.currentSuperAdmin.value?.id;
+      final result = await _leadService.getAllManagers(currentSuperAdminId: saId);
       managers.assignAll(result);
       filteredManagers.assignAll(result);
     } catch (e) {

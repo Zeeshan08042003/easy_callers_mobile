@@ -7,6 +7,7 @@ class ProjectMemberModel {
   final String role; // 'owner' or 'member'
   final String status; // 'pending', 'accepted', 'declined'
   final bool visibleToSuperAdmin;
+  final bool canUpload; // Whether SA granted upload permission
   final String? invitedBySuperAdminId;
   final String? invitedByManagerId;
   final DateTime createdAt;
@@ -26,6 +27,7 @@ class ProjectMemberModel {
     this.role = 'member',
     this.status = 'pending',
     this.visibleToSuperAdmin = false,
+    this.canUpload = false,
     this.invitedBySuperAdminId,
     this.invitedByManagerId,
     required this.createdAt,
@@ -80,6 +82,7 @@ class ProjectMemberModel {
       role: json['role'] as String? ?? 'member',
       status: json['status'] as String? ?? 'pending',
       visibleToSuperAdmin: json['visible_to_super_admin'] as bool? ?? false,
+      canUpload: json['can_upload'] as bool? ?? false,
       invitedBySuperAdminId: json['invited_by_super_admin_id'] as String?,
       invitedByManagerId: json['invited_by_manager_id'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -100,6 +103,7 @@ class ProjectMemberModel {
       'role': role,
       'status': status,
       'visible_to_super_admin': visibleToSuperAdmin,
+      'can_upload': canUpload,
       'invited_by_super_admin_id': invitedBySuperAdminId,
       'invited_by_manager_id': invitedByManagerId,
     };
@@ -112,6 +116,7 @@ class ProjectMemberModel {
       'role': role,
       'status': status,
       'visible_to_super_admin': visibleToSuperAdmin,
+      'can_upload': canUpload,
     };
     if (invitedBySuperAdminId != null) {
       map['invited_by_super_admin_id'] = invitedBySuperAdminId;
@@ -129,6 +134,7 @@ class ProjectMemberModel {
     String? role,
     String? status,
     bool? visibleToSuperAdmin,
+    bool? canUpload,
     String? invitedBySuperAdminId,
     String? invitedByManagerId,
     DateTime? createdAt,
@@ -141,6 +147,7 @@ class ProjectMemberModel {
       role: role ?? this.role,
       status: status ?? this.status,
       visibleToSuperAdmin: visibleToSuperAdmin ?? this.visibleToSuperAdmin,
+      canUpload: canUpload ?? this.canUpload,
       invitedBySuperAdminId: invitedBySuperAdminId ?? this.invitedBySuperAdminId,
       invitedByManagerId: invitedByManagerId ?? this.invitedByManagerId,
       createdAt: createdAt ?? this.createdAt,

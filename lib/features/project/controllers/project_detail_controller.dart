@@ -11,11 +11,8 @@ import 'package:easy_callers_mobile/features/super_admin/models/manager_model.da
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
-import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/features/manager/leads/views/distribute_leads_view.dart';
-import 'package:easy_callers_mobile/features/manager/leads/bindings/distribute_leads_binding.dart';
-import 'package:easy_callers_mobile/features/manager/leads/views/distribution_details_view.dart';
-import 'package:easy_callers_mobile/features/manager/leads/bindings/distribution_details_binding.dart';
+import 'package:easy_callers_mobile/features/manager/leads/views/batch_leads_view.dart';
 import 'package:easy_callers_mobile/features/project/controllers/project_list_controller.dart';
 import 'package:easy_callers_mobile/features/manager/dashboard/controllers/manager_dashboard_controller.dart';
 
@@ -29,6 +26,8 @@ class ProjectDetailController extends GetxController {
   final RxList<ProjectMemberModel> members = <ProjectMemberModel>[].obs;
   final RxList<LeadBatchModel> batches = <LeadBatchModel>[].obs;
   final RxList<ManagerModel> availableManagers = <ManagerModel>[].obs;
+  final RxList<ManagerModel> filteredAvailableManagers = <ManagerModel>[].obs;
+  final RxString managerSearchQuery = ''.obs;
   final RxBool isLoading = false.obs;
   final RxBool isUploading = false.obs;
 
@@ -36,6 +35,9 @@ class ProjectDetailController extends GetxController {
   final RxList<EmployeeModel> projectCallers = <EmployeeModel>[].obs;
   final RxList<EmployeeModel> availableCallers = <EmployeeModel>[].obs;
   final RxString callerAssignment = 'all'.obs; // 'all' or 'selected'
+
+  // The current manager's own membership in this project (null if not a member)
+  final Rx<ProjectMemberModel?> myMembership = Rx<ProjectMemberModel?>(null);
 
   // Stats
   final RxInt leadCount = 0.obs;
@@ -64,6 +66,7 @@ class ProjectDetailController extends GetxController {
     try {
       isLoading.value = true;
 
+      // Fetch all data in parallel
       final results = await Future.wait([
         _projectService.getProjectById(projectId!),
         _projectService.getProjectMembers(projectId!),
@@ -81,11 +84,43 @@ class ProjectDetailController extends GetxController {
       if (project.value != null) {
         callerAssignment.value = project.value!.callerAssignment;
       }
+
+      // For managers: resolve their own membership.
+      // 1) Try to find it in the already-loaded members list.
+      // 2) If not present (e.g. RLS filtered it out), query directly.
+      if (isManager) {
+        final myId = _authService.currentManager.value?.id;
+        if (myId != null) {
+          final fromList = members.firstWhereOrNull((m) => m.managerId == myId);
+          if (fromList != null) {
+            myMembership.value = fromList;
+          } else {
+            myMembership.value = await _fetchMyMembership();
+          }
+        }
+      }
     } catch (e) {
       print('Error fetching project details: $e');
       Get.snackbar('Error', 'Failed to load project details');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Fetch the current manager's own membership record for this project.
+  /// Queries the DB directly so it works even when the members list is empty/restricted.
+  Future<ProjectMemberModel?> _fetchMyMembership() async {
+    try {
+      final myId = _authService.currentManager.value?.id;
+      if (myId == null) return null;
+
+      return await _projectService.getMyMembershipForProject(
+        projectId: projectId!,
+        managerId: myId,
+      );
+    } catch (e) {
+      print('Error fetching my membership: $e');
+      return null;
     }
   }
 
@@ -113,6 +148,15 @@ class ProjectDetailController extends GetxController {
 
   Future<void> handleBatchTap(LeadBatchModel batch) async {
     try {
+      if (isSuperAdmin) {
+        // SA always sees the tabbed leads view (All Leads + Attended)
+        Get.to(
+          () => const BatchLeadsView(),
+          arguments: batch,
+        );
+        return;
+      }
+
       Get.dialog(
         const Center(child: CircularProgressIndicator(color: AppColors.primary)),
         barrierDismissible: false,
@@ -124,19 +168,25 @@ class ProjectDetailController extends GetxController {
       if (Get.isDialogOpen ?? false) Get.back(); // close dialog
       
       if (unassignedIds.isNotEmpty) {
-        // Still has unassigned leads -> Distribute
-        await Get.to(
-          () => const DistributeLeadsView(), 
-          binding: DistributeLeadsBinding(),
-          arguments: batch,
-        );
-        // Refresh batch list to update counts if distribution occurred
-        _fetchBatches();
+        if (isManager) {
+          // Still has unassigned leads -> Distribute (Manager only)
+          await Get.to(
+            () => const DistributeLeadsView(),
+            arguments: batch,
+          );
+          // Refresh batch list to update counts if distribution occurred
+          _fetchBatches();
+        } else {
+          // Fallback: tabbed leads view
+          Get.to(
+            () => const BatchLeadsView(),
+            arguments: batch,
+          );
+        }
       } else {
-        // Fully distributed -> View details
+        // Fully distributed -> show tabbed leads view
         Get.to(
-          () => const DistributionDetailsView(),
-          binding: DistributionDetailsBinding(),
+          () => const BatchLeadsView(),
           arguments: batch,
         );
       }
@@ -260,8 +310,10 @@ class ProjectDetailController extends GetxController {
       isUploading.value = true;
 
       final managerId = _authService.currentManager.value?.id;
-      if (managerId == null) {
-        Get.snackbar('Error', 'Manager profile not found');
+      final superAdminId = _authService.currentSuperAdmin.value?.id;
+
+      if (managerId == null && superAdminId == null) {
+        Get.snackbar('Error', 'Profile not found');
         return;
       }
 
@@ -339,15 +391,40 @@ class ProjectDetailController extends GetxController {
 
   Future<void> loadAvailableManagers() async {
     try {
-      final superAdminId = isSuperAdmin ? _authService.currentSuperAdmin.value?.id : null;
+      // For Super Admin, we show ALL available managers (their own + independent ones)
+      // For Managers, we might only show managers they created (if that's a thing) 
+      // but usually managers can't invite other managers.
+      
+      // If Super Admin, pass their ID to get own + independent managers
+      final saId = _authService.currentSuperAdmin.value?.id;
+      
       availableManagers.value = await _projectService
-          .getAvailableManagersForProject(projectId!, superAdminId: superAdminId);
+          .getAvailableManagersForProject(projectId!, currentSuperAdminId: saId);
+      
+      _applyManagerSearch();
     } catch (e) {
       print('Error loading available managers: $e');
     }
   }
 
-  Future<void> inviteManager(String managerId) async {
+  void searchManagers(String query) {
+    managerSearchQuery.value = query;
+    _applyManagerSearch();
+  }
+
+  void _applyManagerSearch() {
+    if (managerSearchQuery.value.isEmpty) {
+      filteredAvailableManagers.value = availableManagers.toList();
+    } else {
+      final query = managerSearchQuery.value.toLowerCase();
+      filteredAvailableManagers.value = availableManagers.where((m) {
+        return m.fullName.toLowerCase().contains(query) ||
+            m.email.toLowerCase().contains(query);
+      }).toList();
+    }
+  }
+
+  Future<void> inviteManager(String managerId, {bool canUpload = false}) async {
     try {
       final saId = _authService.currentSuperAdmin.value?.id;
       if (saId == null) {
@@ -359,6 +436,7 @@ class ProjectDetailController extends GetxController {
         projectId: projectId!,
         managerId: managerId,
         superAdminId: saId,
+        canUpload: canUpload,
       );
 
       Get.snackbar('Success', 'Manager invited successfully!');
@@ -366,6 +444,22 @@ class ProjectDetailController extends GetxController {
       await loadAvailableManagers();
     } catch (e) {
       Get.snackbar('Error', 'Failed to invite manager: $e');
+    }
+  }
+
+  /// Toggle upload permission for a member (SA only)
+  Future<void> toggleUploadPermission(String membershipId, bool canUpload) async {
+    try {
+      final success = await _projectService.toggleUploadPermission(
+        membershipId: membershipId,
+        canUpload: canUpload,
+      );
+      if (success) {
+        Get.snackbar('Updated', canUpload ? 'Upload permission granted' : 'Upload permission revoked');
+        await fetchProjectDetails();
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to update permission: $e');
     }
   }
 
@@ -403,37 +497,71 @@ class ProjectDetailController extends GetxController {
   bool get isManager => _authService.currentRole.value == UserRole.manager;
   String? get currentManagerId => _authService.currentManager.value?.id;
 
+  /// Whether I am the owner/creator of this project (manager who created it)
+  bool get isProjectOwner {
+    if (!isManager) return false;
+    return project.value?.createdByManagerId == _authService.currentManager.value?.id;
+  }
+
+  /// Whether I am an accepted member of this project
+  /// Works for both: manager-created and SA-created projects.
+  bool get isAcceptedMember {
+    if (!isManager) return false;
+    // Owner role = automatically accepted
+    if (isProjectOwner) return true;
+    // Check the loaded members list first
+    final myId = _authService.currentManager.value?.id;
+    final fromList = members.firstWhereOrNull(
+      (m) => m.managerId == myId && m.status == 'accepted',
+    );
+    if (fromList != null) return true;
+    // Fall back to the separately fetched membership
+    return myMembership.value?.status == 'accepted';
+  }
+
   bool get canInviteManagers {
     if (isSuperAdmin && project.value?.isCreatedBySuperAdmin == true) {
       return true;
     }
-    if (isManager && project.value?.createdByManagerId == _authService.currentManager.value?.id) {
-      return true;
-    }
+    if (isProjectOwner) return true;
     return false;
   }
 
   bool get canUploadLeads {
-    if (isManager) return true;
     if (isSuperAdmin) return true;
+    if (isManager) {
+      // For manager-created projects: owner can always upload
+      if (isProjectOwner) return true;
+      // For SA-created projects: only if SA has granted can_upload permission
+      if (project.value?.isCreatedBySuperAdmin == true) {
+        return _myMembershipRecord?.canUpload == true;
+      }
+      // For other manager-created projects where I'm a member
+      return isAcceptedMember;
+    }
     return false;
   }
 
+  /// Internal helper: get the resolved membership record for the current manager
+  ProjectMemberModel? get _myMembershipRecord {
+    final myId = _authService.currentManager.value?.id;
+    if (myId == null) return null;
+    // Try the members list first
+    final fromList = members.firstWhereOrNull(
+      (m) => m.managerId == myId,
+    );
+    return fromList ?? myMembership.value;
+  }
+
   bool get canManageCallers {
-    if (isManager && project.value?.createdByManagerId == _authService.currentManager.value?.id) {
-      return true;
-    }
-    if (isSuperAdmin && project.value?.isCreatedBySuperAdmin == true) {
-      return true;
-    }
-    return false;
+    if (isSuperAdmin) return false; // Super admin adds managers, not callers
+    // Manager can manage their own callers if they are an accepted member
+    return isAcceptedMember;
   }
 
   bool get canDeleteProject {
     if (project.value == null) return false;
-    if (isManager && project.value!.createdByManagerId == _authService.currentManager.value?.id) {
-      return true;
-    }
+    if (isProjectOwner) return true;
     if (isSuperAdmin && project.value!.isCreatedBySuperAdmin == true) {
       return true;
     }

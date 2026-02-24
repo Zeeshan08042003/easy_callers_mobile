@@ -36,25 +36,41 @@ class DistributeLeadsController extends GetxController {
       final managerId = _authService.currentManager.value?.id;
       if (managerId == null) return;
 
-      final result = await _leadService.getEmployeesByManager(managerId);
-      
-      // Filter to only active employees (callers)
-      employees.value = result.where((emp) => emp.isActive).toList();
-      
+      final batchProjectId = mesh.value?.projectId;
+
+      List<EmployeeModel> result;
+
+      if (batchProjectId != null) {
+        // Project-based batch: only load callers assigned to this project
+        // by this manager (covers both manager-created and SA-created projects).
+        result = await _leadService.getProjectCallersByManager(
+          projectId: batchProjectId,
+          managerId: managerId,
+        );
+      } else {
+        // Legacy non-project batch: load all active employees of the manager
+        result = await _leadService.getEmployeesByManager(managerId);
+        result = result.where((emp) => emp.isActive).toList();
+      }
+
+      employees.value = result;
+
       if (employees.isEmpty) {
         Get.snackbar(
-          'No Active Employees',
-          'You need at least one active employee to distribute leads',
+          'No Active Callers',
+          batchProjectId != null
+              ? 'No callers are assigned to this project. Add callers in the project settings first.'
+              : 'You need at least one active caller to distribute leads',
           snackPosition: SnackPosition.BOTTOM,
         );
         isDistributing.value = false;
         return;
       }
-      
+
       // Initialize equal distribution
       _calculateEqualDistribution();
     } catch (e) {
-      Get.snackbar('Error', 'Failed to fetch employees: $e');
+      Get.snackbar('Error', 'Failed to fetch callers: $e');
     } finally {
       isDistributing.value = false;
     }

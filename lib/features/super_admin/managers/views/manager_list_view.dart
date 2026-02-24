@@ -5,8 +5,7 @@ import 'package:easy_callers_mobile/features/super_admin/models/manager_model.da
 import 'package:easy_callers_mobile/features/super_admin/managers/controllers/manager_list_controller.dart';
 import 'package:easy_callers_mobile/features/super_admin/managers/views/add_manager_view.dart';
 import 'package:easy_callers_mobile/features/super_admin/managers/bindings/manager_bindings.dart';
-import 'package:easy_callers_mobile/features/manager/dashboard/views/manager_dashboard_view.dart';
-import 'package:easy_callers_mobile/features/manager/dashboard/bindings/manager_dashboard_binding.dart';
+import 'package:easy_callers_mobile/features/super_admin/managers/views/manager_oversight_view.dart';
 import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 
 class ManagerListView extends GetView<ManagerListController> {
@@ -14,6 +13,7 @@ class ManagerListView extends GetView<ManagerListController> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(ManagerListController());
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -52,7 +52,8 @@ class ManagerListView extends GetView<ManagerListController> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Get.to(() => const AddManagerView(), binding: AddManagerBinding()),
+        heroTag: 'manager_list_fab',
+        onPressed: () => Get.to(() => const AddManagerView()),
         backgroundColor: AppColors.primary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: const Icon(Icons.add, color: Colors.white, size: 28),
@@ -85,75 +86,78 @@ class ManagerListView extends GetView<ManagerListController> {
   }
 
   Widget _buildManagerCard(ManagerModel manager) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+    return InkWell(
+      onTap: () => Get.to(
+        () => const ManagerOversightView(), 
+        arguments: manager,
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              image: manager.profileImageUrl != null
-                  ? DecorationImage(image: NetworkImage(manager.profileImageUrl!), fit: BoxFit.cover)
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                image: manager.profileImageUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(manager.profileImageUrl!), 
+                        fit: BoxFit.cover
+                      )
+                    : null,
+              ),
+              child: manager.profileImageUrl == null
+                  ? const Icon(Icons.apartment_rounded, color: AppColors.primary, size: 28)
                   : null,
             ),
-            child: manager.profileImageUrl == null
-                ? const Icon(Icons.apartment_rounded, color: AppColors.primary, size: 28)
-                : null,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  manager.fullName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  manager.email,
-                  style: TextStyle(
-                    color: AppColors.textSecondary.withOpacity(0.7),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _buildSmallBadge(
-                      'ACTIVE', 
-                      manager.isActive ? AppColors.success : AppColors.textSecondary
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    manager.fullName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Since ${manager.createdAt.year}',
-                      style: TextStyle(color: AppColors.textSecondary.withOpacity(0.4), fontSize: 10),
+                  ),
+                  Text(
+                    manager.email,
+                    style: TextStyle(
+                      color: AppColors.textSecondary.withOpacity(0.7),
+                      fontSize: 12,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildSmallBadge(
+                        'ACTIVE', 
+                        manager.isActive ? AppColors.success : AppColors.textSecondary
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Since ${manager.createdAt.year}',
+                        style: TextStyle(color: AppColors.textSecondary.withOpacity(0.4), fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textSecondary, size: 16),
-            onPressed: () => Get.to(
-              () => const ManagerDashboardView(), 
-              binding: ManagerDashboardBinding(),
-              arguments: manager.id,
-            ),
-          ),
-        ],
+            const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textSecondary, size: 16),
+          ],
+        ),
       ),
     );
   }

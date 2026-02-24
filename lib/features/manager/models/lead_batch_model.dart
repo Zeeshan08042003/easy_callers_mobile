@@ -4,6 +4,7 @@ class LeadBatchModel {
   final String? fileUrl;
   final int totalLeads;
   final String? uploadedBy;
+  final String? projectId;
   final DateTime createdAt;
 
   // Joined data
@@ -15,6 +16,7 @@ class LeadBatchModel {
     this.fileUrl,
     this.totalLeads = 0,
     this.uploadedBy,
+    this.projectId,
     required this.createdAt,
     this.uploadedByName,
   });
@@ -29,6 +31,9 @@ class LeadBatchModel {
       final user = json['uploaded_by_user'] as Map<String, dynamic>;
       uploaderName =
           '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}'.trim();
+    } else if (json['uploaded_by'] == null) {
+      // Fallback for batches uploaded by Super Admin (where uploaded_by FK is null)
+      uploaderName = 'Super Admin';
     }
 
     return LeadBatchModel(
@@ -37,6 +42,7 @@ class LeadBatchModel {
       fileUrl: json['file_url'] as String?,
       totalLeads: json['total_leads'] as int? ?? 0,
       uploadedBy: json['uploaded_by'] as String?,
+      projectId: json['project_id'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       uploadedByName: uploaderName,
     );

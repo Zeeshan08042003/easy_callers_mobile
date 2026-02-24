@@ -1,4 +1,5 @@
 class AppRoutes {
+  static const String splash = '/splash';
   // Auth
   static const String login = '/login';
   static const String otpVerification = '/otp-verification';

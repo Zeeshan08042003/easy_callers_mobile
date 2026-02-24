@@ -186,8 +186,10 @@ class ManagerDashboardController extends GetxController {
 
     try {
       final managerId = _authService.currentManager.value?.id;
-      if (managerId == null) {
-        Get.snackbar('Error', 'Manager profile not found');
+      final superAdminId = _authService.currentSuperAdmin.value?.id;
+
+      if (managerId == null && superAdminId == null) {
+        Get.snackbar('Error', 'Profile not found');
         return;
       }
 

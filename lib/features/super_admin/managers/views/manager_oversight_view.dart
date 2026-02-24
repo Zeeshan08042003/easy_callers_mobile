@@ -379,7 +379,7 @@ class ManagerOversightView extends StatelessWidget {
       itemBuilder: (context, index) {
         final member = members[index];
         return InkWell(
-          onTap: () => Get.to(() => const EmployeeDetailView(), binding: EmployeeDetailBinding(), arguments: member),
+          onTap: () => Get.to(() => const EmployeeDetailView(), arguments: member),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.all(16),

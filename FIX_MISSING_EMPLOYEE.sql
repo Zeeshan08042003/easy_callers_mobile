@@ -28,6 +28,7 @@ INSERT INTO public.employees (
   NOW()
 );
 
+
 -- Option 2: Check if the employee already exists but with different email format
 SELECT 
   id,

@@ -68,10 +68,8 @@ class LeadDetailView extends StatelessWidget {
             _buildCallDynamicStatus(controller),
             _buildUpdateCallStatus(controller),
 
-            _buildVisitingDateTimePicker(controller),
+            _buildActionDateTimePicker(controller),
             _buildCallSummary(controller),
-
-            _buildFollowUpReminder(controller),
             const SizedBox(height: 100),
           ],
         ),
@@ -475,6 +473,7 @@ class LeadDetailView extends StatelessWidget {
           : '0s';
 
       return Container(
+        margin: EdgeInsets.only(top: 32),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
@@ -757,19 +756,29 @@ class LeadDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildVisitingDateTimePicker(LeadDetailController controller) {
+  Widget _buildActionDateTimePicker(LeadDetailController controller) {
     return Obx(() {
-      if (controller.selectedStatus.value != 'visiting') {
+      final statusValue = controller.selectedStatus.value;
+      final bool requiresDateTime = statusValue == 'visiting' || 
+          statusValue == 'follow_up' || 
+          statusValue == 'callback';
+
+      if (!requiresDateTime) {
         return const SizedBox.shrink();
       }
 
+      final isVisiting = statusValue == 'visiting';
+      final color = isVisiting ? AppColors.success : AppColors.warning;
+      final label = isVisiting ? 'Visiting Date & Time' : 'Follow-up Date & Time';
+      final icon = isVisiting ? Icons.calendar_month_rounded : Icons.event_repeat_rounded;
+
       return Container(
-        margin: EdgeInsets.only(top: 16,bottom: 10),
+        margin: const EdgeInsets.only(top: 16, bottom: 10),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.success.withOpacity(0.2)),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -780,19 +789,19 @@ class LeadDetailView extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.1),
+                    color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
-                    Icons.calendar_month_rounded,
-                    color: AppColors.success,
+                  child: Icon(
+                    icon,
+                    color: color,
                     size: 20,
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Visiting Date & Time',
-                  style: TextStyle(
+                Text(
+                  label,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -806,7 +815,7 @@ class LeadDetailView extends StatelessWidget {
                 // Date picker
                 Expanded(
                   child: InkWell(
-                    onTap: () => _pickVisitingDate(controller),
+                    onTap: () => _pickDateTimeAction(controller, isDate: true),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -815,7 +824,7 @@ class LeadDetailView extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: controller.visitingDate.value != null
-                              ? AppColors.success.withOpacity(0.4)
+                              ? color.withOpacity(0.4)
                               : Colors.white.withOpacity(0.1),
                         ),
                       ),
@@ -825,13 +834,13 @@ class LeadDetailView extends StatelessWidget {
                             Icons.date_range_rounded,
                             size: 18,
                             color: controller.visitingDate.value != null
-                                ? AppColors.success
+                                ? color
                                 : AppColors.textSecondary,
                           ),
                           const SizedBox(width: 10),
                           Text(
                             controller.visitingDate.value != null
-                                ? '${controller.visitingDate.value!.day}/${controller.visitingDate.value!.month}/${controller.visitingDate.value!.year}'
+                                ? DateFormat('dd/MM/yyyy').format(controller.visitingDate.value!)
                                 : 'Select Date',
                             style: TextStyle(
                               color: controller.visitingDate.value != null
@@ -850,7 +859,7 @@ class LeadDetailView extends StatelessWidget {
                 // Time picker
                 Expanded(
                   child: InkWell(
-                    onTap: () => _pickVisitingTime(controller),
+                    onTap: () => _pickDateTimeAction(controller, isDate: false),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -859,7 +868,7 @@ class LeadDetailView extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: controller.visitingTime.value != null
-                              ? AppColors.success.withOpacity(0.4)
+                              ? color.withOpacity(0.4)
                               : Colors.white.withOpacity(0.1),
                         ),
                       ),
@@ -869,7 +878,7 @@ class LeadDetailView extends StatelessWidget {
                             Icons.access_time_rounded,
                             size: 18,
                             color: controller.visitingTime.value != null
-                                ? AppColors.success
+                                ? color
                                 : AppColors.textSecondary,
                           ),
                           const SizedBox(width: 10),
@@ -898,25 +907,25 @@ class LeadDetailView extends StatelessWidget {
     });
   }
 
-  void _pickVisitingDate(LeadDetailController controller) async {
-    final date = await showDatePicker(
-      context: Get.context!,
-      initialDate: controller.visitingDate.value ?? DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (date != null) {
-      controller.visitingDate.value = date;
-    }
-  }
-
-  void _pickVisitingTime(LeadDetailController controller) async {
-    final time = await showTimePicker(
-      context: Get.context!,
-      initialTime: controller.visitingTime.value ?? const TimeOfDay(hour: 10, minute: 0),
-    );
-    if (time != null) {
-      controller.visitingTime.value = time;
+  void _pickDateTimeAction(LeadDetailController controller, {required bool isDate}) async {
+    if (isDate) {
+      final date = await showDatePicker(
+        context: Get.context!,
+        initialDate: controller.visitingDate.value ?? DateTime.now().add(const Duration(days: 1)),
+        firstDate: DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+      );
+      if (date != null) {
+        controller.visitingDate.value = date;
+      }
+    } else {
+      final time = await showTimePicker(
+        context: Get.context!,
+        initialTime: controller.visitingTime.value ?? const TimeOfDay(hour: 10, minute: 0),
+      );
+      if (time != null) {
+        controller.visitingTime.value = time;
+      }
     }
   }
 
@@ -960,90 +969,6 @@ class LeadDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildFollowUpReminder(LeadDetailController controller) {
-    return Obx(() {
-      final statusValue = controller.selectedStatus.value;
-      
-      // Find the status model to see the mapping
-      final statusModel = controller.availableLeadStatuses.firstWhereOrNull(
-        (s) => s.value == statusValue
-      );
-      
-      bool needsFollowUp = statusValue == 'callback' ||
-          statusValue == 'interested' ||
-          statusValue == 'follow_up';
-          
-      if (statusModel != null) {
-        needsFollowUp = statusModel.leadStatusMapping == 'follow_up' || 
-                       statusModel.value == 'callback' || 
-                       statusModel.value == 'interested';
-      }
-
-      if (!needsFollowUp) return const SizedBox.shrink();
-
-      return Container(
-        margin: EdgeInsets.only(top: 20),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.notifications_rounded,
-                color: AppColors.primary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Text(
-                'Set follow-up reminder',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Obx(() => Switch(
-                  value: controller.followUpEnabled.value,
-                  onChanged: (value) {
-                    controller.followUpEnabled.value = value;
-                    if (value) {
-                      _showFollowUpDatePicker(controller);
-                    }
-                  },
-                  activeColor: AppColors.primary,
-                )),
-          ],
-        ),
-      );
-    });
-  }
-
-  void _showFollowUpDatePicker(LeadDetailController controller) async {
-    final date = await showDatePicker(
-      context: Get.context!,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (date != null) {
-      controller.followUpDate.value = date;
-    } else {
-      controller.followUpEnabled.value = false;
-    }
-  }
 
   Widget _buildSaveButton(LeadDetailController controller) {
     return Container(

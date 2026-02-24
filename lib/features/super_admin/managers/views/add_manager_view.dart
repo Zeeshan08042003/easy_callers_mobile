@@ -8,6 +8,7 @@ class AddManagerView extends GetView<AddManagerController> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(AddManagerController());
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
