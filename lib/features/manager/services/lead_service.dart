@@ -1586,10 +1586,12 @@ class LeadService extends GetxService {
           // Unique employees from project_callers
           _supabase.projectCallersTable.select('employee_id').eq('project_id', projectId),
           // Leads for this project
-          _supabase.leadsTable.select('id').eq('project_id', projectId),
-          // Call logs for this project
-          _supabase.callLogsTable.select('id').eq('project_id', projectId),
-        ]);
+        _supabase.leadsTable.select('id').eq('project_id', projectId),
+        // Call logs for this project (join with leads to filter by project_id)
+        _supabase.callLogsTable
+            .select('id, leads!inner(project_id)')
+            .eq('leads.project_id', projectId),
+      ]);
 
         return {
           'manager_count': (results[0] as List).map((m) => m['manager_id']).toSet().length,
@@ -1719,6 +1721,23 @@ class LeadService extends GetxService {
       final List<Map<String, dynamic>> regionalData = [];
 
       for (var manager in managers) {
+        // Enforce visibility rule: 
+        // SA sees all if they created the manager OR if manager allowed it.
+        final bool isVisible = manager.createdBySuperAdminId == currentSuperAdminId || 
+                              manager.isSaVisible;
+        
+        if (!isVisible) {
+          regionalData.add({
+            'manager_name': manager.fullName,
+            'lead_count': 0,
+            'employee_count': 0,
+            'call_count': 0,
+            'conversion_rate': 0.0,
+            'is_private': true,
+          });
+          continue;
+        }
+
         // Fetch stats for each manager branch
         var leadsQuery = _supabase.leadsTable.select('id').eq('uploaded_by', manager.id);
         if (projectId != null) {
@@ -1733,11 +1752,16 @@ class LeadService extends GetxService {
 
         int totalCalls = 0;
         if (employeeIds.isNotEmpty) {
-           var callsQuery = _supabase.callLogsTable.select('id').inFilter('employee_id', employeeIds);
+           var callsQuery = _supabase.callLogsTable.select('id');
+           
            if (projectId != null) {
-             callsQuery = callsQuery.eq('project_id', projectId);
+              // Join with leads to filter calls by project
+              callsQuery = _supabase.callLogsTable
+                  .select('id, leads!inner(project_id)')
+                  .eq('leads.project_id', projectId);
            }
-           final callsResponse = await callsQuery;
+           
+           final callsResponse = await callsQuery.inFilter('employee_id', employeeIds);
            totalCalls = (callsResponse as List).length;
         }
 
@@ -1747,6 +1771,7 @@ class LeadService extends GetxService {
           'employee_count': employees.length,
           'call_count': totalCalls,
           'conversion_rate': totalCalls > 0 ? (leads.length / totalCalls) * 100 : 0.0,
+          'is_private': false,
         });
       }
 
@@ -1754,6 +1779,96 @@ class LeadService extends GetxService {
     } catch (e) {
       print('Error fetching regional performance: $e');
       return [];
+    }
+  }
+
+  /// Get comprehensive manager analytics for Super Admin Oversight
+  Future<Map<String, dynamic>> getManagerAnalytics({
+    required String managerId,
+    required String period, // 'daily', 'weekly', 'yearly'
+    String? currentSuperAdminId,
+  }) async {
+    try {
+      // 1. Fetch the manager to check visibility
+      final managerResponse = await _supabase.managersTable
+          .select()
+          .eq('id', managerId)
+          .single();
+      
+      final manager = ManagerModel.fromJson(managerResponse);
+      final bool isVisible = manager.createdBySuperAdminId == currentSuperAdminId || 
+                            manager.isSaVisible;
+
+      if (!isVisible) {
+        return {'is_private': true};
+      }
+
+      // 2. Fetch Timeframe Data
+      DateTime start;
+      final now = DateTime.now();
+      if (period == 'daily') {
+        start = DateTime(now.year, now.month, now.day);
+      } else if (period == 'weekly') {
+        start = now.subtract(const Duration(days: 7));
+      } else {
+        // yearly
+        start = DateTime(now.year, 1, 1);
+      }
+
+      // 3. Fetch Lead Statuses Distribution
+      final leadsResponse = await _supabase.leadsTable
+          .select('status')
+          .eq('uploaded_by', managerId);
+      
+      final leads = leadsResponse as List;
+      final Map<String, int> statusCounts = {};
+      for (var l in leads) {
+        final s = (l['status'] ?? 'new').toString();
+        statusCounts[s] = (statusCounts[s] ?? 0) + 1;
+      }
+
+      // 4. Fetch Employee Performance
+      final employees = await getEmployeesByManager(managerId);
+      final List<Map<String, dynamic>> employeeStats = [];
+
+      for (var emp in employees) {
+        final callLogs = await _supabase.callLogsTable
+            .select('id, lead_status')
+            .eq('employee_id', emp.id)
+            .gte('created_at', start.toIso8601String());
+        
+        final logs = callLogs as List;
+        final connectedCount = logs.length;
+        final interestedCount = logs.where((l) => l['lead_status'] == 'interested').length;
+
+        employeeStats.add({
+          'id': emp.id,
+          'name': emp.fullName,
+          'profile_image_url': emp.profileImageUrl,
+          'calls': connectedCount,
+          'conversion': connectedCount > 0 ? (interestedCount / connectedCount * 100).round() : 0,
+          'status': emp.isActive ? 'Active' : 'Inactive',
+        });
+      }
+
+      // 5. Calculate overall conversion for timeframe
+      int totalCalls = 0;
+      int totalInterested = 0;
+      for (var stats in employeeStats) {
+        totalCalls += (stats['calls'] as int);
+        totalInterested += ((stats['calls'] as int) * (stats['conversion'] as int) / 100).round();
+      }
+
+      return {
+        'is_private': false,
+        'conversion_rate': totalCalls > 0 ? (totalInterested / totalCalls * 100) : 0.0,
+        'status_counts': statusCounts,
+        'employees': employeeStats,
+        'total_leads': leads.length,
+      };
+    } catch (e) {
+      print('Error fetching manager analytics: $e');
+      return {'error': e.toString()};
     }
   }
 

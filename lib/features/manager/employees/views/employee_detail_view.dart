@@ -10,7 +10,6 @@ class EmployeeDetailView extends GetView<EmployeeDetailController> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(EmployeeDetailController());
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

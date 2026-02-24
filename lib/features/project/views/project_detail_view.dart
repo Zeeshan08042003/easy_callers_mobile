@@ -1610,8 +1610,8 @@ class ProjectDetailView extends StatelessWidget {
                             controller: scrollController,
                             children: [
                               // ---- STATS GRID (Daily/Weekly/Quarterly) ----
-                              _buildStatsGrid(snapshot.data!),
-                              const SizedBox(height: 16),
+                              // _buildStatsGrid(snapshot.data!),
+                              // const SizedBox(height: 16),
 
                               // ---- LAST LEAD ASSIGNMENT ----
                               _buildLastAssignment(snapshot.data!),

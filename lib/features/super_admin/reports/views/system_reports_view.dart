@@ -190,6 +190,8 @@ class SystemReportsView extends GetView<SystemReportsController> {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final agency = data[index];
+        final bool isPrivate = agency['is_private'] ?? false;
+
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -208,23 +210,31 @@ class SystemReportsView extends GetView<SystemReportsController> {
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      '${agency['employee_count']} Agents • ${agency['lead_count']} Total Leads',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      isPrivate 
+                        ? 'Private Agency'
+                        : '${agency['employee_count']} Agents • ${agency['lead_count']} Total Leads',
+                      style: TextStyle(
+                        color: isPrivate ? AppColors.danger : AppColors.textSecondary, 
+                        fontSize: 12
+                      ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+              if (isPrivate)
+                const Icon(Icons.lock_outline_rounded, color: AppColors.textSecondary, size: 16)
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${(agency['conversion_rate'] as double).toStringAsFixed(1)}% CR',
+                    style: const TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                child: Text(
-                  '${(agency['conversion_rate'] as double).toStringAsFixed(1)}% CR',
-                  style: const TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              ),
             ],
           ),
         );

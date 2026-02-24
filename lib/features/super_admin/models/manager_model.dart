@@ -11,6 +11,9 @@ class ManagerModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? createdBySuperAdminId;
+  final bool isSaVisible;
+  final String? agencyName;
+
 
   // Computed / joined data
   final int? employeeCount;
@@ -28,8 +31,12 @@ class ManagerModel {
     required this.createdAt,
     required this.updatedAt,
     this.createdBySuperAdminId,
+    this.isSaVisible = false,
+    this.agencyName,
     this.employeeCount,
   });
+
+
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -57,8 +64,12 @@ class ManagerModel {
           ? DateTime.parse(json['updated_at'] as String) 
           : DateTime.now(),
       createdBySuperAdminId: json['created_by_super_admin_id'] as String?,
+      isSaVisible: json['is_sa_visible'] as bool? ?? false,
+      agencyName: json['agency_name'] as String?,
     );
   }
+
+
 
   Map<String, dynamic> toJson() {
     return {
@@ -72,10 +83,13 @@ class ManagerModel {
       'is_active': isActive,
       'max_employees': maxEmployees,
       'created_by_super_admin_id': createdBySuperAdminId,
+      'is_sa_visible': isSaVisible,
+      'agency_name': agencyName,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
   }
+
 
   Map<String, dynamic> toInsertJson() {
     final map = <String, dynamic>{
@@ -89,8 +103,12 @@ class ManagerModel {
     if (profileImageUrl != null) map['profile_image_url'] = profileImageUrl;
     if (maxEmployees != null) map['max_employees'] = maxEmployees;
     if (createdBySuperAdminId != null) map['created_by_super_admin_id'] = createdBySuperAdminId;
+    map['is_sa_visible'] = isSaVisible;
+    if (agencyName != null) map['agency_name'] = agencyName;
     return map;
   }
+
+
 
   ManagerModel copyWith({
     String? id,
@@ -105,6 +123,8 @@ class ManagerModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? createdBySuperAdminId,
+    bool? isSaVisible,
+    String? agencyName,
     int? employeeCount,
   }) {
     return ManagerModel(
@@ -120,9 +140,13 @@ class ManagerModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBySuperAdminId: createdBySuperAdminId ?? this.createdBySuperAdminId,
+      isSaVisible: isSaVisible ?? this.isSaVisible,
+      agencyName: agencyName ?? this.agencyName,
       employeeCount: employeeCount ?? this.employeeCount,
     );
   }
+
+
 
   @override
   String toString() => 'Manager($fullName, $email)';

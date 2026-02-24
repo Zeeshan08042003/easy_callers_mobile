@@ -371,6 +371,7 @@ class AuthService extends GetxService {
         'first_name': firstName,
         'last_name': lastName,
         'is_active': true,
+        'created_by_super_admin_id': currentSuperAdmin.value!.id,
       };
       if (phone != null) insertData['phone'] = phone;
 

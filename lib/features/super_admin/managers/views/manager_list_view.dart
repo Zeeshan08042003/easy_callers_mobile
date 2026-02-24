@@ -132,7 +132,7 @@ class ManagerListView extends GetView<ManagerListController> {
                     ),
                   ),
                   Text(
-                    manager.email,
+                    manager.agencyName ?? manager.email,
                     style: TextStyle(
                       color: AppColors.textSecondary.withOpacity(0.7),
                       fontSize: 12,
