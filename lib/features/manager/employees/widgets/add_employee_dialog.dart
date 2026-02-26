@@ -10,9 +10,6 @@ class AddEmployeeDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<ManagerTeamController>();
-    if (controller.activeOTP.value.isEmpty) {
-      controller.generateOTP();
-    }
 
     return Dialog(
       backgroundColor: AppColors.cardBg,
@@ -55,32 +52,25 @@ class AddEmployeeDialog extends StatelessWidget {
               _buildFieldLabel('PHONE (OPTIONAL)'),
               _buildTextField('+1 234 567 890', controller.phoneController, keyboardType: TextInputType.phone),
               const SizedBox(height: 30),
-              Obx(() => controller.activeOTP.value.isNotEmpty 
-                ? Column(
-                    children: [
-                      _buildOTPSection(controller),
-                      const SizedBox(height: 16),
-                      // Share via WhatsApp button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _shareEmployeeViaWhatsApp(controller),
-                          icon: const Icon(Icons.share_rounded, size: 18),
-                          label: const Text('Share via WhatsApp',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF25D366),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : const SizedBox.shrink()),
+              const SizedBox(height: 30),
+              // Share via WhatsApp button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _shareEmployeeViaWhatsApp(controller),
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: const Text('Share Access Details',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
               const SizedBox(height: 30),
               Obx(() => SizedBox(
                 width: double.infinity,
@@ -141,85 +131,15 @@ class AddEmployeeDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildOTPSection(ManagerTeamController controller) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'ACTIVATION OTP',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2.0,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Obx(() {
-            final otp = controller.activeOTP.value;
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(6, (index) {
-                final char = otp.length > index ? otp[index] : '';
-                return _buildOTPBox(char);
-              }),
-            );
-          }),
-          const SizedBox(height: 20),
-          Obx(() => Text(
-                'This code expires in ${controller.formattedTimer}',
-                style: TextStyle(
-                  color: AppColors.textSecondary.withOpacity(0.7),
-                  fontSize: 11,
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOTPBox(String char) {
-    return Container(
-      width: 40,
-      height: 50,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: char.isNotEmpty ? AppColors.primary : Colors.white.withOpacity(0.1),
-          width: char.isNotEmpty ? 2 : 1,
-        ),
-      ),
-      child: Text(
-        char,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
 
   void _shareEmployeeViaWhatsApp(ManagerTeamController controller) async {
     final email = controller.emailController.text.trim();
-    final otp = controller.activeOTP.value;
     final name = '${controller.firstNameController.text.trim()} ${controller.lastNameController.text.trim()}'.trim();
-
     final message = Uri.encodeComponent(
       'Hello${name.isNotEmpty ? ' $name' : ''},\n\n'
       'Your Easy Callers employee account has been created.\n\n'
-      '📧 Email: $email\n'
-      '🔑 OTP Code: $otp\n\n'
-      'Please download the app, enter your email and use this OTP to activate your account.\n\n'
+      '📧 Email: $email\n\n'
+      'Check your email for an activation code. Use that code in the app to set your password.\n\n'
       'Thank you!',
     );
 

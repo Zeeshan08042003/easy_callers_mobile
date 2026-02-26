@@ -161,19 +161,19 @@ class EmployeeDetailController extends GetxController {
     
     try {
       isLoading.value = true;
-      final newOtp = await _authService.resendEmployeeOTP(employee.value!.email);
+      final success = await _authService.requestActivationOTP(employee.value!.email);
       
-      if (newOtp != null) {
+      if (success) {
         Get.dialog(
           AlertDialog(
             backgroundColor: AppColors.cardBg,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('New OTP Generated', style: TextStyle(color: Colors.white)),
+            title: const Text('OTP Sent', style: TextStyle(color: Colors.white)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'A new activation code has been generated for',
+                  'A new activation code has been sent directly to',
                   style: TextStyle(color: AppColors.textSecondary),
                   textAlign: TextAlign.center,
                 ),
@@ -181,35 +181,25 @@ class EmployeeDetailController extends GetxController {
                   employee.value!.fullName,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    newOtp,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 8,
-                    ),
-                  ),
+                const SizedBox(height: 12),
+                Text(
+                  employee.value!.email,
+                  style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 13),
                 ),
                 const SizedBox(height: 20),
+                const Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 48),
+                const SizedBox(height: 20),
                 const Text(
-                  'This code is valid for 24 hours.',
+                  'The employee can use the code from their email to activate.',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Get.back(),
-                child: const Text('Close', style: TextStyle(color: AppColors.primary)),
+                child: const Text('Got it', style: TextStyle(color: AppColors.primary)),
               ),
             ],
           ),

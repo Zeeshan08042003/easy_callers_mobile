@@ -35,8 +35,6 @@ class AddManagerController extends GetxController {
       );
 
       if (result != null) {
-        final manager = result.manager;
-        final otp = result.otp;
         // Refresh the manager list if it exists
         if (Get.isRegistered<ManagerListController>()) {
           Get.find<ManagerListController>().fetchManagers();
@@ -46,7 +44,6 @@ class AddManagerController extends GetxController {
         _showSuccessDialog(
           name: '$firstName $lastName',
           email: email,
-          otp: otp ?? 'N/A',
         );
       } else {
         print("manager creating error: ${_authService.error.value}");
@@ -63,7 +60,6 @@ class AddManagerController extends GetxController {
   void _showSuccessDialog({
     required String name,
     required String email,
-    required String otp,
   }) {
     Get.dialog(
       AlertDialog(
@@ -115,7 +111,10 @@ class AddManagerController extends GetxController {
                 children: [
                   _credentialRow('Email', email),
                   const SizedBox(height: 12),
-                  _credentialRow('OTP Code', otp),
+                  const Text(
+                    'Verification code sent to their email.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -127,7 +126,6 @@ class AddManagerController extends GetxController {
                 onPressed: () => _shareViaWhatsApp(
                   name: name,
                   email: email,
-                  otp: otp,
                 ),
                 icon: const Icon(Icons.share_rounded, size: 18),
                 label: const Text('Share via WhatsApp',
@@ -196,14 +194,12 @@ class AddManagerController extends GetxController {
   Future<void> _shareViaWhatsApp({
     required String name,
     required String email,
-    required String otp,
   }) async {
     final message = Uri.encodeComponent(
       'Hello $name,\n\n'
       'Your Easy Callers manager account has been created.\n\n'
-      '📧 Email: $email\n'
-      '🔐 OTP Code: $otp\n\n'
-      'Please download the app and activate your account using this OTP.\n\n'
+      '📧 Email: $email\n\n'
+      'Please download the app and use the activation code sent to your email to set your password.\n\n'
       'Thank you!',
     );
 

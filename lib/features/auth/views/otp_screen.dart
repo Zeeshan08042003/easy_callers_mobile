@@ -154,6 +154,24 @@ class OTPScreen extends StatelessWidget {
                       ),
                     )
                   : const SizedBox.shrink()),
+
+              const Spacer(),
+
+              Center(
+                child: TextButton(
+                  onPressed: controller.isLoading.value
+                      ? null
+                      : () => controller.resendOTP(),
+                  child: Text(
+                    "Resend OTP",
+                    style: TextStyle(
+                      color: const Color(0xff2D201C).withOpacity(0.7),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),

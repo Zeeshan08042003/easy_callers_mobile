@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -132,190 +131,44 @@ class AuthService extends GetxService {
   }
 
   // ============================================
-  // EMPLOYEE OTP ACTIVATION
+  // ACCOUNT ACTIVATION (NATIVE OTP)
   // ============================================
 
-  /// Verify OTP for employee first-time activation
-  Future<bool> verifyEmployeeOTP({
-    required String email,
-    required String otpCode,
-  }) async {
-    try {
-      isLoading.value = true;
-      error.value = '';
-
-      final result = await _supabase.client.rpc(
-        'get_employee_for_otp',
-        params: {
-          'input_email': email.trim().toLowerCase(),
-        },
-      );
-
-      if (result == null || result.isEmpty) {
-        error.value = 'No employee account found with this email.';
-        return false;
-      }
-
-      final employee = EmployeeModel.fromJson(result.first);
-
-      if (employee.otpCode != otpCode) {
-        error.value = 'Invalid OTP. Please try again.';
-        return false;
-      }
-
-      if (employee.isOTPExpired) {
-        error.value = 'OTP has expired. Please request a new one.';
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      error.value = 'Unexpected error: $e';
-      print('error : $e');
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Complete employee activation: set password and activate account
-  Future<EmployeeModel?> activateEmployee({
-    required String email,
-    required String password,
-  }) async {
+  /// Request a native Supabase OTP for account activation
+  Future<bool> requestActivationOTP(String email) async {
     try {
       isLoading.value = true;
       error.value = '';
 
       final normalizedEmail = email.toLowerCase().trim();
 
-      // STEP 1: Check if employee exists in database BEFORE creating auth account
-      print("=== Employee Activation ===");
-      print("Checking if employee exists: '$normalizedEmail'");
+      // 1. Verify user exists in our DB first
+      final managerChecked = await _supabase.client.rpc(
+        'get_manager_for_otp',
+        params: {'input_email': normalizedEmail},
+      );
       
-      List<dynamic> existingRecords = await _supabase.employeesTable
-          .select()
-          .ilike('email', normalizedEmail);
-      
-      if (existingRecords.isEmpty) {
-        // Try exact match as fallback
-        existingRecords = await _supabase.employeesTable
-            .select()
-            .eq('email', normalizedEmail);
-      }
-      
-      // If still not found, show helpful error
-      if (existingRecords.isEmpty) {
-        final allEmployees = await _supabase.employeesTable.select();
-        print("❌ Employee not found in database");
-        print("Total employees in database: ${allEmployees.length}");
-        
-        if (allEmployees.isNotEmpty) {
-          print("Available employee emails:");
-          for (var emp in allEmployees.take(10)) {
-            print("  - ${emp['email']} (${emp['first_name']} ${emp['last_name']})");
-          }
-        }
-        
-        error.value = 
-            'No employee account found with email: $normalizedEmail\n\n'
-            'This email was not created by a manager.\n'
-            'Please ask your manager to create your employee account first.';
-        return null;
-      }
-      
-      if (existingRecords.length > 1) {
-        error.value = 'Multiple employee accounts found. Please contact your administrator.';
-        print("❌ Duplicate employee records found for $normalizedEmail");
-        return null;
+      final employeeChecked = await _supabase.client.rpc(
+        'get_employee_for_otp',
+        params: {'input_email': normalizedEmail},
+      );
+
+      if ((managerChecked == null || managerChecked.isEmpty) && 
+          (employeeChecked == null || employeeChecked.isEmpty)) {
+        error.value = 'No account found with this email. Please contact your administrator.';
+        return false;
       }
 
-      final employeeRecord = existingRecords.first;
-      final employeeId = employeeRecord['id'];
-      print("✅ Employee found in database: ID=$employeeId");
+      // 2. Trigger Supabase native OTP
+      await _supabase.client.auth.signInWithOtp(
+        email: normalizedEmail,
+        shouldCreateUser: true,
+      );
 
-      // STEP 2: Create or get auth account
-      String? authUserId;
-      
-      try {
-        final authResponse = await _supabase.client.auth.signUp(
-          email: normalizedEmail,
-          password: password,
-        );
-
-        if (authResponse.user != null) {
-          authUserId = authResponse.user!.id;
-          print("✅ Auth account created: $authUserId");
-        } else {
-          error.value = 'Failed to create account. Please try again.';
-          return null;
-        }
-      } on AuthException catch (e) {
-        // If user already exists, try to sign in to get the auth ID
-        if (e.message.contains('already registered') || 
-            e.message.contains('User already registered')) {
-          print("⚠️ Auth account already exists, signing in...");
-          
-          try {
-            final signInResponse = await _supabase.client.auth.signInWithPassword(
-              email: normalizedEmail,
-              password: password,
-            );
-            
-            if (signInResponse.user != null) {
-              authUserId = signInResponse.user!.id;
-              print("✅ Signed in with existing account: $authUserId");
-            } else {
-              error.value = 'Account exists but password is incorrect.';
-              return null;
-            }
-          } catch (signInError) {
-            error.value = 'Account exists but password is incorrect.';
-            print("❌ Sign in failed: $signInError");
-            return null;
-          }
-        } else {
-          throw e;
-        }
-      }
-
-      if (authUserId == null) {
-        error.value = 'Failed to create or access account.';
-        return null;
-      }
-
-      // STEP 3: Link auth account to employee record and activate
-      print("Activating employee: linking auth_id=$authUserId to employee_id=$employeeId");
-      
-      await _supabase.employeesTable.update({
-        'auth_id': authUserId,
-        'is_active': true,
-        'otp_code': null,
-        'otp_expires_at': null,
-      }).eq('id', employeeId);
-
-      print("✅ Employee activated successfully");
-
-      // STEP 4: Fetch and return updated employee profile
-      final data = await _supabase.employeesTable
-          .select()
-          .eq('id', employeeId)
-          .single();
-
-      final employee = EmployeeModel.fromJson(data);
-      _setCurrentUser(UserRole.employee, employee);
-      print("✅ Logged in as: ${employee.fullName}");
-      
-      return employee;
-    } on AuthException catch (e) {
-      print("❌ Auth error: ${e.message}");
-      error.value = e.message;
-      return null;
-    } catch (e, stackTrace) {
-      print("❌ Error activating employee: $e");
-      print("Stack trace: $stackTrace");
-      error.value = 'Error activating employee: $e';
-      return null;
+      return true;
+    } catch (e) {
+      error.value = 'Failed to send OTP: $e';
+      return false;
     } finally {
       isLoading.value = false;
     }
@@ -325,14 +178,9 @@ class AuthService extends GetxService {
   // MANAGER: CREATE EMPLOYEE
   // ============================================
 
-  /// Generate a 6-digit OTP
-  String generateOTP() {
-    final random = Random.secure();
-    return (100000 + random.nextInt(900000)).toString();
-  }
 
   /// Create a new employee (called by Manager)
-  Future<({EmployeeModel? employee, String? otp})> createEmployee({
+  Future<EmployeeModel?> createEmployee({
     required String email,
     required String firstName,
     required String lastName,
@@ -345,12 +193,8 @@ class AuthService extends GetxService {
       final managerId = currentManager.value?.id;
       if (managerId == null && currentSuperAdmin.value == null) {
         error.value = 'Only managers can create employees.';
-        return (employee: null, otp: null);
+        return null;
       }
-
-      // Generate OTP
-      final otp = generateOTP();
-      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
 
       // Insert into employees table
       final normalizedEmail = email.toLowerCase().trim();
@@ -360,8 +204,6 @@ class AuthService extends GetxService {
         'last_name': lastName,
         'is_active': false,
         'manager_id': managerId,
-        'otp_code': otp,
-        'otp_expires_at': otpExpiry.toIso8601String(),
       };
       if (phone != null) insertData['phone'] = phone;
 
@@ -371,10 +213,10 @@ class AuthService extends GetxService {
           .single();
 
       final employee = EmployeeModel.fromJson(response);
-      return (employee: employee, otp: otp);
+      return employee;
     } catch (e) {
       error.value = 'Error creating employee: $e';
-      return (employee: null, otp: null);
+      return null;
     } finally {
       isLoading.value = false;
     }
@@ -385,7 +227,7 @@ class AuthService extends GetxService {
   // ============================================
 
   /// Create a new manager (called by Super Admin)
-  Future<({ManagerModel? manager, String? otp})?> createManager({
+  Future<ManagerModel?> createManager({
     required String email,
     required String firstName,
     required String lastName,
@@ -400,12 +242,9 @@ class AuthService extends GetxService {
         return null;
       }
 
-      // 1. Generate OTP
-      final otp = generateOTP();
-      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
       final normalizedEmail = email.toLowerCase().trim();
 
-      // 2. Insert into managers table
+      // 1. Insert into managers table (no OTP needed here now)
       final insertData = <String, dynamic>{
         'email': normalizedEmail,
         'first_name': firstName,
@@ -413,8 +252,6 @@ class AuthService extends GetxService {
         'is_active': false,
         'created_by_super_admin_id': currentSuperAdmin.value!.id,
         'manager_type': 'manager',
-        'otp_code': otp,
-        'otp_expires_at': otpExpiry.toIso8601String(),
       };
       if (phone != null) insertData['phone'] = phone;
 
@@ -425,7 +262,7 @@ class AuthService extends GetxService {
 
       final manager = ManagerModel.fromJson(response);
 
-      // 3. Log the action
+      // 2. Log the action
       await _logActivity(
         action: 'create_manager',
         targetType: 'manager',
@@ -433,7 +270,7 @@ class AuthService extends GetxService {
         details: {'manager_email': email},
       );
 
-      return (manager: manager, otp: otp);
+      return manager;
     } catch (e) {
       error.value = 'Error creating manager: $e';
       return null;
@@ -446,8 +283,8 @@ class AuthService extends GetxService {
   // MANAGER OTP ACTIVATION
   // ============================================
 
-  /// Verify OTP for manager first-time activation
-  Future<bool> verifyManagerOTP({
+  /// Verify native Supabase OTP
+  Future<UserRole?> verifyActivationOTP({
     required String email,
     required String otpCode,
   }) async {
@@ -457,118 +294,89 @@ class AuthService extends GetxService {
 
       final normalizedEmail = email.toLowerCase().trim();
       
-      final result = await _supabase.client.rpc(
-        'get_manager_for_otp',
-        params: {'input_email': normalizedEmail},
+      // 1. Verify with Supabase
+      final response = await _supabase.client.auth.verifyOTP(
+        email: normalizedEmail,
+        token: otpCode,
+        type: OtpType.email,
       );
 
-      if (result == null || (result is List && result.isEmpty)) {
-        error.value = 'No manager account found with this email.';
-        return false;
+      if (response.session == null) {
+        error.value = 'Invalid or expired OTP.';
+        return null;
       }
 
-      final managerData = result is List ? result.first : result;
-      final manager = ManagerModel.fromJson(managerData);
+      // 2. Identify role
+      final managerData = await _supabase.managersTable
+          .select()
+          .ilike('email', normalizedEmail)
+          .maybeSingle();
+      
+      if (managerData != null) return UserRole.manager;
 
-      if (manager.otpCode != otpCode) {
-        error.value = 'Invalid OTP code. Please try again.';
-        return false;
-      }
+      final employeeData = await _supabase.employeesTable
+          .select()
+          .ilike('email', normalizedEmail)
+          .maybeSingle();
+      
+      if (employeeData != null) return UserRole.employee;
 
-      if (manager.isOTPExpired) {
-        error.value = 'OTP has expired. Please request a new one.';
-        return false;
-      }
-
-      return true;
+      error.value = 'Account role not recognized.';
+      return null;
     } catch (e) {
-      error.value = 'Error verifying OTP: $e';
-      return false;
+      error.value = 'OTP verification failed: $e';
+      return null;
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Complete manager activation: set password and activate account
-  Future<ManagerModel?> activateManager({
+  /// Complete account activation: set password and activate account
+  Future<bool> completeActivation({
     required String email,
     required String password,
+    required UserRole role,
   }) async {
     try {
       isLoading.value = true;
       error.value = '';
 
       final normalizedEmail = email.toLowerCase().trim();
-      String? authUserId;
-
-      // 1. Create or get auth account
-      try {
-        final authResponse = await _supabase.client.auth.signUp(
-          email: normalizedEmail,
-          password: password,
-        );
-
-        if (authResponse.user != null) {
-          authUserId = authResponse.user!.id;
-        } else {
-          error.value = 'Failed to create account.';
-          return null;
-        }
-      } on AuthException catch (e) {
-        if (e.message.contains('already registered')) {
-          try {
-            final signInResponse = await _supabase.client.auth.signInWithPassword(
-              email: normalizedEmail,
-              password: password,
-            );
-            if (signInResponse.user != null) {
-              authUserId = signInResponse.user!.id;
-            } else {
-              error.value = 'Account exists but password setup failed.';
-              return null;
-            }
-          } catch (signInError) {
-            error.value = 'Account exists but password setup failed.';
-            return null;
-          }
-        } else {
-          throw e;
-        }
-      }
-
-      if (authUserId == null) return null;
-
-      // 2. Find and update manager record
-      final managerRecords = await _supabase.managersTable
-          .select()
-          .ilike('email', normalizedEmail);
-
-      if (managerRecords.isEmpty) {
-        error.value = 'No manager record found.';
-        return null;
-      }
-
-      final managerId = managerRecords.first['id'];
-      await _supabase.managersTable.update({
-        'auth_id': authUserId,
-        'is_active': true,
-        'otp_code': null,
-        'otp_expires_at': null,
-      }).eq('id', managerId);
-
-      // 3. Fetch updated manager
-      final data = await _supabase.managersTable
-          .select()
-          .eq('id', managerId)
-          .single();
-
-      final manager = ManagerModel.fromJson(data);
-      _setCurrentUser(UserRole.manager, manager);
       
-      return manager;
+      // 1. Update password (assumes user is already session-authed by verifyOTP)
+      await _supabase.client.auth.updateUser(
+        UserAttributes(password: password),
+      );
+
+      final authId = _supabase.client.auth.currentUser?.id;
+      if (authId == null) {
+        error.value = 'Session lost. Please try again.';
+        return false;
+      }
+
+      // 2. Update our DB record
+      if (role == UserRole.manager || role == UserRole.agency) {
+        await _supabase.managersTable.update({
+          'auth_id': authId,
+          'is_active': true,
+        }).ilike('email', normalizedEmail);
+      } else if (role == UserRole.employee) {
+        await _supabase.employeesTable.update({
+          'auth_id': authId,
+          'is_active': true,
+        }).ilike('email', normalizedEmail);
+      }
+
+      // 3. Set current session
+      final profileResponse = await _supabase.detectCurrentUser();
+      if (profileResponse != null) {
+        _setCurrentUser(profileResponse.role, profileResponse.profile);
+      }
+      
+      return true;
     } catch (e) {
-      error.value = 'Error activating manager: $e';
-      return null;
+      error.value = 'Activation failed: $e';
+      return false;
     } finally {
       isLoading.value = false;
     }
@@ -801,22 +609,4 @@ class AuthService extends GetxService {
     }
   }
 
-  /// Resend OTP for an employee
-  Future<String?> resendEmployeeOTP(String employeeEmail) async {
-    try {
-      final otp = generateOTP();
-      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
-
-      final normalizedEmail = employeeEmail.toLowerCase().trim();
-      await _supabase.employeesTable.update({
-        'otp_code': otp,
-        'otp_expires_at': otpExpiry.toIso8601String(),
-      }).ilike('email', normalizedEmail);
-
-      return otp;
-    } catch (e) {
-      print('Error resending OTP: $e');
-      return null;
-    }
-  }
 }

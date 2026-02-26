@@ -86,13 +86,19 @@ class AuthController extends GetxController {
   // ============================================
 
   /// Navigate to OTP screen
-  void goToOTPScreen() {
+  Future<void> goToOTPScreen() async {
     if (email.value.trim().isEmpty) {
       emailError.value = 'Please enter your email first';
       return;
     }
     emailError.value = '';
-    Get.to(() => const OTPScreen());
+
+    final success = await _authService.requestActivationOTP(email.value);
+    if (success) {
+      Get.to(() => const OTPScreen());
+    } else {
+      Get.snackbar('Error', error.value);
+    }
   }
 
   /// Verify OTP
@@ -101,26 +107,13 @@ class AuthController extends GetxController {
     final emailVal = email.value.trim();
     final otpVal = otpCode.value.trim();
 
-    // 1. Try Employee OTP
-    bool success = await _authService.verifyEmployeeOTP(
+    final role = await _authService.verifyActivationOTP(
       email: emailVal,
       otpCode: otpVal,
     );
 
-    if (success) {
-      detectedActivationRole.value = UserRole.employee;
-    } else {
-      // 2. Try Manager OTP
-      success = await _authService.verifyManagerOTP(
-        email: emailVal,
-        otpCode: otpVal,
-      );
-      if (success) {
-        detectedActivationRole.value = UserRole.manager;
-      }
-    }
-
-    if (success) {
+    if (role != null) {
+      detectedActivationRole.value = role;
       Get.to(() => const SetPasswordScreen());
     } else if (error.value.isNotEmpty) {
       Get.snackbar('Verification Failed', error.value);
@@ -131,7 +124,7 @@ class AuthController extends GetxController {
   // SET PASSWORD (Employee activation)
   // ============================================
 
-  /// Set password and activate the employee account
+  /// Set password and activate the account
   Future<void> setPasswordAndActivate() async {
     if (!_validatePasswordForm()) return;
 
@@ -139,29 +132,35 @@ class AuthController extends GetxController {
     final emailVal = email.value.trim();
     final passVal = password.value;
 
-    if (role == UserRole.manager) {
-      final manager = await _authService.activateManager(
-        email: emailVal,
-        password: passVal,
-      );
-      if (manager != null) {
-        Get.snackbar('Success', 'Manager account activated!');
-        _navigateToDashboard(UserRole.manager);
-      }
-    } else {
-      // Default to employee if role is null or employee
-      final employee = await _authService.activateEmployee(
-        email: emailVal,
-        password: passVal,
-      );
-      if (employee != null) {
-        Get.snackbar('Success', 'Employee account activated!');
-        _navigateToDashboard(UserRole.employee);
-      }
+    if (role == null) {
+      Get.snackbar('Error', 'Session lost. Please try again.');
+      return;
     }
 
-    if (error.value.isNotEmpty) {
+    final success = await _authService.completeActivation(
+      email: emailVal,
+      password: passVal,
+      role: role,
+    );
+
+    if (success) {
+      Get.snackbar('Success', 'Account activated successfully!');
+      _navigateToDashboard(role);
+    } else if (error.value.isNotEmpty) {
       Get.snackbar('Activation Failed', error.value);
+    }
+  }
+
+  /// Resend OTP
+  Future<void> resendOTP() async {
+    final emailVal = email.value.trim();
+    if (emailVal.isEmpty) return;
+
+    final success = await _authService.requestActivationOTP(emailVal);
+    if (success) {
+      Get.snackbar('OTP Sent', 'A new verification code has been sent to your email.');
+    } else {
+      Get.snackbar('Error', error.value);
     }
   }
 
