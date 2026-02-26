@@ -136,6 +136,12 @@ class CallHistoryView extends StatelessWidget {
               isSelected: controller.selectedFilter.value == 'visiting',
               onTap: () => controller.selectedFilter.value = 'visiting',
             ),
+            const SizedBox(width: 10),
+            _buildFilterTab(
+              label: 'Completed',
+              isSelected: controller.selectedFilter.value == 'completed',
+              onTap: () => controller.selectedFilter.value = 'completed',
+            ),
           ],
         ),
       )),
@@ -198,7 +204,11 @@ class CallHistoryView extends StatelessWidget {
     String statusLabel;
 
     // Priority: lead status > call status
-    if (leadStatusStr == 'visiting') {
+    if (leadStatusStr == 'visit_completed') {
+      icon = Icons.assignment_turned_in_rounded;
+      statusColor = AppColors.success;
+      statusLabel = 'Visit Completed';
+    } else if (leadStatusStr == 'visiting') {
       icon = Icons.location_on_rounded;
       statusColor = AppColors.success;
       statusLabel = 'Visiting';
@@ -498,7 +508,10 @@ class CallHistoryView extends StatelessWidget {
     // Lead status badge
     String? leadStatusLabel;
     Color? leadStatusColor;
-    if (leadStatusStr == 'visiting') {
+    if (leadStatusStr == 'visit_completed') {
+      leadStatusLabel = 'VISIT COMPLETED';
+      leadStatusColor = AppColors.success;
+    } else if (leadStatusStr == 'visiting') {
       leadStatusLabel = 'VISITING';
       leadStatusColor = AppColors.success;
     } else if (leadStatusStr == 'interested') {

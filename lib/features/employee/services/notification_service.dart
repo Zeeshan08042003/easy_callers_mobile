@@ -71,6 +71,7 @@ class NotificationService extends GetxService {
         roleColumn = 'super_admin_id';
         break;
       case UserRole.manager:
+      case UserRole.agency:
         roleColumn = 'manager_id';
         break;
       case UserRole.employee:

@@ -105,9 +105,11 @@ class ProjectService extends GetxService {
           ''')
           .order('created_at', ascending: false);
 
-      return (response as List)
+      final projects = (response as List)
           .map((json) => ProjectModel.fromJson(json))
           .toList();
+
+      return await _enrichWithCounts(projects);
     } catch (e) {
       print('Error fetching projects for super admin: $e');
       return [];
@@ -166,7 +168,7 @@ class ProjectService extends GetxService {
 
       final result = allProjects.values.toList();
       result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return result;
+      return await _enrichWithCounts(result);
     } catch (e) {
       print('Error fetching projects for manager: $e');
       return [];
@@ -273,19 +275,25 @@ class ProjectService extends GetxService {
   Future<ProjectMemberModel?> inviteManagerToProject({
     required String projectId,
     required String managerId,
-    required String superAdminId,
+    String? superAdminId,
+    String? inviterManagerId,
     bool canUpload = false,
   }) async {
     try {
-      final data = {
+      final data = <String, dynamic>{
         'project_id': projectId,
         'manager_id': managerId,
         'role': 'member',
         'status': 'pending',
-        'invited_by_super_admin_id': superAdminId,
-        'visible_to_super_admin': true,
+        'visible_to_super_admin': superAdminId != null,
         'can_upload': canUpload,
       };
+
+      if (superAdminId != null) {
+        data['invited_by_super_admin_id'] = superAdminId;
+      } else if (inviterManagerId != null) {
+        data['invited_by_manager_id'] = inviterManagerId;
+      }
 
       final response = await _supabase.projectMembersTable
           .insert(data)
@@ -300,6 +308,8 @@ class ProjectService extends GetxService {
       await _sendProjectInvitationNotification(
         managerId: managerId,
         projectId: projectId,
+        inviterSuperAdminId: superAdminId,
+        inviterManagerId: inviterManagerId,
       );
 
       return ProjectMemberModel.fromJson(response);
@@ -547,14 +557,14 @@ class ProjectService extends GetxService {
     }
   }
 
-  /// Get all managers (optionally filtered to own + independent for Super Admin)
+  /// Get managers created by this Super Admin only (no agencies).
   Future<List<ManagerModel>> getAllManagers({String? currentSuperAdminId}) async {
     try {
       var query = _supabase.managersTable.select().eq('is_active', true);
           
       if (currentSuperAdminId != null) {
-        // Show managers created by THIS super admin OR managers not created by any super admin
-        query = query.or('created_by_super_admin_id.eq.$currentSuperAdminId,created_by_super_admin_id.is.null');
+        // Only managers created by this SA — agencies are separate
+        query = query.eq('created_by_super_admin_id', currentSuperAdminId);
       }
       
       final response = await query.order('first_name');
@@ -568,7 +578,8 @@ class ProjectService extends GetxService {
     }
   }
 
-  /// Get managers not yet in a specific project (optionally filtered by super admin creator)
+  /// Get managers not yet in a specific project.
+  /// Returns BOTH SA-created managers AND agencies so the invite sheet tabs can filter.
   Future<List<ManagerModel>> getAvailableManagersForProject(String projectId, {String? currentSuperAdminId}) async {
     try {
       // Get managers already in this project
@@ -580,8 +591,15 @@ class ProjectService extends GetxService {
           .map((m) => m['manager_id'] as String)
           .toList();
 
-      // Get active managers (filtered by creator if provided)
-      final allManagers = await getAllManagers(currentSuperAdminId: currentSuperAdminId);
+      // Get both SA-created managers AND agencies
+      var query = _supabase.managersTable.select().eq('is_active', true);
+      if (currentSuperAdminId != null) {
+        query = query.or('created_by_super_admin_id.eq.$currentSuperAdminId,created_by_super_admin_id.is.null');
+      }
+      final response = await query.order('first_name');
+      final allManagers = (response as List)
+          .map((json) => ManagerModel.fromJson(json))
+          .toList();
 
       // Filter out already-invited managers
       return allManagers
@@ -649,6 +667,26 @@ class ProjectService extends GetxService {
     };
   }
 
+  /// Enrich a list of projects with batch count and member count.
+  Future<List<ProjectModel>> _enrichWithCounts(List<ProjectModel> projects) async {
+    final enriched = <ProjectModel>[];
+    for (final project in projects) {
+      try {
+        final counts = await Future.wait([
+          getProjectBatchCount(project.id),
+          getProjectMemberCount(project.id),
+        ]);
+        enriched.add(project.copyWith(
+          batchCount: counts[0],
+          memberCount: counts[1],
+        ));
+      } catch (_) {
+        enriched.add(project);
+      }
+    }
+    return enriched;
+  }
+
   // ============================================
   // HELPERS
   // ============================================
@@ -657,6 +695,8 @@ class ProjectService extends GetxService {
   Future<void> _sendProjectInvitationNotification({
     required String managerId,
     required String projectId,
+    String? inviterSuperAdminId,
+    String? inviterManagerId,
   }) async {
     try {
       // Get project name
@@ -665,7 +705,7 @@ class ProjectService extends GetxService {
           .eq('id', projectId)
           .single();
 
-      await _supabase.notificationsTable.insert({
+      final data = <String, dynamic>{
         'manager_id': managerId,
         'title': 'Project Invitation',
         'body': 'You have been invited to join project "${project['name']}"',
@@ -673,7 +713,13 @@ class ProjectService extends GetxService {
         'metadata': {
           'project_id': projectId,
         },
-      });
+      };
+
+      if (inviterSuperAdminId != null) {
+        data['super_admin_id'] = null; // recipient is manager_id, but inviter info can be in metadata if needed
+      }
+
+      await _supabase.notificationsTable.insert(data);
     } catch (e) {
       print('Error sending invitation notification: $e');
     }

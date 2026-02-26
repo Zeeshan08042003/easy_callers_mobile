@@ -124,424 +124,62 @@ class CreateProjectView extends StatelessWidget {
               textCapitalization: TextCapitalization.sentences,
             ),
 
-            // Assignment Section (Managers for SA, Callers for Manager)
-            const SizedBox(height: 24),
-            Text(
-              controller.isSuperAdmin ? 'Manager Assignment' : 'Caller Assignment',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              controller.isSuperAdmin 
-                ? 'Choose which managers are part of this project' 
-                : 'Choose which callers are part of this project',
-              style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.5),
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Obx(() => Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (controller.isSuperAdmin) {
-                            controller.managerAssignment.value = 'all';
-                          } else {
-                            controller.callerAssignment.value = 'all';
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
-                                ? AppColors.primary
-                                : AppColors.cardBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
-                                      ? AppColors.primary
-                                      : Colors.white.withOpacity(0.05),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                controller.isSuperAdmin ? Icons.apartment_rounded : Icons.groups_rounded,
-                                color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
-                                        ? Colors.white
-                                        : AppColors.textSecondary,
-                                size: 24,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                controller.isSuperAdmin ? 'All Managers' : 'All Callers',
-                                style: TextStyle(
-                                  color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'all'
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (controller.isSuperAdmin) {
-                            controller.managerAssignment.value = 'selected';
-                          } else {
-                            controller.callerAssignment.value = 'selected';
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
-                                    ? AppColors.primary
-                                    : AppColors.cardBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
-                                  ? AppColors.primary
-                                  : Colors.white.withOpacity(0.05),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.person_search_rounded,
-                                color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
-                                    ? Colors.white
-                                    : AppColors.textSecondary,
-                                size: 24,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                controller.isSuperAdmin ? 'Select Agencies' : 'Select Callers',
-                                style: TextStyle(
-                                  color: (controller.isSuperAdmin ? controller.managerAssignment.value : controller.callerAssignment.value) == 'selected'
-                                          ? Colors.white
-                                          : AppColors.textSecondary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                )),
-
-            // Employee preview (when "selected" mode) or info text (when "all")
-            Obx(() {
-              final isAll = controller.isSuperAdmin 
-                  ? controller.managerAssignment.value == 'all'
-                  : controller.callerAssignment.value == 'all';
-
-              if (isAll) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded,
-                            color: AppColors.primary, size: 16),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            controller.isSuperAdmin 
-                              ? 'All available managers will be invited to this project'
-                              : 'All your callers will be included in this project',
-                            style: TextStyle(
-                              color: AppColors.primary.withOpacity(0.9),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              // Selected mode
-              final isLoading = controller.isSuperAdmin ? controller.isLoadingManagers.value : controller.isLoadingEmployees.value;
-              
-              if (isLoading) {
-                return const Padding(
-                  padding: EdgeInsets.only(top: 20),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.primary, strokeWidth: 2),
-                  ),
-                );
-              }
-
-              final list = controller.isSuperAdmin ? controller.allManagers : controller.allEmployees;
-
-              if (list.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(controller.isSuperAdmin ? Icons.business_center_outlined : Icons.person_off_outlined,
-                               color: Colors.white.withOpacity(0.1), size: 36),
-                          const SizedBox(height: 8),
-                          Text(
-                            controller.isSuperAdmin ? 'No managers found' : 'No employees found',
-                            style: TextStyle(
-                                color:
-                                    AppColors.textSecondary.withOpacity(0.6)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              // Preview
-              final previewList = list.take(3).toList();
-              final totalCount = list.length;
-              final selectedCount = controller.isSuperAdmin ? controller.selectedManagerIds.length : controller.selectedEmployeeIds.length;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Text(
-                        '$selectedCount of $totalCount selected',
-                        style: TextStyle(
-                          color: AppColors.textSecondary.withOpacity(0.7),
-                          fontSize: 12,
-                        ),
-                      ),
-                      const Spacer(),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  ...previewList.map((item) {
-                    final id = controller.isSuperAdmin ? (item as dynamic).id : (item as dynamic).id;
-                    final isSelected = controller.isSuperAdmin 
-                        ? controller.selectedManagerIds.contains(id)
-                        : controller.selectedEmployeeIds.contains(id);
-                    
-                    final name = controller.isSuperAdmin ? (item as dynamic).fullName : (item as dynamic).fullName;
-                    final email = controller.isSuperAdmin ? (item as dynamic).email : (item as dynamic).email;
-                    final initials = controller.isSuperAdmin ? (item as dynamic).initials : (item as dynamic).initials;
-
-                    return GestureDetector(
-                      onTap: () => controller.isSuperAdmin ? controller.toggleManager(id) : controller.toggleEmployee(id),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary.withOpacity(0.1)
-                              : AppColors.cardBg,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.primary.withOpacity(0.4)
-                                : Colors.white.withOpacity(0.03),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.primary.withOpacity(0.2)
-                                    : AppColors.success.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  initials,
-                                  style: TextStyle(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.success,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    name,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    email,
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary
-                                          .withOpacity(0.5),
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              isSelected
-                                  ? Icons.check_circle_rounded
-                                  : Icons.circle_outlined,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary
-                                      .withOpacity(0.3),
-                              size: 22,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-
-                  // VIEW ALL BUTTON
-                  if (totalCount > 3) ...[
-                    const SizedBox(height: 4),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => Get.to(
-                          () => controller.isSuperAdmin 
-                              ? const ManagerSelectionView() 
-                              : const CallerSelectionView(),
-                        ),
-                        icon: Icon(
-                          controller.isSuperAdmin ? Icons.apartment_rounded : Icons.people_outline_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          controller.isSuperAdmin 
-                              ? 'View All Agencies' 
-                              : 'View All $totalCount Callers',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              );
-            }),
-
-            // Visibility toggle (only for managers)
-            // if (controller.isManager) ...[
-            //   const SizedBox(height: 24),
-            //   Container(
-            //     padding: const EdgeInsets.all(16),
-            //     decoration: BoxDecoration(
-            //       color: AppColors.cardBg,
-            //       borderRadius: BorderRadius.circular(16),
-            //       border: Border.all(color: Colors.white.withOpacity(0.05)),
-            //     ),
-            //     child: Obx(() => Row(
-            //           children: [
-            //             Container(
-            //               padding: const EdgeInsets.all(10),
-            //               decoration: BoxDecoration(
-            //                 color: AppColors.warning.withOpacity(0.1),
-            //                 borderRadius: BorderRadius.circular(12),
-            //               ),
-            //               child: const Icon(Icons.visibility_outlined,
-            //                   color: AppColors.warning, size: 22),
-            //             ),
-            //             const SizedBox(width: 14),
-            //             Expanded(
-            //               child: Column(
-            //                 crossAxisAlignment: CrossAxisAlignment.start,
-            //                 children: [
-            //                   const Text(
-            //                     'Visible to Super Admin',
-            //                     style: TextStyle(
-            //                       color: Colors.white,
-            //                       fontSize: 14,
-            //                       fontWeight: FontWeight.w600,
-            //                     ),
-            //                   ),
-            //                   Text(
-            //                     'Allow super admin to see this project',
-            //                     style: TextStyle(
-            //                       color:
-            //                           AppColors.textSecondary.withOpacity(0.6),
-            //                       fontSize: 12,
-            //                     ),
-            //                   ),
-            //                 ],
-            //               ),
-            //             ),
-            //             Switch.adaptive(
-            //               value: controller.visibleToSuperAdmin.value,
-            //               onChanged: (val) =>
-            //                   controller.visibleToSuperAdmin.value = val,
-            //               activeColor: AppColors.success,
-            //             ),
-            //           ],
-            //         )),
+            // Manager/Agency Assignment Section
+            // const SizedBox(height: 24),
+            // const Text(
+            //   'Agency Assignment',
+            //   style: TextStyle(
+            //     color: Colors.white,
+            //     fontSize: 14,
+            //     fontWeight: FontWeight.w600,
             //   ),
-            // ],
-            //
-            const SizedBox(height: 20),
+            // ),
+            // const SizedBox(height: 4),
+            // Text(
+            //   'Choose which independent agencies or managers are part of this project',
+            //   style: TextStyle(
+            //     color: AppColors.textSecondary.withOpacity(0.5),
+            //     fontSize: 12,
+            //   ),
+            // ),
+            // const SizedBox(height: 12),
+            // _buildAgencyAssignmentSelector(controller),
+            // _buildAgencyPreview(controller),
+
+            // Caller Assignment Section (Only for Managers)
+            if (controller.isManager) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'Caller Assignment',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose which callers from your team are part of this project',
+                style: TextStyle(
+                  color: AppColors.textSecondary.withOpacity(0.5),
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildCallerAssignmentSelector(controller),
+              _buildCallerPreview(controller),
+            ],
+
+            const SizedBox(height: 32),
 
             // Create button
             Obx(() => SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed:(){
-                      controller.isLoading.value
-                          ? null
-                          : controller.createProject();
-                    },
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : () => controller.createProject(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -570,6 +208,282 @@ class CreateProjectView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAgencyAssignmentSelector(CreateProjectController controller) {
+    return Obx(() => Row(
+      children: [
+        Expanded(
+          child: _buildRoleCard(
+            label: 'All Agencies',
+            icon: Icons.apartment_rounded,
+            isSelected: controller.managerAssignment.value == 'all',
+            onTap: () => controller.managerAssignment.value = 'all',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildRoleCard(
+            label: 'Select Agencies',
+            icon: Icons.person_search_rounded,
+            isSelected: controller.managerAssignment.value == 'selected',
+            onTap: () => controller.managerAssignment.value = 'selected',
+          ),
+        ),
+      ],
+    ));
+  }
+
+  Widget _buildCallerAssignmentSelector(CreateProjectController controller) {
+    return Obx(() => Row(
+      children: [
+        Expanded(
+          child: _buildRoleCard(
+            label: 'All Callers',
+            icon: Icons.groups_rounded,
+            isSelected: controller.callerAssignment.value == 'all',
+            onTap: () => controller.callerAssignment.value = 'all',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildRoleCard(
+            label: 'Select Callers',
+            icon: Icons.person_search_rounded,
+            isSelected: controller.callerAssignment.value == 'selected',
+            onTap: () => controller.callerAssignment.value = 'selected',
+          ),
+        ),
+      ],
+    ));
+  }
+
+  Widget _buildRoleCard({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.05),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+              size: 24,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAgencyPreview(CreateProjectController controller) {
+    return Obx(() {
+      if (controller.managerAssignment.value == 'all') {
+        return _buildInfoBox('All available managers and agencies will be invited');
+      }
+
+      if (controller.isLoadingManagers.value) {
+        return _buildLoading();
+      }
+
+      if (controller.allManagers.isEmpty) {
+        return _buildEmptyState('No agencies found', Icons.business_center_outlined);
+      }
+
+      final previewList = controller.allManagers.take(3).toList();
+      return _buildGeneralPreviewList(
+        items: previewList,
+        totalCount: controller.allManagers.length,
+        selectedCount: controller.selectedManagerIds.length,
+        onToggle: controller.toggleManager,
+        isSelected: (id) => controller.selectedManagerIds.contains(id),
+        onViewAll: () => Get.to(() => const ManagerSelectionView()),
+        viewAllLabel: 'View All Agencies',
+      );
+    });
+  }
+
+  Widget _buildCallerPreview(CreateProjectController controller) {
+    return Obx(() {
+      if (controller.callerAssignment.value == 'all') {
+        return _buildInfoBox('All your callers will be included in this project');
+      }
+
+      if (controller.isLoadingEmployees.value) {
+        return _buildLoading();
+      }
+
+      if (controller.allEmployees.isEmpty) {
+        return _buildEmptyState('No callers found', Icons.person_off_outlined);
+      }
+
+      final previewList = controller.allEmployees.take(3).toList();
+      return _buildGeneralPreviewList(
+        items: previewList,
+        totalCount: controller.allEmployees.length,
+        selectedCount: controller.selectedEmployeeIds.length,
+        onToggle: controller.toggleEmployee,
+        isSelected: (id) => controller.selectedEmployeeIds.contains(id),
+        onViewAll: () => Get.to(() => const CallerSelectionView()),
+        viewAllLabel: 'View All Callers',
+      );
+    });
+  }
+
+  Widget _buildInfoBox(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 16),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(color: AppColors.primary.withOpacity(0.9), fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.only(top: 20),
+      child: Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2)),
+    );
+  }
+
+  Widget _buildEmptyState(String message, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(16)),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white.withOpacity(0.1), size: 36),
+              const SizedBox(height: 8),
+              Text(message, style: TextStyle(color: AppColors.textSecondary.withOpacity(0.6))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGeneralPreviewList({
+    required List<dynamic> items,
+    required int totalCount,
+    required int selectedCount,
+    required Function(String) onToggle,
+    required bool Function(String) isSelected,
+    required VoidCallback onViewAll,
+    required String viewAllLabel,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        Text(
+          '$selectedCount of $totalCount selected',
+          style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 12),
+        ),
+        const SizedBox(height: 10),
+        ...items.map((item) {
+          final id = item.id;
+          final selected = isSelected(id);
+          return GestureDetector(
+            onTap: () => onToggle(id),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary.withOpacity(0.1) : AppColors.cardBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: selected ? AppColors.primary.withOpacity(0.4) : Colors.white.withOpacity(0.03)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: selected ? AppColors.primary.withOpacity(0.2) : AppColors.success.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        item.initials,
+                        style: TextStyle(color: selected ? AppColors.primary : AppColors.success, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.fullName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                        Text(item.email, style: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? AppColors.primary : AppColors.textSecondary.withOpacity(0.3), size: 22),
+                ],
+              ),
+            ),
+          );
+        }),
+        if (totalCount > 3) ...[
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onViewAll,
+              icon: const Icon(Icons.people_outline_rounded, size: 18),
+              label: Text(viewAllLabel, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 

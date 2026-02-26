@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 import 'package:easy_callers_mobile/features/manager/employees/controllers/manager_team_controller.dart';
 
@@ -55,7 +56,30 @@ class AddEmployeeDialog extends StatelessWidget {
               _buildTextField('+1 234 567 890', controller.phoneController, keyboardType: TextInputType.phone),
               const SizedBox(height: 30),
               Obx(() => controller.activeOTP.value.isNotEmpty 
-                ? _buildOTPSection(controller)
+                ? Column(
+                    children: [
+                      _buildOTPSection(controller),
+                      const SizedBox(height: 16),
+                      // Share via WhatsApp button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _shareEmployeeViaWhatsApp(controller),
+                          icon: const Icon(Icons.share_rounded, size: 18),
+                          label: const Text('Share via WhatsApp',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
                 : const SizedBox.shrink()),
               const SizedBox(height: 30),
               Obx(() => SizedBox(
@@ -185,31 +209,26 @@ class AddEmployeeDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildPrimaryButton(String label, IconData icon, VoidCallback onPressed) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
+  void _shareEmployeeViaWhatsApp(ManagerTeamController controller) async {
+    final email = controller.emailController.text.trim();
+    final otp = controller.activeOTP.value;
+    final name = '${controller.firstNameController.text.trim()} ${controller.lastNameController.text.trim()}'.trim();
 
-  Widget _buildSecondaryButton(String label, IconData icon, VoidCallback onPressed) {
-    return TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: TextButton.styleFrom(
-        backgroundColor: Colors.white.withOpacity(0.05),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+    final message = Uri.encodeComponent(
+      'Hello${name.isNotEmpty ? ' $name' : ''},\n\n'
+      'Your Easy Callers employee account has been created.\n\n'
+      '📧 Email: $email\n'
+      '🔑 OTP Code: $otp\n\n'
+      'Please download the app, enter your email and use this OTP to activate your account.\n\n'
+      'Thank you!',
     );
+
+    final url = Uri.parse('https://wa.me/?text=$message');
+
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      Get.snackbar('Error', 'Could not open WhatsApp');
+    }
   }
 }

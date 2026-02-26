@@ -38,20 +38,27 @@ class CreateProjectController extends GetxController {
     super.onInit();
     if (isManager) {
       fetchEmployees();
+      fetchManagers(); // Also fetch agencies for collaboration
     } else if (isSuperAdmin) {
       fetchManagers();
     }
   }
 
-  /// Fetch managers (for Super Admin)
+  /// Fetch managers (agencies for Manager, internal for Super Admin)
   Future<void> fetchManagers() async {
     try {
       isLoadingManagers.value = true;
       final saId = _authService.currentSuperAdmin.value?.id;
+      final currentManagerId = _authService.currentManager.value?.id;
       
-      // We use the same service method that filters for own + independent managers
-      final managers = await _projectService.getAllManagers(currentSuperAdminId: saId);
-      allManagers.assignAll(managers);
+      // If SA: get their created managers + agencies
+      // If Manager (Agency): get agencies
+      final managers = await _leadService.getAllManagersAndAgencies(currentSuperAdminId: saId);
+      
+      // Filter out the current user themselves
+      allManagers.assignAll(
+        managers.where((m) => m.id != currentManagerId).toList()
+      );
     } catch (e) {
       print('Error fetching managers: $e');
     } finally {
@@ -220,9 +227,9 @@ class CreateProjectController extends GetxController {
       }
 
       // ==============================
-      // MANAGER
+      // MANAGER & AGENCY
       // ==============================
-      else if (role == UserRole.manager) {
+      else if (role == UserRole.manager || role == UserRole.agency) {
         final mgrId = _authService.currentManager.value?.id;
 
         if (mgrId == null) {
@@ -292,7 +299,8 @@ class CreateProjectController extends GetxController {
   }
 
 
-  bool get isManager => _authService.currentRole.value == UserRole.manager;
+  bool get isManager => _authService.currentRole.value == UserRole.manager || 
+                     _authService.currentRole.value == UserRole.agency;
   bool get isSuperAdmin => _authService.currentRole.value == UserRole.superAdmin;
 
   @override

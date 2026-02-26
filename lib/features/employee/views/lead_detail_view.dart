@@ -760,8 +760,7 @@ class LeadDetailView extends StatelessWidget {
     return Obx(() {
       final statusValue = controller.selectedStatus.value;
       final bool requiresDateTime = statusValue == 'visiting' || 
-          statusValue == 'follow_up' || 
-          statusValue == 'callback';
+          statusValue == 'follow_up';
 
       if (!requiresDateTime) {
         return const SizedBox.shrink();

@@ -13,6 +13,7 @@ import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:easy_callers_mobile/features/manager/leads/views/distribute_leads_view.dart';
 import 'package:easy_callers_mobile/features/manager/leads/views/batch_leads_view.dart';
+import 'package:easy_callers_mobile/features/super_admin/batch_analytics/views/sa_batch_analytics_view.dart';
 import 'package:easy_callers_mobile/features/project/controllers/project_list_controller.dart';
 import 'package:easy_callers_mobile/features/manager/dashboard/controllers/manager_dashboard_controller.dart';
 
@@ -149,9 +150,9 @@ class ProjectDetailController extends GetxController {
   Future<void> handleBatchTap(LeadBatchModel batch) async {
     try {
       if (isSuperAdmin) {
-        // SA always sees the tabbed leads view (All Leads + Attended)
+        // SA gets the analytics view with manager filter + status tabs
         Get.to(
-          () => const BatchLeadsView(),
+          () => const SABatchAnalyticsView(),
           arguments: batch,
         );
         return;
@@ -306,6 +307,11 @@ class ProjectDetailController extends GetxController {
   // ============================================
 
   Future<void> uploadLeadsToProject() async {
+    if (!canUploadLeads) {
+      Get.snackbar('Permission Denied', 'You do not have permission to upload leads to this project.');
+      return;
+    }
+    
     try {
       isUploading.value = true;
 
@@ -397,9 +403,15 @@ class ProjectDetailController extends GetxController {
       
       // If Super Admin, pass their ID to get own + independent managers
       final saId = _authService.currentSuperAdmin.value?.id;
+      final currentManagerId = _authService.currentManager.value?.id;
       
-      availableManagers.value = await _projectService
+      final result = await _projectService
           .getAvailableManagersForProject(projectId!, currentSuperAdminId: saId);
+      
+      // Filter out the current user themselves
+      availableManagers.assignAll(
+        result.where((m) => m.id != currentManagerId).toList()
+      );
       
       _applyManagerSearch();
     } catch (e) {
@@ -427,8 +439,10 @@ class ProjectDetailController extends GetxController {
   Future<void> inviteManager(String managerId, {bool canUpload = false}) async {
     try {
       final saId = _authService.currentSuperAdmin.value?.id;
-      if (saId == null) {
-        Get.snackbar('Error', 'Super Admin profile not found');
+      final currentMgrId = _authService.currentManager.value?.id;
+
+      if (saId == null && currentMgrId == null) {
+        Get.snackbar('Error', 'Profile not found');
         return;
       }
 
@@ -436,6 +450,7 @@ class ProjectDetailController extends GetxController {
         projectId: projectId!,
         managerId: managerId,
         superAdminId: saId,
+        inviterManagerId: currentMgrId,
         canUpload: canUpload,
       );
 
@@ -494,8 +509,10 @@ class ProjectDetailController extends GetxController {
   // ============================================
 
   bool get isSuperAdmin => _authService.currentRole.value == UserRole.superAdmin;
-  bool get isManager => _authService.currentRole.value == UserRole.manager;
+  bool get isManager => _authService.currentRole.value == UserRole.manager || 
+                     _authService.currentRole.value == UserRole.agency;
   String? get currentManagerId => _authService.currentManager.value?.id;
+  AuthService get authService => _authService;
 
   /// Whether I am the owner/creator of this project (manager who created it)
   bool get isProjectOwner {

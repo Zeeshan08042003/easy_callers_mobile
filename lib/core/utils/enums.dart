@@ -2,7 +2,8 @@
 enum UserRole {
   superAdmin('super_admin'),
   manager('manager'),
-  employee('employee');
+  employee('employee'),
+  agency('agency');
 
   final String value;
   const UserRole(this.value);
@@ -19,13 +20,12 @@ enum UserRole {
 enum LeadStatus {
   newLead('new'),
   assigned('assigned'),
-  connected('connected'),
-  notConnected('not_connected'),
-  interested('interested'),
-  notInterested('not_interested'),
   followUp('follow_up'),
+  notInterested('not_interested'),
+  visiting('visiting'),
+  visitCompleted('visit_completed'),
   converted('converted'),
-  closed('closed');
+  drop('drop');
 
   final String value;
   const LeadStatus(this.value);
@@ -36,20 +36,18 @@ enum LeadStatus {
         return 'New';
       case LeadStatus.assigned:
         return 'Assigned';
-      case LeadStatus.connected:
-        return 'Connected';
-      case LeadStatus.notConnected:
-        return 'Not Connected';
-      case LeadStatus.interested:
-        return 'Interested';
-      case LeadStatus.notInterested:
-        return 'Not Interested';
       case LeadStatus.followUp:
         return 'Follow Up';
+      case LeadStatus.notInterested:
+        return 'Not Interested';
+      case LeadStatus.visiting:
+        return 'Visiting';
+      case LeadStatus.visitCompleted:
+        return 'Visit Completed';
       case LeadStatus.converted:
         return 'Converted';
-      case LeadStatus.closed:
-        return 'Closed';
+      case LeadStatus.drop:
+        return 'Drop';
     }
   }
 
@@ -113,30 +111,30 @@ enum CallStatus {
 
 /// Lead interest status after a call
 enum CallLeadStatus {
-  interested('interested'),
-  notInterested('not_interested'),
   followUp('follow_up'),
-  callback('callback'),
+  notInterested('not_interested'),
   visiting('visiting'),
-  closed('closed');
+  visitCompleted('visit_completed'),
+  converted('converted'),
+  drop('drop');
 
   final String value;
   const CallLeadStatus(this.value);
 
   String get displayName {
     switch (this) {
-      case CallLeadStatus.interested:
-        return 'Interested';
-      case CallLeadStatus.notInterested:
-        return 'Not Interested';
       case CallLeadStatus.followUp:
         return 'Follow Up';
-      case CallLeadStatus.callback:
-        return 'Callback';
+      case CallLeadStatus.notInterested:
+        return 'Not Interested';
       case CallLeadStatus.visiting:
         return 'Visiting';
-      case CallLeadStatus.closed:
-        return 'Closed';
+      case CallLeadStatus.visitCompleted:
+        return 'Visit Completed';
+      case CallLeadStatus.converted:
+        return 'Converted';
+      case CallLeadStatus.drop:
+        return 'Drop';
     }
   }
 

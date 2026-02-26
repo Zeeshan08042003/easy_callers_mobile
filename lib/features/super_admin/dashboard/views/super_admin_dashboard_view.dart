@@ -26,7 +26,9 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(SuperAdminDashboardController());
+    final controller = Get.put(SuperAdminDashboardController(), permanent: true);
+    // Always refresh data when dashboard is built (handles hot restart)
+    controller.refreshDashboard();
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Obx(() => IndexedStack(
@@ -171,33 +173,13 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total Visits',
-                style: TextStyle(
-                  color: AppColors.textSecondary.withOpacity(0.8),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF065F46).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  '+12%',
-                  style: TextStyle(
-                    color: Color(0xFF10B981),
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            'Total Leads',
+            style: TextStyle(
+              color: AppColors.textSecondary.withOpacity(0.8),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           Obx(() => Text(
@@ -212,50 +194,37 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
               letterSpacing: -1,
             ),
           )),
-          const SizedBox(height: 25),
-          Stack(
-            children: [
-              Container(
-                height: 10,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              FractionallySizedBox(
-                widthFactor: 0.65,
-                child: Container(
-                  height: 10,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF6366F1)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
   Widget _buildSmallStatsGrid() {
-    return Row(
-      children: [
-        Expanded(child: _buildSmallStatCard('MANAGERS', controller.totalManagers)),
-        const SizedBox(width: 15),
-        Expanded(child: _buildSmallStatCard('EMPLOYEES', controller.totalEmployees)),
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 140,
+            child: _buildSmallStatCard('MANAGERS', controller.totalManagers)
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 140, 
+            child: _buildSmallStatCard('EMPLOYEES', controller.totalEmployees)
+          ),
+          Obx(() => controller.totalAgencies.value > 0 
+            ? Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: SizedBox(
+                  width: 140,
+                  child: _buildSmallStatCard('AGENCIES', controller.totalAgencies)
+                ),
+              )
+            : const SizedBox.shrink()
+          ),
+        ],
+      ),
     );
   }
 

@@ -12,6 +12,7 @@ class ProfileController extends GetxController {
       case UserRole.superAdmin:
         return _authService.currentSuperAdmin.value?.fullName ?? 'Admin';
       case UserRole.manager:
+      case UserRole.agency:
         return _authService.currentManager.value?.fullName ?? 'Manager';
       case UserRole.employee:
         return _authService.currentEmployee.value?.fullName ?? 'Employee';
@@ -25,6 +26,7 @@ class ProfileController extends GetxController {
       case UserRole.superAdmin:
         return _authService.currentSuperAdmin.value?.email ?? '';
       case UserRole.manager:
+      case UserRole.agency:
         return _authService.currentManager.value?.email ?? '';
       case UserRole.employee:
         return _authService.currentEmployee.value?.email ?? '';
@@ -38,7 +40,9 @@ class ProfileController extends GetxController {
       case UserRole.superAdmin:
         return 'System Administrator';
       case UserRole.manager:
-        return 'Agency Manager';
+        return 'Team Manager';
+      case UserRole.agency:
+        return 'Agency Owner';
       case UserRole.employee:
         return 'Sales Representative';
       default:

@@ -19,7 +19,7 @@ class AddManagerView extends GetView<AddManagerController> {
           onPressed: () => Get.back(),
         ),
         title: const Text(
-          'Register New Agency',
+          'Register New Manager',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
@@ -38,7 +38,6 @@ class AddManagerView extends GetView<AddManagerController> {
             _buildSectionHeader('LOGIN CREDENTIALS'),
             const SizedBox(height: 16),
             _buildTextField('Email Address', controller.emailController, Icons.email_outlined, isEmail: true),
-            _buildTextField('Temporary Password', controller.passwordController, Icons.lock_outline, isPassword: true),
             
             const SizedBox(height: 48),
             _buildCreateButton(),

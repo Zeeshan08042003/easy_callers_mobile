@@ -19,13 +19,23 @@ class SuperAdminDashboardController extends GetxController {
   final RxInt totalManagers = 0.obs;
   final RxInt totalEmployees = 0.obs;
   final RxInt totalLeads = 0.obs;
+  final RxInt totalAgencies = 0.obs;
   final RxList<ManagerModel> recentManagers = <ManagerModel>[].obs;
   final RxList<ProjectModel> recentProjects = <ProjectModel>[].obs;
   final RxBool isLoading = false.obs;
 
+  // Track whether initial data has been loaded
+  bool _hasLoadedData = false;
+
   @override
   void onInit() {
     super.onInit();
+    // Listen for SA auth changes so we reload when auth is ready
+    ever(_authService.currentSuperAdmin, (_) {
+      if (!_hasLoadedData) {
+        refreshDashboard();
+      }
+    });
     refreshDashboard();
   }
 
@@ -34,15 +44,34 @@ class SuperAdminDashboardController extends GetxController {
       isLoading.value = true;
       
       final saId = _authService.currentSuperAdmin.value?.id;
-      
+
+      // If SA ID isn't available yet, wait briefly for auth to resolve
+      if (saId == null) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        final retryId = _authService.currentSuperAdmin.value?.id;
+        if (retryId == null) {
+          // Still no SA — will re-trigger when the ever() listener fires
+          isLoading.value = false;
+          return;
+        }
+        return _loadData(retryId);
+      }
+
+      return _loadData(saId);
+    } catch (e) {
+      print('Error refreshing SA dashboard: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> _loadData(String saId) async {
+    try {
       // Fetch stats, managers, and projects in parallel
       final results = await Future.wait([
-        _leadService.getGlobalStats(),
-        _leadService.getAllManagers(currentSuperAdminId: saId),
-        if (saId != null) 
-          _projectService.getProjectsForSuperAdmin(saId)
-        else 
-          Future.value(<ProjectModel>[]),
+        _leadService.getGlobalStats(superAdminId: saId),
+        _leadService.getNetworkManagers(currentSuperAdminId: saId),
+        _projectService.getProjectsForSuperAdmin(saId),
       ]);
 
       final stats = results[0] as Map<String, dynamic>;
@@ -52,15 +81,17 @@ class SuperAdminDashboardController extends GetxController {
       totalManagers.value = stats['manager_count'] ?? 0;
       totalEmployees.value = stats['employee_count'] ?? 0;
       totalLeads.value = stats['lead_count'] ?? 0;
+      totalAgencies.value = stats['agency_count'] ?? 0;
       
-      // For "Recent Managers", we show the top 5
+      // For "Recent Managers", show top 5
       recentManagers.value = managers.take(5).toList();
       
-      // For "Recent Projects", we show top 3
+      // For "Recent Projects", show top 3
       recentProjects.value = projects.take(3).toList();
-      
+
+      _hasLoadedData = true;
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load dashboard data: $e');
+      print('Error loading SA dashboard data: $e');
     } finally {
       isLoading.value = false;
     }

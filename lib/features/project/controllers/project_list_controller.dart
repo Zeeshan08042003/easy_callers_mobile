@@ -51,7 +51,9 @@ class ProjectListController extends GetxController {
     }
 
     fetchProjects();
-    if (_authService.currentRole.value == UserRole.manager || oversightManagerId != null) {
+    if (_authService.currentRole.value == UserRole.manager || 
+        _authService.currentRole.value == UserRole.agency || 
+        oversightManagerId != null) {
       fetchPendingInvitations();
     }
   }
@@ -69,7 +71,7 @@ class ProjectListController extends GetxController {
         final saId = _authService.currentSuperAdmin.value?.id;
         if (saId == null) return;
         projects.value = await _projectService.getProjectsForSuperAdmin(saId);
-      } else if (role == UserRole.manager) {
+      } else if (role == UserRole.manager || role == UserRole.agency) {
         final mgrId = _authService.currentManager.value?.id;
         if (mgrId == null) return;
         projects.value = await _projectService.getProjectsForManager(mgrId);
@@ -78,7 +80,7 @@ class ProjectListController extends GetxController {
       _applySearch();
 
       // Also refresh pending invitations for managers
-      if (role == UserRole.manager || oversightManagerId != null) {
+      if (role == UserRole.manager || role == UserRole.agency || oversightManagerId != null) {
         fetchPendingInvitations();
       }
     } catch (e) {
@@ -151,5 +153,7 @@ class ProjectListController extends GetxController {
   }
 
   bool get isSuperAdmin => _authService.currentRole.value == UserRole.superAdmin && oversightManagerId == null;
-  bool get isManager => _authService.currentRole.value == UserRole.manager || oversightManagerId != null;
+  bool get isManager => _authService.currentRole.value == UserRole.manager || 
+                     _authService.currentRole.value == UserRole.agency || 
+                     oversightManagerId != null;
 }

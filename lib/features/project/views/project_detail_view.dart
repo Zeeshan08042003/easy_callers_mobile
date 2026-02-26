@@ -167,8 +167,8 @@ class ProjectDetailView extends StatelessWidget {
                     _buildActionButtons(context, controller),
                     const SizedBox(height: 28),
 
-                    // Members Section
-                    if (controller.isSuperAdmin) ...[
+                    // Members Section (Visible to SA and Managers)
+                    if (controller.isSuperAdmin || controller.isManager) ...[
                       _buildSectionHeader(
                         'Members',
                         Icons.people_outline_rounded,
@@ -269,7 +269,7 @@ class ProjectDetailView extends StatelessWidget {
               Icons.upload_file_rounded,
               AppColors.success,
             ),
-            if (controller.isSuperAdmin) ...[
+            if (controller.isSuperAdmin || controller.isManager) ...[
               const SizedBox(width: 12),
               _buildStatCard(
                 'Members',
@@ -1205,101 +1205,140 @@ class ProjectDetailView extends StatelessWidget {
       isScrollControlled: true,
       builder: (context) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.5,
+          initialChildSize: 0.6,
           minChildSize: 0.3,
-          maxChildSize: 0.8,
+          maxChildSize: 0.85,
           expand: false,
           builder: (context, scrollController) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
+            return DefaultTabController(
+              length: controller.isSuperAdmin ? 2 : 1,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.textSecondary.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Invite Manager',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Select a manager or agency to invite',
+                      style: TextStyle(
+                        color: AppColors.textSecondary.withOpacity(0.6),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Tab bar: Managers | Agencies (Only for SA)
+                    if (controller.isSuperAdmin) ...[
+                      Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: TabBar(
+                          indicator: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          indicatorSize: TabBarIndicatorSize.tab,
+                          dividerColor: Colors.transparent,
+                          labelColor: Colors.white,
+                          unselectedLabelColor: AppColors.textSecondary.withOpacity(0.5),
+                          labelStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                          unselectedLabelStyle: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                          labelPadding: EdgeInsets.zero,
+                          tabs: [
+                            Obx(() {
+                              final count = controller.filteredAvailableManagers
+                                  .where((m) => !m.isAgency)
+                                  .length;
+                              return Tab(child: Text('Managers ($count)'));
+                            }),
+                            Obx(() {
+                              final count = controller.filteredAvailableManagers
+                                  .where((m) => m.isAgency)
+                                  .length;
+                              return Tab(child: Text('Agencies ($count)'));
+                            }),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    // Search Bar
+                    Container(
                       decoration: BoxDecoration(
-                        color: AppColors.textSecondary.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(2),
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: TextField(
+                        onChanged: controller.searchManagers,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Search by name or email...',
+                          hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.4)),
+                          prefixIcon: Icon(Icons.search, color: AppColors.textSecondary.withOpacity(0.4), size: 18),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Invite Manager',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Select a manager to invite to this project',
-                    style: TextStyle(
-                      color: AppColors.textSecondary.withOpacity(0.6),
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Search Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.05)),
-                    ),
-                    child: TextField(
-                      onChanged: controller.searchManagers,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: 'Search by name or email...',
-                        hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.4)),
-                        prefixIcon: Icon(Icons.search, color: AppColors.textSecondary.withOpacity(0.4), size: 18),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: Obx(() {
-                      if (controller.filteredAvailableManagers.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                    const SizedBox(height: 12),
+                    // Tab content
+                    Expanded(
+                      child: controller.isSuperAdmin 
+                        ? TabBarView(
                             children: [
-                              Icon(Icons.people_outline,
-                                  color: Colors.white.withOpacity(0.1),
-                                  size: 48),
-                              const SizedBox(height: 12),
-                              Text(
-                                controller.managerSearchQuery.value.isEmpty
-                                    ? 'No available managers to invite'
-                                    : 'No managers match your search',
-                                style: TextStyle(
-                                    color: AppColors.textSecondary
-                                        .withOpacity(0.6)),
+                              // Tab 1: Managers (created by this SA)
+                              _buildInviteManagerTab(
+                                controller: controller,
+                                scrollController: scrollController,
+                                filterFn: (m) => !m.isAgency,
+                                emptyLabel: 'No managers created by you to invite',
+                              ),
+                              // Tab 2: Agencies (independent)
+                              _buildInviteManagerTab(
+                                controller: controller,
+                                scrollController: scrollController,
+                                filterFn: (m) => m.isAgency,
+                                emptyLabel: 'No independent agencies to invite',
                               ),
                             ],
+                          )
+                        : _buildInviteManagerTab(
+                            controller: controller,
+                            scrollController: scrollController,
+                            filterFn: (m) => m.isAgency,
+                            emptyLabel: 'No independent agencies found to invite',
                           ),
-                        );
-                      }
-
-                      return ListView.separated(
-                        controller: scrollController,
-                        itemCount: controller.filteredAvailableManagers.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          return _buildAvailableManagerCard(
-                              controller.filteredAvailableManagers[index], controller);
-                        },
-                      );
-                    }),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -1307,6 +1346,48 @@ class ProjectDetailView extends StatelessWidget {
       },
     );
   }
+
+  Widget _buildInviteManagerTab({
+    required ProjectDetailController controller,
+    required ScrollController scrollController,
+    required bool Function(ManagerModel) filterFn,
+    required String emptyLabel,
+  }) {
+    return Obx(() {
+      final filtered = controller.filteredAvailableManagers.where(filterFn).toList();
+
+      if (filtered.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outline,
+                  color: Colors.white.withOpacity(0.1), size: 48),
+              const SizedBox(height: 12),
+              Text(
+                controller.managerSearchQuery.value.isEmpty
+                    ? emptyLabel
+                    : 'No results match your search',
+                style: TextStyle(
+                    color: AppColors.textSecondary.withOpacity(0.6)),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      }
+
+      return ListView.separated(
+        controller: scrollController,
+        itemCount: filtered.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (context, index) {
+          return _buildAvailableManagerCard(filtered[index], controller);
+        },
+      );
+    });
+  }
+
 
   Widget _buildAvailableManagerCard(ManagerModel manager, ProjectDetailController controller) {
     final canUploadNotifier = ValueNotifier<bool>(false);
@@ -1388,52 +1469,55 @@ class ProjectDetailView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          ValueListenableBuilder<bool>(
-            valueListenable: canUploadNotifier,
-            builder: (context, canUpload, _) {
-              return GestureDetector(
-                onTap: () => canUploadNotifier.value = !canUpload,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: canUpload
-                        ? AppColors.success.withOpacity(0.08)
-                        : Colors.white.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
+          Align(
+            alignment: Alignment.centerRight,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: canUploadNotifier,
+              builder: (context, canUpload, _) {
+                return GestureDetector(
+                  onTap: () => canUploadNotifier.value = !canUpload,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
                       color: canUpload
-                          ? AppColors.success.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.05),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        canUpload
-                            ? Icons.check_box_rounded
-                            : Icons.check_box_outline_blank_rounded,
+                          ? AppColors.success.withOpacity(0.08)
+                          : Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
                         color: canUpload
-                            ? AppColors.success
-                            : AppColors.textSecondary.withOpacity(0.4),
-                        size: 18,
+                            ? AppColors.success.withOpacity(0.2)
+                            : Colors.white.withOpacity(0.05),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Allow Excel Upload',
-                        style: TextStyle(
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          canUpload
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
                           color: canUpload
                               ? AppColors.success
-                              : AppColors.textSecondary.withOpacity(0.5),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                              : AppColors.textSecondary.withOpacity(0.4),
+                          size: 18,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          'Allow Excel Upload',
+                          style: TextStyle(
+                            color: canUpload
+                                ? AppColors.success
+                                : AppColors.textSecondary.withOpacity(0.5),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ],
       ),

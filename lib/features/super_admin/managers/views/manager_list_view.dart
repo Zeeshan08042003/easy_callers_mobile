@@ -115,7 +115,11 @@ class ManagerListView extends GetView<ManagerListController> {
                     : null,
               ),
               child: manager.profileImageUrl == null
-                  ? const Icon(Icons.apartment_rounded, color: AppColors.primary, size: 28)
+                  ? Icon(
+                      manager.isAgency ? Icons.apartment_rounded : Icons.person_rounded, 
+                      color: AppColors.primary, 
+                      size: 28
+                    )
                   : null,
             ),
             const SizedBox(width: 16),
@@ -144,6 +148,12 @@ class ManagerListView extends GetView<ManagerListController> {
                       _buildSmallBadge(
                         'ACTIVE', 
                         manager.isActive ? AppColors.success : AppColors.textSecondary
+                      ),
+                      const SizedBox(width: 8),
+                      // New Role Badge
+                      _buildSmallBadge(
+                        manager.isAgency ? 'AGENCY' : 'MANAGER',
+                        manager.isAgency ? Colors.blueAccent : Colors.orangeAccent
                       ),
                       const SizedBox(width: 8),
                       Text(

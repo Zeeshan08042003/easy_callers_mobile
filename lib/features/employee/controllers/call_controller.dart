@@ -6,6 +6,7 @@ import 'package:easy_callers_mobile/core/services/storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/call_session_model.dart';
 
@@ -40,6 +41,43 @@ class CallController extends GetxController {
     final storage = Get.find<StorageService>();
     await storage.setInt('selected_sim_slot', slot);
     selectedSimSlot.value = slot;
+  }
+
+  // ------------------------------------------------------------
+  // PERMISSIONS
+  // ------------------------------------------------------------
+
+  Future<bool> requestAllPermissions() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.phone,
+      Permission.sms,
+      Permission.notification,
+    ].request();
+    
+    bool allGranted = true;
+    statuses.forEach((permission, status) {
+      if (!status.isGranted) {
+        // notification is often optional but we want it
+        if (permission != Permission.notification) {
+          allGranted = false;
+        }
+      }
+    });
+
+    if (!allGranted) {
+      Get.snackbar(
+        'Permissions Required',
+        'Please grant phone and SMS permissions to make calls and send messages.',
+        backgroundColor: Colors.red.withOpacity(0.1),
+        colorText: Colors.red,
+        mainButton: TextButton(
+          onPressed: () => openAppSettings(),
+          child: const Text('Settings'),
+        ),
+      );
+    }
+    
+    return allGranted;
   }
 
   // ------------------------------------------------------------
@@ -172,6 +210,9 @@ class CallController extends GetxController {
   Future<CallSession?> makeCallForIos({
     required String phoneNumber,
   }) async {
+    final hasPermission = await requestAllPermissions();
+    if (!hasPermission) return null;
+
     resetCallSession();
     try {
       await _platform.invokeMethod('startCall', {'number': phoneNumber});
@@ -218,6 +259,9 @@ class CallController extends GetxController {
     required String phoneNumber,
     int? simSlot,
   }) async {
+    final hasPermission = await requestAllPermissions();
+    if (!hasPermission) return null;
+
     resetCallSession();
 
     // Use selected SIM slot if not explicitly provided

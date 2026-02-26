@@ -30,7 +30,7 @@ class ManagerRegistrationView extends StatelessWidget {
 
                 // Title
                 const Text(
-                  "Manager\nRegistration",
+                  "Agency\nRegistration",
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 36,

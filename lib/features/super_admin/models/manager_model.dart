@@ -11,8 +11,11 @@ class ManagerModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? createdBySuperAdminId;
+  final String? otpCode;
+  final DateTime? otpExpiresAt;
   final bool isSaVisible;
   final String? agencyName;
+  final String managerType; // 'manager' or 'agency'
 
 
   // Computed / joined data
@@ -26,19 +29,28 @@ class ManagerModel {
     required this.lastName,
     this.phone,
     this.profileImageUrl,
-    this.isActive = true,
+    this.isActive = false,
     this.maxEmployees,
     required this.createdAt,
     required this.updatedAt,
     this.createdBySuperAdminId,
+    this.otpCode,
+    this.otpExpiresAt,
     this.isSaVisible = false,
     this.agencyName,
+    this.managerType = 'manager',
     this.employeeCount,
   });
 
 
 
   String get fullName => '$firstName $lastName'.trim();
+  bool get isAgency => managerType == 'agency';
+
+  bool get isOTPExpired {
+    if (otpExpiresAt == null) return true;
+    return otpExpiresAt!.isBefore(DateTime.now());
+  }
 
   String get initials {
     final f = firstName.isNotEmpty ? firstName[0].toUpperCase() : '';
@@ -66,6 +78,12 @@ class ManagerModel {
       createdBySuperAdminId: json['created_by_super_admin_id'] as String?,
       isSaVisible: json['is_sa_visible'] as bool? ?? false,
       agencyName: json['agency_name'] as String?,
+      managerType: json['manager_type'] as String? ?? 
+                   (json['created_by_super_admin_id'] == null ? 'agency' : 'manager'),
+      otpCode: json['otp_code'] as String?,
+      otpExpiresAt: json['otp_expires_at'] != null 
+          ? DateTime.parse(json['otp_expires_at'] as String) 
+          : null,
     );
   }
 
@@ -85,6 +103,7 @@ class ManagerModel {
       'created_by_super_admin_id': createdBySuperAdminId,
       'is_sa_visible': isSaVisible,
       'agency_name': agencyName,
+      'manager_type': managerType,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -105,6 +124,9 @@ class ManagerModel {
     if (createdBySuperAdminId != null) map['created_by_super_admin_id'] = createdBySuperAdminId;
     map['is_sa_visible'] = isSaVisible;
     if (agencyName != null) map['agency_name'] = agencyName;
+    map['manager_type'] = managerType;
+    if (otpCode != null) map['otp_code'] = otpCode;
+    if (otpExpiresAt != null) map['otp_expires_at'] = otpExpiresAt!.toIso8601String();
     return map;
   }
 
@@ -125,6 +147,9 @@ class ManagerModel {
     String? createdBySuperAdminId,
     bool? isSaVisible,
     String? agencyName,
+    String? managerType,
+    String? otpCode,
+    DateTime? otpExpiresAt,
     int? employeeCount,
   }) {
     return ManagerModel(
@@ -142,6 +167,9 @@ class ManagerModel {
       createdBySuperAdminId: createdBySuperAdminId ?? this.createdBySuperAdminId,
       isSaVisible: isSaVisible ?? this.isSaVisible,
       agencyName: agencyName ?? this.agencyName,
+      managerType: managerType ?? this.managerType,
+      otpCode: otpCode ?? this.otpCode,
+      otpExpiresAt: otpExpiresAt ?? this.otpExpiresAt,
       employeeCount: employeeCount ?? this.employeeCount,
     );
   }

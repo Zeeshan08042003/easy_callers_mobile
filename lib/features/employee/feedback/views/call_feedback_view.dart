@@ -189,9 +189,9 @@ class CallFeedbackView extends GetView<CallFeedbackController> {
       
       bool showFollowUp = false;
       if (status is LeadStatusModel) {
-        showFollowUp = status.leadStatusMapping == 'follow_up' || status.value == 'callback' || status.value == 'follow_up';
+        showFollowUp = status.leadStatusMapping == 'follow_up' || status.leadStatusMapping == 'visiting' || status.value == 'follow_up' || status.value == 'visiting';
       } else if (status is CallLeadStatus) {
-        showFollowUp = status == CallLeadStatus.followUp || status == CallLeadStatus.callback;
+        showFollowUp = status == CallLeadStatus.followUp || status == CallLeadStatus.visiting;
       }
       
       if (!showFollowUp) {

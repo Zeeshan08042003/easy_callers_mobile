@@ -11,6 +11,9 @@ import 'package:easy_callers_mobile/features/profile/bindings/profile_binding.da
 import 'package:easy_callers_mobile/features/project/views/project_list_view.dart';
 import 'package:easy_callers_mobile/features/project/views/create_project_view.dart';
 import 'package:easy_callers_mobile/features/project/models/project_model.dart';
+import 'package:easy_callers_mobile/features/manager/leads/views/manager_lead_lifecycle_view.dart';
+import 'package:easy_callers_mobile/features/manager/models/lead_model.dart';
+import 'package:easy_callers_mobile/core/widgets/lead_card.dart';
 import 'package:intl/intl.dart';
 
 class ManagerDashboardView extends GetView<ManagerDashboardController> {
@@ -64,7 +67,8 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                 _buildLastCallActivity(),
                 _buildWeeklyDistribution(),
                 const SizedBox(height: 30),
-                _buildTeamStatusSection(),
+                _buildLifecycleTabsSection(),
+                const SizedBox(height: 100), // Extra space at bottom
               ],
             ),
           );
@@ -482,18 +486,30 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: controller.isLoading.value ? null : () => controller.uploadLeads(),
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 24),
-                  label: const Text(
-                    'New Upload',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  onPressed: (controller.isLoading.value || !controller.canUploadExcel.value) 
+                      ? null 
+                      : () => controller.uploadLeads(),
+                  icon: Icon(
+                    controller.canUploadExcel.value 
+                        ? Icons.cloud_upload_outlined 
+                        : Icons.lock_outline_rounded, 
+                    size: 24,
+                    color: Colors.white,
+                  ),
+                  label: Text(
+                    controller.canUploadExcel.value ? 'New Upload' : 'Upload Restricted',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: controller.canUploadExcel.value 
+                        ? AppColors.primary
+                        : AppColors.primary,
+                    foregroundColor: controller.canUploadExcel.value
+                        ? Colors.white
+                        : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 4,
+                    elevation: controller.canUploadExcel.value ? 4 : 0,
                     shadowColor: AppColors.primary.withOpacity(0.4),
                   ),
                 ),
@@ -997,7 +1013,7 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
     );
   }
 
-  Widget _buildTeamStatusSection() {
+  Widget _buildLifecycleTabsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1005,7 +1021,7 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'TEAM STATUS',
+              'LEAD LIFECYCLE',
               style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 14,
@@ -1013,41 +1029,194 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
                 letterSpacing: 1,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF161C28),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  _buildToggleItem('ACTIVE', true),
-                  _buildToggleItem('ALL', false),
-                ],
+            GestureDetector(
+              onTap: () {
+                final status = controller.selectedLifecycleTab.value == 0 ? 'follow_up' : 
+                               controller.selectedLifecycleTab.value == 1 ? 'visiting' : 
+                               controller.selectedLifecycleTab.value == 2 ? 'visit_completed' : 'all';
+                
+                final title = controller.selectedLifecycleTab.value == 0 ? 'Follow-up' : 
+                               controller.selectedLifecycleTab.value == 1 ? 'Visiting' : 
+                               controller.selectedLifecycleTab.value == 2 ? 'Completed' : 'All Leads';
+                
+                Get.to(() => ManagerLeadLifecycleView(
+                  projectId: controller.selectedProject.value!.id,
+                  status: status,
+                  title: title,
+                  managerId: controller.oversightManagerId,
+                ));
+              },
+              child: const Text(
+                'FULL VIEW',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 20),
+        
+        // Custom TabBar
+        Obx(() => Container(
+          height: 48,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2432),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              _buildLifecycleTab(0, 'Follow-up', controller.dailyFollowUps.value),
+              _buildLifecycleTab(1, 'Visiting', controller.dailyVisiting.value),
+              _buildLifecycleTab(2, 'Completed', controller.visitCompleted.value),
+              _buildLifecycleTab(3, 'All', controller.allActivityCount.value),
+            ],
+          ),
+        )),
+        
+        const SizedBox(height: 25),
+        
+        // Leads List
         Obx(() {
-          if (controller.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
+          if (controller.isLoadingLeads.value) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            );
           }
-          return Column(
-            children: controller.teamMembers.map((member) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _buildTeamMemberItem(
-                  member['name'],
-                  member['calls'],
-                  member['progress'],
-                  Color(member['statusColor']),
-                ),
+          
+          if (controller.dashboardLeads.isEmpty) {
+            return _buildEmptyLeadsState();
+          }
+          
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: controller.dashboardLeads.length.clamp(0, 10), // Show only top 10 on dashboard
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final lead = controller.dashboardLeads[index];
+              return LeadCard(
+                lead: lead,
+                onStatusChanged: (newStatus) {
+                  controller.updateLeadStatus(lead.id, newStatus);
+                },
+                onTap: () {
+                  final status = controller.selectedLifecycleTab.value == 0 ? 'follow_up' : 
+                                 controller.selectedLifecycleTab.value == 1 ? 'visiting' : 
+                                 controller.selectedLifecycleTab.value == 2 ? 'visit_completed' : 'all';
+                  
+                  final title = controller.selectedLifecycleTab.value == 0 ? 'Follow-up' : 
+                                 controller.selectedLifecycleTab.value == 1 ? 'Visiting' : 
+                                 controller.selectedLifecycleTab.value == 2 ? 'Completed' : 'All Leads';
+                  
+                  Get.to(() => ManagerLeadLifecycleView(
+                    projectId: controller.selectedProject.value!.id,
+                    status: status,
+                    title: title,
+                    managerId: controller.oversightManagerId,
+                  ));
+                },
               );
-            }).toList(),
+            },
           );
         }),
       ],
+    );
+  }
+
+  Widget _buildLifecycleTab(int index, String label, int count) {
+    final isSelected = controller.selectedLifecycleTab.value == index;
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => controller.setLifecycleTab(index),
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected ? [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              )
+            ] : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppColors.textSecondary.withOpacity(0.6),
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.white.withOpacity(0.2) : AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    count.toString(),
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.primary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyLeadsState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E2432).withOpacity(0.4),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.03)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.assignment_late_outlined, 
+               color: Colors.white.withOpacity(0.05), size: 64),
+          const SizedBox(height: 16),
+          Text(
+            'No leads found',
+            style: TextStyle(
+              color: AppColors.textSecondary.withOpacity(0.7),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Change the tab or check back later',
+            style: TextStyle(
+              color: AppColors.textSecondary.withOpacity(0.4),
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1215,7 +1384,7 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
               padding: EdgeInsets.only(bottom: 6),
               child: Icon(Icons.settings_rounded, size: 26),
             ),
-            label: 'Admin',
+            label: 'Profile',
           ),
         ],
       ),

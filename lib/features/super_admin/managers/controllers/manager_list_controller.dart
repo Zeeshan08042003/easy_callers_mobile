@@ -21,7 +21,9 @@ class ManagerListController extends GetxController {
     try {
       isLoading.value = true;
       final saId = _authService.currentSuperAdmin.value?.id;
-      final result = await _leadService.getAllManagers(currentSuperAdminId: saId);
+      if (saId == null) return;
+
+      final result = await _leadService.getNetworkManagers(currentSuperAdminId: saId);
       managers.assignAll(result);
       filteredManagers.assignAll(result);
     } catch (e) {

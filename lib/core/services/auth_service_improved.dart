@@ -449,6 +449,7 @@ class AuthService extends GetxService {
         userId = admin.id;
         break;
       case UserRole.manager:
+      case UserRole.agency:
         final manager = profile as ManagerModel;
         currentManager.value = manager;
         userId = manager.id;
@@ -498,6 +499,7 @@ class AuthService extends GetxService {
           insertData['performer_super_admin_id'] = userId;
           break;
         case UserRole.manager:
+        case UserRole.agency:
           insertData['performer_manager_id'] = userId;
           break;
         case UserRole.employee:

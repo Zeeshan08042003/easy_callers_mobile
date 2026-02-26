@@ -152,6 +152,12 @@ class CallHistoryController extends GetxController {
           return leadStatusStr == 'visiting' || notes == 'visiting';
         }).toList();
         break;
+      case 'completed':
+        filtered = filtered.where((log) {
+          final leadStatusStr = log.leadStatus?.toString() ?? '';
+          return leadStatusStr == 'visit_completed';
+        }).toList();
+        break;
       default:
         // 'all' - no filtering
         break;
@@ -202,6 +208,7 @@ class CallHistoryController extends GetxController {
             _buildFilterOption('All Calls', 'all'),
             _buildFilterOption('Follow-ups', 'followup'),
             _buildFilterOption('Visiting', 'visiting'),
+            _buildFilterOption('Visit Completed', 'completed'),
             const SizedBox(height: 24),
           ],
         ),

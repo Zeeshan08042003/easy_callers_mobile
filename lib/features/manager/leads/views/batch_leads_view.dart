@@ -524,7 +524,7 @@ class BatchLeadsView extends StatelessWidget {
     switch (status) {
       case LeadStatus.newLead:
         return AppColors.primary;
-      case LeadStatus.connected:
+      case LeadStatus.visiting:
         return AppColors.success;
       case LeadStatus.followUp:
         return AppColors.warning;

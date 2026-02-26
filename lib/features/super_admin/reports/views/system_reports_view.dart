@@ -36,11 +36,11 @@ class SystemReportsView extends GetView<SystemReportsController> {
               const SizedBox(height: 16),
               _buildGlobalStatsGrid(),
               const SizedBox(height: 40),
-              _buildSectionTitle('AGENCY PERFORMANCE COMPARISON'),
+              _buildSectionTitle('TEAM & AGENCY PERFORMANCE'),
               const SizedBox(height: 16),
               _buildAgencyComparisonChart(),
               const SizedBox(height: 40),
-              _buildSectionTitle('BRANCH BREAKDOWN'),
+              _buildSectionTitle('NETWORK BREAKDOWN'),
               const SizedBox(height: 16),
               _buildAgencyList(),
               const SizedBox(height: 100),
@@ -111,10 +111,10 @@ class SystemReportsView extends GetView<SystemReportsController> {
       crossAxisSpacing: 16,
       childAspectRatio: 1.4,
       children: [
-        _buildStatCard('Total System Leads', s['lead_count']?.toString() ?? '0', Icons.auto_graph_rounded),
-        _buildStatCard('Total System Calls', s['call_count']?.toString() ?? '0', Icons.call_made_rounded),
-        _buildStatCard('Registered Agencies', s['manager_count']?.toString() ?? '0', Icons.apartment_rounded),
+        _buildStatCard('Total Leads', s['lead_count']?.toString() ?? '0', Icons.auto_graph_rounded),
         _buildStatCard('Field Employees', s['employee_count']?.toString() ?? '0', Icons.groups_rounded),
+        _buildStatCard('My managers', s['manager_count']?.toString() ?? '0', Icons.manage_accounts_rounded),
+        _buildStatCard('Independent Agencies', s['agency_count']?.toString() ?? '0', Icons.apartment_rounded),
       ],
     );
   }

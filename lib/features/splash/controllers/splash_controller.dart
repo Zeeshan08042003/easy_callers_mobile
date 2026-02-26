@@ -28,6 +28,7 @@ class SplashController extends GetxController {
         Get.offAllNamed(AppRoutes.superAdminDashboard);
         break;
       case UserRole.manager:
+      case UserRole.agency:
         Get.offAllNamed(AppRoutes.managerDashboard);
         break;
       case UserRole.employee:

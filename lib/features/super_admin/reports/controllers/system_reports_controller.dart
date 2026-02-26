@@ -47,12 +47,12 @@ class SystemReportsController extends GetxController {
     try {
       isLoading.value = true;
       final projectId = selectedProject.value?.id;
-      
+      final saId = _authService.currentSuperAdmin.value?.id;
       final results = await Future.wait([
-        _leadService.getGlobalStats(projectId: projectId),
+        _leadService.getGlobalStats(projectId: projectId, superAdminId: saId),
         _leadService.getRegionalPerformance(
           projectId: projectId,
-          currentSuperAdminId: _authService.currentSuperAdmin.value?.id,
+          currentSuperAdminId: saId,
         ),
       ]);
 

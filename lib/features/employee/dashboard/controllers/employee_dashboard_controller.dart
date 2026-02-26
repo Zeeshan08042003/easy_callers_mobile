@@ -74,8 +74,11 @@ class EmployeeDashboardController extends GetxController {
   Future<void> _initDashboard() async {
     await _loadProjects();
     refreshData();
+    // Request all necessary permissions
+    final callController = Get.find<CallController>();
+    await callController.requestAllPermissions();
     // Check for SIM selection if on Android
-    Get.find<CallController>().checkAndPromptSimSelection();
+    callController.checkAndPromptSimSelection();
   }
 
   Future<void> _loadProjects() async {

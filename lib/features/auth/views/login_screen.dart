@@ -72,7 +72,7 @@ class NewLoginScreen extends StatelessWidget {
                   child: GestureDetector(
                     onTap: () => controller.goToOTPScreen(),
                     child: const Text(
-                      "First time employee? Verify OTP",
+                      "First time login? Activate with OTP",
                       style: TextStyle(
                         color: Color(0xff2D201C),
                         fontSize: 13,
@@ -83,7 +83,7 @@ class NewLoginScreen extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 48), // increased from 40 for spacing
 
                 // Login button
                 Obx(() => SizedBox(
@@ -160,7 +160,7 @@ class NewLoginScreen extends StatelessWidget {
                       GestureDetector(
                         onTap: () => Get.toNamed(AppRoutes.managerRegistration),
                         child: const Text(
-                          "Register as Manager",
+                          "Register as Agency",
                           style: TextStyle(
                             color: Color(0xff2D201C),
                             fontSize: 14,

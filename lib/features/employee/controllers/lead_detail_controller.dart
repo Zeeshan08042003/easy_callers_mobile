@@ -50,7 +50,25 @@ class LeadDetailController extends GetxController {
     try {
       final managerId = _authService.currentEmployee.value?.managerId;
       final statuses = await _leadService.getLeadStatuses(managerId);
-      availableLeadStatuses.assignAll(statuses);
+      
+      // Employee visible statuses: Follow-up, Not Interested, Visiting, Visit Completed
+      final visibleMappings = ['follow_up', 'not_interested', 'visiting', 'visit_completed'];
+      
+      final filteredStatuses = statuses.where((s) {
+        final mapping = s.leadStatusMapping.toLowerCase();
+        
+        // Basic visibility
+        if (!visibleMappings.contains(mapping)) return false;
+        
+        // Visit Completed only if currently visiting
+        if (mapping == 'visit_completed') {
+          return lead.status == LeadStatus.visiting;
+        }
+        
+        return true;
+      }).toList();
+
+      availableLeadStatuses.assignAll(filteredStatuses);
     } catch (e) {
       print('Error loading statuses: $e');
     }
@@ -98,7 +116,7 @@ class LeadDetailController extends GetxController {
       }
 
       if (session == null) {
-        selectedStatus.value = 'no_answer';
+        selectedStatus.value = 'follow_up';
         callDurationSeconds.value = 0;
         lastCallSession.value = null;
         return;
@@ -111,11 +129,11 @@ class LeadDetailController extends GetxController {
 
       // Business decision
       if (!session.isConnected) {
-        selectedStatus.value = 'callback';
+        selectedStatus.value = 'follow_up';
       } else if (session.durationInSeconds > 30) {
-        selectedStatus.value = 'interested';
+        selectedStatus.value = 'visiting';
       } else {
-        selectedStatus.value = 'callback';
+        selectedStatus.value = 'follow_up';
       }
 
     } catch (e) {
@@ -149,7 +167,7 @@ class LeadDetailController extends GetxController {
       isLoading.value = true;
 
       final String statusValue = selectedStatus.value;
-      final bool requiresDateTime = statusValue == 'visiting' || statusValue == 'follow_up' || statusValue == 'callback';
+      final bool requiresDateTime = statusValue == 'visiting' || statusValue == 'follow_up';
 
       if (requiresDateTime && (visitingDate.value == null || visitingTime.value == null)) {
         Get.snackbar(

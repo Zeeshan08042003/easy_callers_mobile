@@ -41,6 +41,9 @@ class AuthController extends GetxController {
   Rx<SuperAdminModel?> get currentSuperAdmin => _authService.currentSuperAdmin;
   Rx<ManagerModel?> get currentManager => _authService.currentManager;
   Rx<EmployeeModel?> get currentEmployee => _authService.currentEmployee;
+  
+  // For first-time activation
+  final Rx<UserRole?> detectedActivationRole = Rx<UserRole?>(null);
 
   // ============================================
   // LOGIN
@@ -69,6 +72,7 @@ class AuthController extends GetxController {
         Get.offAll(() => const SuperAdminDashboardView(), binding: SuperAdminDashboardBinding());
         break;
       case UserRole.manager:
+      case UserRole.agency:
         Get.offAll(() => const ManagerDashboardView(), binding: ManagerDashboardBinding());
         break;
       case UserRole.employee:
@@ -93,16 +97,28 @@ class AuthController extends GetxController {
 
   /// Verify OTP
   Future<void> verifyOTP() async {
-    if (otpCode.value.trim().length != 6) {
-      otpError.value = 'Please enter a valid 6-digit OTP';
-      return;
-    }
     otpError.value = '';
+    final emailVal = email.value.trim();
+    final otpVal = otpCode.value.trim();
 
-    final success = await _authService.verifyEmployeeOTP(
-      email: email.value.trim(),
-      otpCode: otpCode.value.trim(),
+    // 1. Try Employee OTP
+    bool success = await _authService.verifyEmployeeOTP(
+      email: emailVal,
+      otpCode: otpVal,
     );
+
+    if (success) {
+      detectedActivationRole.value = UserRole.employee;
+    } else {
+      // 2. Try Manager OTP
+      success = await _authService.verifyManagerOTP(
+        email: emailVal,
+        otpCode: otpVal,
+      );
+      if (success) {
+        detectedActivationRole.value = UserRole.manager;
+      }
+    }
 
     if (success) {
       Get.to(() => const SetPasswordScreen());
@@ -119,15 +135,32 @@ class AuthController extends GetxController {
   Future<void> setPasswordAndActivate() async {
     if (!_validatePasswordForm()) return;
 
-    final employee = await _authService.activateEmployee(
-      email: email.value.trim(),
-      password: password.value,
-    );
+    final role = detectedActivationRole.value;
+    final emailVal = email.value.trim();
+    final passVal = password.value;
 
-    if (employee != null) {
-      Get.snackbar('Success', 'Account activated successfully!');
-      _navigateToDashboard(UserRole.employee);
-    } else if (error.value.isNotEmpty) {
+    if (role == UserRole.manager) {
+      final manager = await _authService.activateManager(
+        email: emailVal,
+        password: passVal,
+      );
+      if (manager != null) {
+        Get.snackbar('Success', 'Manager account activated!');
+        _navigateToDashboard(UserRole.manager);
+      }
+    } else {
+      // Default to employee if role is null or employee
+      final employee = await _authService.activateEmployee(
+        email: emailVal,
+        password: passVal,
+      );
+      if (employee != null) {
+        Get.snackbar('Success', 'Employee account activated!');
+        _navigateToDashboard(UserRole.employee);
+      }
+    }
+
+    if (error.value.isNotEmpty) {
       Get.snackbar('Activation Failed', error.value);
     }
   }

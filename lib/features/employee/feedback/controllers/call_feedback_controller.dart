@@ -53,7 +53,25 @@ class CallFeedbackController extends GetxController {
       isLoading.value = true;
       final managerId = _authService.currentEmployee.value?.managerId;
       final statuses = await _leadService.getLeadStatuses(managerId);
-      availableLeadStatuses.assignAll(statuses);
+      
+      // Employee visible statuses: Follow-up, Not Interested, Visiting, Visit Completed
+      final visibleMappings = ['follow_up', 'not_interested', 'visiting', 'visit_completed'];
+      
+      final filteredStatuses = statuses.where((s) {
+        final mapping = s.leadStatusMapping.toLowerCase();
+        
+        // Basic visibility
+        if (!visibleMappings.contains(mapping)) return false;
+        
+        // Visit Completed only if currently visiting
+        if (mapping == 'visit_completed') {
+          return lead.status == LeadStatus.visiting;
+        }
+        
+        return true;
+      }).toList();
+
+      availableLeadStatuses.assignAll(filteredStatuses);
     } catch (e) {
       print('Error loading statuses: $e');
     } finally {

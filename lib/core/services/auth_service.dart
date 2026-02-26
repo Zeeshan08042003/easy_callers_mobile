@@ -98,10 +98,19 @@ class AuthService extends GetxService {
       // 3. Set current user based on role
       _setCurrentUser(result.role, result.profile);
 
-      // 4. Check if employee is active
+      // 4. Check if user is active
       if (result.role == UserRole.employee) {
         final emp = result.profile as EmployeeModel;
         if (!emp.isActive) {
+          error.value =
+              'Your account is not active. Please verify with OTP first.';
+          await _supabase.client.auth.signOut();
+          _clearCurrentUser();
+          return null;
+        }
+      } else if (result.role == UserRole.manager || result.role == UserRole.agency) {
+        final mgr = result.profile as ManagerModel;
+        if (!mgr.isActive) {
           error.value =
               'Your account is not active. Please verify with OTP first.';
           await _supabase.client.auth.signOut();
@@ -376,9 +385,8 @@ class AuthService extends GetxService {
   // ============================================
 
   /// Create a new manager (called by Super Admin)
-  Future<ManagerModel?> createManager({
+  Future<({ManagerModel? manager, String? otp})?> createManager({
     required String email,
-    required String password,
     required String firstName,
     required String lastName,
     String? phone,
@@ -392,33 +400,21 @@ class AuthService extends GetxService {
         return null;
       }
 
-      // 1. Create auth account using a temporary client to avoid session swap
+      // 1. Generate OTP
+      final otp = generateOTP();
+      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
       final normalizedEmail = email.toLowerCase().trim();
-      final tempClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl, 
-        SupabaseConstants.supabaseAnonKey,
-      );
-      
-      final tempAuth = await tempClient.auth.signUp(
-        email: normalizedEmail,
-        password: password,
-      );
-
-      if (tempAuth.user == null) {
-        error.value = 'Failed to create auth account for manager.';
-        return null;
-      }
-
-      final authId = tempAuth.user!.id;
 
       // 2. Insert into managers table
       final insertData = <String, dynamic>{
-        'auth_id': authId,
         'email': normalizedEmail,
         'first_name': firstName,
         'last_name': lastName,
-        'is_active': true,
+        'is_active': false,
         'created_by_super_admin_id': currentSuperAdmin.value!.id,
+        'manager_type': 'manager',
+        'otp_code': otp,
+        'otp_expires_at': otpExpiry.toIso8601String(),
       };
       if (phone != null) insertData['phone'] = phone;
 
@@ -427,20 +423,151 @@ class AuthService extends GetxService {
           .select()
           .single();
 
+      final manager = ManagerModel.fromJson(response);
+
       // 3. Log the action
       await _logActivity(
         action: 'create_manager',
         targetType: 'manager',
-        targetId: response['id'],
+        targetId: manager.id,
         details: {'manager_email': email},
       );
 
-      return ManagerModel.fromJson(response);
-    } on AuthException catch (e) {
-      error.value = e.message;
-      return null;
+      return (manager: manager, otp: otp);
     } catch (e) {
       error.value = 'Error creating manager: $e';
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ============================================
+  // MANAGER OTP ACTIVATION
+  // ============================================
+
+  /// Verify OTP for manager first-time activation
+  Future<bool> verifyManagerOTP({
+    required String email,
+    required String otpCode,
+  }) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final normalizedEmail = email.toLowerCase().trim();
+      
+      final result = await _supabase.client.rpc(
+        'get_manager_for_otp',
+        params: {'input_email': normalizedEmail},
+      );
+
+      if (result == null || (result is List && result.isEmpty)) {
+        error.value = 'No manager account found with this email.';
+        return false;
+      }
+
+      final managerData = result is List ? result.first : result;
+      final manager = ManagerModel.fromJson(managerData);
+
+      if (manager.otpCode != otpCode) {
+        error.value = 'Invalid OTP code. Please try again.';
+        return false;
+      }
+
+      if (manager.isOTPExpired) {
+        error.value = 'OTP has expired. Please request a new one.';
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      error.value = 'Error verifying OTP: $e';
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Complete manager activation: set password and activate account
+  Future<ManagerModel?> activateManager({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final normalizedEmail = email.toLowerCase().trim();
+      String? authUserId;
+
+      // 1. Create or get auth account
+      try {
+        final authResponse = await _supabase.client.auth.signUp(
+          email: normalizedEmail,
+          password: password,
+        );
+
+        if (authResponse.user != null) {
+          authUserId = authResponse.user!.id;
+        } else {
+          error.value = 'Failed to create account.';
+          return null;
+        }
+      } on AuthException catch (e) {
+        if (e.message.contains('already registered')) {
+          try {
+            final signInResponse = await _supabase.client.auth.signInWithPassword(
+              email: normalizedEmail,
+              password: password,
+            );
+            if (signInResponse.user != null) {
+              authUserId = signInResponse.user!.id;
+            } else {
+              error.value = 'Account exists but password setup failed.';
+              return null;
+            }
+          } catch (signInError) {
+            error.value = 'Account exists but password setup failed.';
+            return null;
+          }
+        } else {
+          throw e;
+        }
+      }
+
+      if (authUserId == null) return null;
+
+      // 2. Find and update manager record
+      final managerRecords = await _supabase.managersTable
+          .select()
+          .ilike('email', normalizedEmail);
+
+      if (managerRecords.isEmpty) {
+        error.value = 'No manager record found.';
+        return null;
+      }
+
+      final managerId = managerRecords.first['id'];
+      await _supabase.managersTable.update({
+        'auth_id': authUserId,
+        'is_active': true,
+        'otp_code': null,
+        'otp_expires_at': null,
+      }).eq('id', managerId);
+
+      // 3. Fetch updated manager
+      final data = await _supabase.managersTable
+          .select()
+          .eq('id', managerId)
+          .single();
+
+      final manager = ManagerModel.fromJson(data);
+      _setCurrentUser(UserRole.manager, manager);
+      
+      return manager;
+    } catch (e) {
+      error.value = 'Error activating manager: $e';
       return null;
     } finally {
       isLoading.value = false;
@@ -485,7 +612,8 @@ class AuthService extends GetxService {
         'first_name': firstName,
         'last_name': lastName,
         'is_active': true,
-        'max_employees': 10, 
+        'max_employees': 10,
+        'manager_type': 'agency',
       };
       if (phone != null) insertData['phone'] = phone;
 
@@ -497,7 +625,7 @@ class AuthService extends GetxService {
       final manager = ManagerModel.fromJson(response);
       
       // 3. Set current user session
-      _setCurrentUser(UserRole.manager, manager);
+      _setCurrentUser(UserRole.agency, manager);
       
       // 4. Log initial activity
       await _logActivity(
@@ -560,6 +688,7 @@ class AuthService extends GetxService {
       case UserRole.superAdmin:
         return SuperAdminModel.fromJson(json);
       case UserRole.manager:
+      case UserRole.agency:
         return ManagerModel.fromJson(json);
       case UserRole.employee:
         return EmployeeModel.fromJson(json);
@@ -597,6 +726,7 @@ class AuthService extends GetxService {
         profileJson = admin.toJson();
         break;
       case UserRole.manager:
+      case UserRole.agency:
         final manager = profile as ManagerModel;
         currentManager.value = manager;
         userId = manager.id;
@@ -657,6 +787,7 @@ class AuthService extends GetxService {
           insertData['performer_super_admin_id'] = userId;
           break;
         case UserRole.manager:
+        case UserRole.agency:
           insertData['performer_manager_id'] = userId;
           break;
         case UserRole.employee:

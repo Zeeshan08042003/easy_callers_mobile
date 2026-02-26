@@ -115,9 +115,10 @@ class SupabaseService extends GetxService {
           .eq('auth_id', authId)
           .maybeSingle();
       if (managerData != null) {
+        final model = ManagerModel.fromJson(managerData);
         return (
-          role: UserRole.manager,
-          profile: ManagerModel.fromJson(managerData)
+          role: model.isAgency ? UserRole.agency : UserRole.manager,
+          profile: model
         );
       }
 
