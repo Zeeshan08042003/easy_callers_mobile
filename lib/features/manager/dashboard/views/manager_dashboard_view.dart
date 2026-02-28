@@ -486,27 +486,31 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: (controller.isLoading.value || !controller.canUploadExcel.value) 
+                  onPressed: (controller.isLoading.value || controller.isUploading.value || !controller.canUploadExcel.value) 
                       ? null 
                       : () => controller.uploadLeads(),
-                  icon: Icon(
-                    controller.canUploadExcel.value 
-                        ? Icons.cloud_upload_outlined 
-                        : Icons.lock_outline_rounded, 
-                    size: 24,
-                    color: Colors.white,
-                  ),
+                  icon: controller.isUploading.value
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Icon(
+                          controller.canUploadExcel.value 
+                              ? Icons.cloud_upload_outlined 
+                              : Icons.lock_outline_rounded, 
+                          size: 24,
+                          color: Colors.white,
+                        ),
                   label: Text(
-                    controller.canUploadExcel.value ? 'New Upload' : 'Upload Restricted',
+                    controller.isUploading.value
+                        ? 'Uploading...'
+                        : (controller.canUploadExcel.value ? 'New Upload' : 'Upload Restricted'),
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: controller.canUploadExcel.value 
-                        ? AppColors.primary
-                        : AppColors.primary,
-                    foregroundColor: controller.canUploadExcel.value
-                        ? Colors.white
-                        : Colors.white,
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     elevation: controller.canUploadExcel.value ? 4 : 0,
@@ -531,8 +535,8 @@ class ManagerDashboardView extends GetView<ManagerDashboardController> {
             ],
           ),
           
-          // Distribute Button (shown if unassigned leads exist)
-          if (hasLastBatch && controller.unassignedCount.value > 0) ...[
+          // Distribute Button (shown if unassigned leads exist in any batch)
+          if (controller.unassignedCount.value > 0) ...[
             const SizedBox(height: 15),
             SizedBox(
               width: double.infinity,

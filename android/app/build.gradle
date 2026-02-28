@@ -30,6 +30,26 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions "app"
+
+    productFlavors {
+
+        prod {
+            dimension "app"
+            applicationId "com.anz.easycaller"
+            versionCode 1
+            versionName "1.0.0"
+        }
+
+        beta {
+            dimension "app"
+            applicationId "com.anz.easycaller.beta"
+            versionCode 1
+            versionName "1.0.0"
+        }
+    }
+
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

@@ -8,11 +8,12 @@ import 'package:easy_callers_mobile/features/project/services/project_service.da
 import 'package:easy_callers_mobile/features/project/models/project_model.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
+import 'package:easy_callers_mobile/core/services/background_upload_manager.dart';
 import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dart';
-import 'package:easy_callers_mobile/features/employee/models/call_log_model.dart';
-import 'package:easy_callers_mobile/features/manager/leads/views/distribute_leads_view.dart';
-import 'package:easy_callers_mobile/features/manager/leads/bindings/distribute_leads_binding.dart';
 
+import '../../../employee/models/call_log_model.dart';
+import '../../leads/bindings/distribute_leads_binding.dart';
+import '../../leads/views/distribute_leads_view.dart';
 import '../../models/lead_model.dart';
 
 class ManagerDashboardController extends GetxController {
@@ -50,6 +51,10 @@ class ManagerDashboardController extends GetxController {
   final leadsAssigned = 0.obs;
   final teamPerformance = 0.0.obs;
   
+  final RxBool isLoading = false.obs;
+  final RxBool isUploading = false.obs;
+  final RxBool canUploadExcel = true.obs; // This should be fetched properly
+  
   // Status Counts
   final dailyFollowUps = 0.obs;
   final dailyVisiting = 0.obs;
@@ -57,7 +62,6 @@ class ManagerDashboardController extends GetxController {
   final convertedCount = 0.obs;
   final allActivityCount = 0.obs;
 
-  final isLoading = false.obs;
   final Rx<LeadBatchModel?> lastUploadedBatch = Rx<LeadBatchModel?>(null);
   final unassignedCount = 0.obs;
 
@@ -76,7 +80,6 @@ class ManagerDashboardController extends GetxController {
   final Rx<CallLogModel?> lastCallLog = Rx<CallLogModel?>(null);
 
   // Permissions
-  final canUploadExcel = true.obs;
 
   @override
   void onInit() {
@@ -222,43 +225,40 @@ class ManagerDashboardController extends GetxController {
       return;
     }
 
+    final managerId = _authService.currentManager.value?.id;
+    final superAdminId = _authService.currentSuperAdmin.value?.id;
+
+    if (managerId == null && superAdminId == null) {
+      Get.snackbar('Error', 'Profile not found');
+      return;
+    }
+
     try {
-      final managerId = _authService.currentManager.value?.id;
-      final superAdminId = _authService.currentSuperAdmin.value?.id;
-
-      if (managerId == null && superAdminId == null) {
-        Get.snackbar('Error', 'Profile not found');
-        return;
-      }
-
-      isLoading.value = true;
-      // Always upload to the selected project
-      final batch = await _leadService.pickAndUploadLeadsToProject(
+      isUploading.value = true;
+      
+      // Use background upload manager — file picker opens immediately,
+      // upload runs in background so the user can keep using the app.
+      final uploadManager = Get.find<BackgroundUploadManager>();
+      await uploadManager.startUpload(
         managerId: managerId,
         projectId: selectedProject.value!.id,
+        projectName: selectedProject.value!.name,
       );
 
-      if (batch != null) {
-        lastUploadedBatch.value = batch;
-        Get.snackbar(
-          'Success',
-          'Uploaded ${batch.totalLeads} leads to "${selectedProject.value!.name}"!\nClick "Distribute Leads" to assign them.',
-          duration: const Duration(seconds: 4),
-        );
-        await fetchDashboardData();
-      }
+      // Refresh dashboard data after a short delay to pick up new batch
+      Future.delayed(const Duration(seconds: 2), () {
+        fetchDashboardData();
+      });
     } catch (e) {
-      print("Upload Failed, ${e.toString()}");
-      Get.snackbar('Upload Failed', e.toString());
+      print('Error starting upload: $e');
     } finally {
-      isLoading.value = false;
+      isUploading.value = false;
     }
   }
 
   Future<void> distributeLeads() async {
-    final batch = lastUploadedBatch.value;
-    if (batch == null) {
-      Get.snackbar('Error', 'No batch to distribute');
+    if (selectedProject.value == null || unassignedCount.value == 0) {
+      Get.snackbar('Error', 'No unassigned leads to distribute');
       return;
     }
 
@@ -271,9 +271,7 @@ class ManagerDashboardController extends GetxController {
         return;
       }
 
-      print('🔍 Fetching employees for manager: $managerId');
       final employees = await _leadService.getEmployeesByManager(managerId);
-      print('✅ Fetched ${employees.length} employees');
 
       if (employees.isEmpty) {
         isLoading.value = false;
@@ -285,14 +283,21 @@ class ManagerDashboardController extends GetxController {
         return;
       }
 
-      // Navigate to distribution screen
       isLoading.value = false;
-      print('🚀 Navigating to distribution screen with batch: ${batch.id}');
 
+      // Pass project info so distribution works with ALL unassigned leads
+      // across all batches in this project
       await Get.to(
         () => const DistributeLeadsView(),
         binding: DistributeLeadsBinding(),
-        arguments: batch,
+        arguments: {
+          'projectId': selectedProject.value!.id,
+          'projectName': selectedProject.value!.name,
+          'totalUnassigned': unassignedCount.value,
+          'managerId': managerId,
+          // Also pass a batch if one exists, for backward compatibility
+          if (lastUploadedBatch.value != null) 'batch': lastUploadedBatch.value,
+        },
       );
 
       // Refresh after returning
@@ -308,6 +313,12 @@ class ManagerDashboardController extends GetxController {
 
   void clearLastBatch() {
     lastUploadedBatch.value = null;
+  }
+
+  /// Called from ProjectListController after accepting an invitation
+  /// to immediately refresh the dashboard project list
+  void refreshAfterInvitation() {
+    fetchProjects();
   }
 
   // ============================================
@@ -344,24 +355,20 @@ class ManagerDashboardController extends GetxController {
           canUploadExcel.value = false; // Default to false if membership not found
         }
 
-        // Fetch latest batch with unassigned leads FOR THIS PROJECT
+        // Fetch latest batch (for reference)
         final batch = await _leadService.getLatestBatchWithUnassignedLeadsForProject(
-          managerId: oversightManagerId, // Only filter by manager if SA is doing oversight
+          managerId: oversightManagerId,
           projectId: projectId,
         );
         lastUploadedBatch.value = batch;
 
-        if (batch != null) {
-          final unassigned =
-              await _leadService.getUnassignedLeadsFromBatch(batch.id);
-          unassignedCount.value = unassigned.length;
-        } else {
-          unassignedCount.value = 0;
-        }
+        // Count ALL unassigned leads across ALL batches in the project
+        final allUnassigned = await _leadService.getUnassignedLeadsForProject(projectId);
+        unassignedCount.value = allUnassigned.length;
 
         // Fetch dashboard stats FOR THIS PROJECT
         final stats = await _leadService.getProjectDashboardStats(
-          managerId: oversightManagerId, // Only filter stats by manager if SA is doing oversight
+          managerId: managerId, // Filter stats by manager
           projectId: projectId,
         );
         totalLeads.value = stats['totalLeads'] as int;
@@ -379,7 +386,7 @@ class ManagerDashboardController extends GetxController {
         // Fetch status counts
         final statusCounts = await _leadService.getProjectStatusCounts(
           projectId: projectId,
-          managerId: oversightManagerId, // Only filter counts by manager if SA is doing oversight
+          managerId: managerId, // Filter counts by manager
           todayOnly: true,
         );
         dailyFollowUps.value = statusCounts['follow_up'] ?? 0;
@@ -442,7 +449,7 @@ class ManagerDashboardController extends GetxController {
           result = await _leadService.getProjectLeadsByStatus(
             projectId: projectId, 
             status: 'follow_up',
-            managerId: oversightManagerId,
+            managerId: managerId,
             todayOnly: true,
           );
           break;
@@ -450,7 +457,7 @@ class ManagerDashboardController extends GetxController {
           result = await _leadService.getProjectLeadsByStatus(
             projectId: projectId, 
             status: 'visiting',
-            managerId: oversightManagerId,
+            managerId: managerId,
             todayOnly: true,
           );
           break;
@@ -458,14 +465,14 @@ class ManagerDashboardController extends GetxController {
           result = await _leadService.getProjectLeadsByStatus(
             projectId: projectId, 
             status: 'visit_completed',
-            managerId: oversightManagerId,
+            managerId: managerId,
             todayOnly: true,
           );
           break;
         case 3: // All Activity
           result = await _leadService.getProjectLeads(
             projectId,
-            managerId: oversightManagerId,
+            managerId: managerId,
           );
           break;
         default:

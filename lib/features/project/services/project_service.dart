@@ -787,7 +787,7 @@ class ProjectService extends GetxService {
       final response = await _supabase.projectCallersTable
           .select('''
             *,
-            employee:employee_id(id, first_name, last_name, email, phone, is_active)
+            employee:employee_id(id, first_name, last_name, email, phone, is_active, manager_id)
           ''')
           .eq('project_id', projectId)
           .order('created_at', ascending: true);

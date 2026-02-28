@@ -26,15 +26,30 @@ class SupabaseService extends GetxService {
   Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
   /// Initialize Supabase (call once in main.dart)
-  static Future<SupabaseService> init() async {
-    await Supabase.initialize(
-      url: SupabaseConstants.supabaseUrl,
-      anonKey: SupabaseConstants.supabaseAnonKey,
-    );
-
-    final service = SupabaseService();
-    service._client = Supabase.instance.client;
-    return service;
+  static Future<SupabaseService> init({
+    required String url,
+    required String anonKey,
+  }) async {
+    print('🚀 Initializing Supabase for: $url');
+    try {
+      await Supabase.initialize(
+        url: url,
+        anonKey: anonKey,
+      );
+      
+      final service = SupabaseService();
+      service._client = Supabase.instance.client;
+      
+      // Test connectivity quietly
+      print('📡 Testing connectivity to Supabase...');
+      final health = await service._client.from('system_settings').select().limit(1).maybeSingle();
+      print('✅ Supabase connected successfully. Settings: ${health != null}');
+      
+      return service;
+    } catch (e) {
+      print('❌ Supabase initialization failed: $e');
+      rethrow;
+    }
   }
 
   // ============================================

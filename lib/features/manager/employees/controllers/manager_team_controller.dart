@@ -73,7 +73,7 @@ class ManagerTeamController extends GetxController {
         activeOTP.value = result.otp!;
         _startOTPTimer();
         fetchEmployees(); // Refresh list
-        Get.snackbar('Success', 'Employee created. Share the OTP below with them.');
+        Get.snackbar('Success', 'Employee created. OTP has been sent to their email.');
         _clearFields(keepOTP: true);
       } else {
         Get.snackbar('Error', _authService.error.value);
@@ -96,12 +96,12 @@ class ManagerTeamController extends GetxController {
           AlertDialog(
             backgroundColor: AppColors.cardBg,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('New OTP Generated', style: TextStyle(color: Colors.white)),
+            title: const Text('OTP Sent via Email', style: TextStyle(color: Colors.white)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'A new activation code has been generated for',
+                  'A new activation code has been generated and sent via email to',
                   style: TextStyle(color: AppColors.textSecondary),
                   textAlign: TextAlign.center,
                 ),

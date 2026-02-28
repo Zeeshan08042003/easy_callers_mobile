@@ -31,174 +31,180 @@ class ProjectDetailView extends StatelessWidget {
           );
         }
 
-        return CustomScrollView(
-          slivers: [
-            // Header
-            SliverAppBar(
-              backgroundColor: AppColors.background,
-              expandedHeight: 200,
-              pinned: true,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 20),
-                onPressed: () => Get.back(),
-              ),
-              actions: [
-                if (controller.canDeleteProject)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
-                    onPressed: () => _confirmDeleteProject(context, controller),
-                  ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  project.name,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18),
+        return RefreshIndicator(
+          onRefresh: controller.fetchProjectDetails,
+          color: AppColors.primary,
+          backgroundColor: AppColors.cardBg,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // Header
+              SliverAppBar(
+                backgroundColor: AppColors.background,
+                expandedHeight: 200,
+                pinned: true,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white, size: 20),
+                  onPressed: () => Get.back(),
                 ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary.withOpacity(0.3),
-                        AppColors.background,
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
+                actions: [
+                  if (controller.canDeleteProject)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                      onPressed: () => _confirmDeleteProject(context, controller),
                     ),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  title: Text(
+                    project.name,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18),
                   ),
-                  child: Center(
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.4),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withOpacity(0.3),
+                          AppColors.background,
                         ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
-                      child: const Icon(Icons.folder_outlined,
-                          color: Colors.white, size: 32),
                     ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Content
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Subtitle
-                    if (project.subtitle != null &&
-                        project.subtitle!.isNotEmpty) ...[
-                      Text(
-                        project.subtitle!,
-                        style: TextStyle(
-                          color: AppColors.textSecondary.withOpacity(0.8),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Instruction
-                    if (project.instruction != null &&
-                        project.instruction!.isNotEmpty) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: Container(
+                        width: 72,
+                        height: 72,
                         decoration: BoxDecoration(
-                          color: AppColors.cardBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: AppColors.warning.withOpacity(0.15)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.info_outline_rounded,
-                                    color: AppColors.warning, size: 18),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Instructions',
-                                  style: TextStyle(
-                                    color: AppColors.warning,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              project.instruction!,
-                              style: TextStyle(
-                                color:
-                                    AppColors.textSecondary.withOpacity(0.7),
-                                fontSize: 13,
-                                height: 1.5,
-                              ),
+                          gradient: AppColors.primaryGradient,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.4),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
+                        child: const Icon(Icons.folder_outlined,
+                            color: Colors.white, size: 32),
                       ),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // Quick Stats
-                    _buildStatsRow(controller),
-                    const SizedBox(height: 24),
-
-                    // Action Buttons
-                    _buildActionButtons(context, controller),
-                    const SizedBox(height: 28),
-
-                    // Members Section (Visible to SA and Managers)
-                    if (controller.isSuperAdmin || controller.isManager) ...[
-                      _buildSectionHeader(
-                        'Members',
-                        Icons.people_outline_rounded,
-                        controller.canInviteManagers
-                            ? () => _showInviteManagerSheet(context, controller)
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildMembersList(controller),
-                      const SizedBox(height: 28),
-                    ],
-
-                    // Callers (Employees) Section
-                    _buildCallersSection(context, controller),
-                    const SizedBox(height: 28),
-
-                    // Excel Sheets / Batches Section
-                    _buildSectionHeader(
-                      'Excel Sheets',
-                      Icons.table_chart_outlined,
-                      null,
                     ),
-                    const SizedBox(height: 12),
-                    _buildBatchesList(controller),
-                    const SizedBox(height: 40),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+
+              // Content
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Subtitle
+                      if (project.subtitle != null &&
+                          project.subtitle!.isNotEmpty) ...[
+                        Text(
+                          project.subtitle!,
+                          style: TextStyle(
+                            color: AppColors.textSecondary.withOpacity(0.8),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Instruction
+                      if (project.instruction != null &&
+                          project.instruction!.isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: AppColors.warning.withOpacity(0.15)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.info_outline_rounded,
+                                      color: AppColors.warning, size: 18),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Instructions',
+                                    style: TextStyle(
+                                      color: AppColors.warning,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                project.instruction!,
+                                style: TextStyle(
+                                  color:
+                                      AppColors.textSecondary.withOpacity(0.7),
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // Quick Stats
+                      _buildStatsRow(controller),
+                      const SizedBox(height: 24),
+
+                      // Action Buttons
+                      _buildActionButtons(context, controller),
+                      const SizedBox(height: 28),
+
+                      // Members Section (Visible to SA and Managers)
+                      if (controller.isSuperAdmin || controller.isManager) ...[
+                        _buildSectionHeader(
+                          'Members',
+                          Icons.people_outline_rounded,
+                          controller.canInviteManagers
+                              ? () => _showInviteManagerSheet(context, controller)
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildMembersList(controller),
+                        const SizedBox(height: 28),
+                      ],
+
+                      // Callers (Employees) Section
+                      _buildCallersSection(context, controller),
+                      const SizedBox(height: 28),
+
+                      // Excel Sheets / Batches Section
+                      _buildSectionHeader(
+                        'Excel Sheets',
+                        Icons.table_chart_outlined,
+                        null,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildBatchesList(controller),
+                      const SizedBox(height: 100), // More space at bottom for scrolling
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       }),
     );

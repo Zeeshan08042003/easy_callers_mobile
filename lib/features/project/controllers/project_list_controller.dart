@@ -5,6 +5,7 @@ import 'package:easy_callers_mobile/features/super_admin/models/manager_model.da
 import 'package:easy_callers_mobile/features/project/services/project_service.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
+import 'package:easy_callers_mobile/features/manager/dashboard/controllers/manager_dashboard_controller.dart';
 
 import '../../../core/theme/app_colors.dart';
 
@@ -109,6 +110,12 @@ class ProjectListController extends GetxController {
         Get.snackbar('Success', 'Invitation accepted! You are now a member of "${invitation.projectName}"');
         await fetchPendingInvitations();
         await fetchProjects();
+
+        // Also refresh the dashboard controller so the new project
+        // appears in the project selector immediately
+        if (Get.isRegistered<ManagerDashboardController>()) {
+          Get.find<ManagerDashboardController>().refreshAfterInvitation();
+        }
       } else {
         Get.snackbar('Error', 'Failed to accept invitation. Please try again.',
             backgroundColor: AppColors.danger.withOpacity(0.1),

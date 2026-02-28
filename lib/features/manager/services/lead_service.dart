@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import 'package:path/path.dart' as p;
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/manager/models/lead_model.dart';
 import 'package:easy_callers_mobile/features/manager/models/lead_batch_model.dart';
@@ -108,6 +110,167 @@ class LeadService extends GetxService {
     }
   }
 
+  // ============================================
+  // BACKGROUND-COMPATIBLE UPLOAD METHODS
+  // ============================================
+
+  /// Pick a file without starting the upload.
+  /// Returns the FilePickerResult so the caller can start the upload later.
+  Future<FilePickerResult?> pickFileOnly() async {
+    return await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+    );
+  }
+
+  /// Upload leads from an already-picked file (no project).
+  /// Accepts a progress callback for background upload tracking.
+  Future<LeadBatchModel?> pickAndUploadLeadsFromResult({
+    required FilePickerResult pickerResult,
+    required String managerId,
+    void Function(double)? onProgress,
+  }) async {
+    try {
+      if (pickerResult.files.single.path == null) return null;
+
+      final filePath = pickerResult.files.single.path!;
+      final fileName = pickerResult.files.single.name;
+      final file = File(filePath);
+
+      onProgress?.call(0.1);
+
+      // 1. Parse Excel
+      final leadsData = await _parseExcelLeads(file);
+      if (leadsData.isEmpty) {
+        throw 'No valid leads found in the file. Ensure you have "Name" and "Phone" columns.';
+      }
+      onProgress?.call(0.3);
+
+      // 2. Create Lead Batch record
+      final batchResponse = await _supabase.client.from('lead_batches').insert({
+        'file_name': fileName,
+        'total_leads': leadsData.length,
+        'uploaded_by': managerId,
+      }).select().single();
+
+      final batch = LeadBatchModel.fromJson(batchResponse);
+      onProgress?.call(0.4);
+
+      // 3. Upload File to Storage
+      final fileUrl = await _uploadToStorage(file, batch.id);
+      if (fileUrl != null) {
+        await _supabase.client
+            .from('lead_batches')
+            .update({'file_url': fileUrl})
+            .eq('id', batch.id);
+      }
+      onProgress?.call(0.5);
+
+      // 4. Bulk Insert Leads in chunks
+      final List<Map<String, dynamic>> finalLeads = leadsData.map((lead) {
+        return {
+          ...lead,
+          'uploaded_by': managerId,
+          'batch_id': batch.id,
+          'status': LeadStatus.newLead.value,
+        };
+      }).toList();
+
+      await _insertLeadsInChunks(finalLeads, onProgress, 0.5, 1.0);
+
+      onProgress?.call(1.0);
+      return batch;
+    } catch (e) {
+      print('Error uploading leads: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload leads from an already-picked file to a specific project.
+  /// Accepts a progress callback for background upload tracking.
+  Future<LeadBatchModel?> pickAndUploadLeadsToProjectFromResult({
+    required FilePickerResult pickerResult,
+    String? managerId,
+    required String projectId,
+    void Function(double)? onProgress,
+  }) async {
+    try {
+      if (pickerResult.files.single.path == null) return null;
+
+      final filePath = pickerResult.files.single.path!;
+      final fileName = pickerResult.files.single.name;
+      final file = File(filePath);
+
+      onProgress?.call(0.1);
+
+      // 1. Parse Excel
+      final leadsData = await _parseExcelLeads(file);
+      if (leadsData.isEmpty) {
+        throw 'No valid leads found in the file. Ensure you have "Name" and "Phone" columns.';
+      }
+      onProgress?.call(0.3);
+
+      // 2. Create Lead Batch record WITH project_id
+      final batchResponse = await _supabase.client.from('lead_batches').insert({
+        'file_name': fileName,
+        'total_leads': leadsData.length,
+        'uploaded_by': managerId,
+        'project_id': projectId,
+      }).select().single();
+
+      final batch = LeadBatchModel.fromJson(batchResponse);
+      onProgress?.call(0.4);
+
+      // 3. Upload File to Storage
+      final fileUrl = await _uploadToStorage(file, batch.id);
+      if (fileUrl != null) {
+        await _supabase.client
+            .from('lead_batches')
+            .update({'file_url': fileUrl})
+            .eq('id', batch.id);
+      }
+      onProgress?.call(0.5);
+
+      // 4. Bulk Insert Leads WITH project_id in chunks
+      final List<Map<String, dynamic>> finalLeads = leadsData.map((lead) {
+        return {
+          ...lead,
+          'uploaded_by': managerId,
+          'batch_id': batch.id,
+          'project_id': projectId,
+          'status': LeadStatus.newLead.value,
+        };
+      }).toList();
+
+      await _insertLeadsInChunks(finalLeads, onProgress, 0.5, 1.0);
+
+      onProgress?.call(1.0);
+      return batch;
+    } catch (e) {
+      print('Error uploading leads to project: $e');
+      rethrow;
+    }
+  }
+
+  /// Insert leads in chunks of 100, reporting progress between progressStart and progressEnd.
+  Future<void> _insertLeadsInChunks(
+    List<Map<String, dynamic>> leads,
+    void Function(double)? onProgress,
+    double progressStart,
+    double progressEnd,
+  ) async {
+    const chunkSize = 100;
+    for (var i = 0; i < leads.length; i += chunkSize) {
+      final end = (i + chunkSize < leads.length) ? i + chunkSize : leads.length;
+      final chunk = leads.sublist(i, end);
+      await _supabase.leadsTable.insert(chunk);
+
+      final progress = progressStart +
+          (progressEnd - progressStart) * (end / leads.length);
+      onProgress?.call(progress);
+    }
+  }
+
   /// Pick a file, parse leads, and upload to a specific project
   Future<LeadBatchModel?> pickAndUploadLeadsToProject({
     String? managerId,
@@ -177,103 +340,9 @@ class LeadService extends GetxService {
   /// Parse Excel file and return list of lead maps
   /// Uses intelligent column detection and phone cleaning
   Future<List<Map<String, dynamic>>> _parseExcelLeads(File file) async {
-    final bytes = file.readAsBytesSync();
-    final excel = Excel.decodeBytes(bytes);
-    final List<Map<String, dynamic>> leads = [];
-
-    for (var table in excel.tables.keys) {
-      final sheet = excel.tables[table];
-      if (sheet == null || sheet.rows.isEmpty) continue;
-
-      // First row is headers
-      final rawHeaders = sheet.rows.first
-          .map((cell) => cell?.value?.toString().trim() ?? '')
-          .toList();
-      final headers = rawHeaders.map((h) => h.toLowerCase()).toList();
-
-      // Map headers to our field names using regex
-      var columnMap = _mapColumns(headers);
-
-      // Check if headers are missing or unclear
-      final hasName = columnMap['name'] != null ||
-          columnMap['first_name'] != null;
-      final hasPhone = columnMap['phone'] != null;
-
-      // If no name/phone detected from headers, try intelligent content detection
-      if (!hasName && !hasPhone && sheet.rows.length > 1) {
-        print('📊 No clear headers detected. Analyzing content...');
-        columnMap = _detectColumnsByContent(sheet, rawHeaders);
-      }
-
-      // Re-check after content detection
-      final hasNameAfterDetection = columnMap['name'] != null ||
-          columnMap['first_name'] != null;
-      final hasPhoneAfterDetection = columnMap['phone'] != null;
-
-      if (!hasNameAfterDetection && !hasPhoneAfterDetection) {
-        continue; // Skip this sheet
-      }
-
-      // Process data rows (skip header row)
-      for (var i = 1; i < sheet.rows.length; i++) {
-        final row = sheet.rows[i];
-        final lead = <String, dynamic>{};
-
-        // Extract mapped fields
-        for (final entry in columnMap.entries) {
-          if (entry.value != null && entry.value! < row.length) {
-            final cellValue = row[entry.value!]?.value?.toString().trim();
-            if (cellValue != null && cellValue.isNotEmpty) {
-              // Extract multiple phone numbers if it's the phone column
-              if (entry.key == 'phone') {
-                lead[entry.key] = _extractPhoneNumbers(cellValue);
-              } else {
-                lead[entry.key] = cellValue;
-              }
-            }
-          }
-        }
-
-        // Build the final name from first_name + last_name if 'name' isn't set
-        if (!lead.containsKey('name') || (lead['name'] as String? ?? '').isEmpty) {
-          final firstName = (lead.remove('first_name') as String?) ?? '';
-          final lastName = (lead.remove('last_name') as String?) ?? '';
-          final combined = '$firstName $lastName'.trim();
-          if (combined.isNotEmpty) {
-            lead['name'] = combined;
-          }
-        } else {
-          // Clean up split fields if name was already found
-          lead.remove('first_name');
-          lead.remove('last_name');
-        }
-
-        // Database requires BOTH name AND phone (NOT NULL constraints)
-        final hasName = (lead['name'] as String? ?? '').isNotEmpty;
-        final phones = lead['phone'] as List<String>? ?? [];
-        final hasPhone = phones.isNotEmpty;
-
-        // Only add if we have BOTH name AND phone
-        if (hasName && hasPhone) {
-          leads.add(lead);
-        } else if (hasPhone && !hasName) {
-          // If we have phone but no name, use a placeholder
-          lead['name'] = 'Unknown';
-          leads.add(lead);
-          print('⚠️ Row has phone but no name, using "Unknown" as placeholder');
-        } else if (hasName && !hasPhone) {
-          // If we have name but no phone, skip this row
-          print('⚠️ Skipping row: has name "${lead['name']}" but no phone number');
-        } else {
-          // No name and no phone, skip
-          print('⚠️ Skipping row: no name and no phone number');
-        }
-      }
-
-      // Only process the first sheet
-      break;
-    }
-    return leads;
+    final bytes = await file.readAsBytes();
+    // Use compute to run CPU-intensive parsing in a background isolate
+    return await compute(ExcelParser.parseExcel, bytes);
   }
 
   /// Upload file to Supabase Storage
@@ -655,6 +724,23 @@ class LeadService extends GetxService {
       return [];
     }
   }
+
+  /// Get ALL unassigned lead IDs across ALL batches in a project
+  Future<List<String>> getUnassignedLeadsForProject(String projectId) async {
+    try {
+      final response = await _supabase.leadsTable
+          .select('id')
+          .eq('project_id', projectId)
+          .eq('status', LeadStatus.newLead.value.toLowerCase())
+          .limit(50000);
+
+      return (response as List).map((l) => l['id'] as String).toList();
+    } catch (e) {
+      print('Error fetching unassigned leads for project: $e');
+      return [];
+    }
+  }
+
 
   /// Get the latest batch with unassigned leads for a manager
   /// Returns null if no batches have unassigned leads
@@ -1448,21 +1534,37 @@ class LeadService extends GetxService {
     required String managerId,
   }) async {
     try {
-      // Query project_callers table for this project + manager combo
+      // Query project_callers table for this project
+      // We don't filter ONLY by added_by_manager_id because a caller might have been
+      // added by a Super Admin or another manager in a shared project context, 
+      // but they still belong to this manager's team.
       final response = await _supabase.client
           .from('project_callers')
           .select('''
+            *,
             employee:employee_id(*)
           ''')
-          .eq('project_id', projectId)
-          .eq('added_by_manager_id', managerId);
+          .eq('project_id', projectId);
 
       final list = response as List;
-      return list
-          .where((row) => row['employee'] != null && row['employee'] is Map)
-          .map((row) => EmployeeModel.fromJson(row['employee'] as Map<String, dynamic>))
-          .where((emp) => emp.isActive)
-          .toList();
+      final result = <EmployeeModel>[];
+      for (final row in list) {
+        if (row['employee'] == null || row['employee'] is! Map) continue;
+        
+        final empJson = row['employee'] as Map<String, dynamic>;
+        final emp = EmployeeModel.fromJson(empJson);
+        
+        // Include if:
+        // 1. the employee belongs to this manager (manager_id)
+        // 2. OR the employee was specifically added to this project by this manager
+        // AND the employee is active.
+        final addedBy = row['added_by_manager_id'] as String?;
+        if ((emp.managerId == managerId || addedBy == managerId) && emp.isActive) {
+          result.add(emp);
+        }
+      }
+      
+      return result;
     } catch (e) {
       print('Error fetching project callers by manager: $e');
       return [];
@@ -1503,8 +1605,20 @@ class LeadService extends GetxService {
 
       // Total assigned leads
       final totalLeadsRes = await _supabase.leadsTable
-          .select('id')
+          .select('id, status')
           .eq('assigned_to', employeeId);
+      final allLeads = totalLeadsRes as List;
+
+      // Status breakdowns
+      final interestedLeads = allLeads.where((l) => l['status'] == 'interested').length;
+      final callbackLeads = allLeads.where((l) =>
+          l['status'] == 'callback' || l['status'] == 'follow_up').length;
+
+      // Total calls (all time)
+      final totalCallsRes = await _supabase.callLogsTable
+          .select('id')
+          .eq('employee_id', employeeId);
+      final totalCalls = (totalCallsRes as List).length;
 
       double conversionRate = todayCalls > 0 
           ? (todayInterested / todayCalls) * 100 
@@ -1514,7 +1628,10 @@ class LeadService extends GetxService {
         'calls_today': todayCalls,
         'interested_today': todayInterested,
         'conversion_rate': conversionRate,
-        'total_leads': (totalLeadsRes as List).length,
+        'total_leads': allLeads.length,
+        'total_calls': totalCalls,
+        'interested_leads': interestedLeads,
+        'callback_leads': callbackLeads,
       };
     } catch (e) {
       print('Error fetching employee stats: $e');
@@ -1523,6 +1640,9 @@ class LeadService extends GetxService {
         'interested_today': 0,
         'conversion_rate': 0.0,
         'total_leads': 0,
+        'total_calls': 0,
+        'interested_leads': 0,
+        'callback_leads': 0,
       };
     }
   }
@@ -2275,243 +2395,211 @@ class LeadService extends GetxService {
     }
   }
 
-  // ============================================
-  // EXCEL PARSING HELPER METHODS
-  // ============================================
 
-  /// Known column types that we skip (serial numbers, etc.)
-  static const _skipHeaders = {
+}
+
+/// Helper class to parse Excel files in a background isolate (compute)
+class ExcelParser {
+  static const Set<String> _skipHeaders = {
     'sr no', 'sr no.', 'sr.no', 'sr.no.', 's.no', 's no', 'sno',
     'serial', 'serial no', 'serial no.', '#', 'no.', 'sl no', 'sl no.',
   };
 
-  /// Map column headers to our field names using regex patterns
-  Map<String, int?> _mapColumns(List<String> headers) {
+  static Future<List<Map<String, dynamic>>> parseExcel(Uint8List bytes) async {
+    final excel = Excel.decodeBytes(bytes);
+    final List<Map<String, dynamic>> leads = [];
+
+    for (var table in excel.tables.keys) {
+      final sheet = excel.tables[table];
+      if (sheet == null || sheet.rows.isEmpty) continue;
+
+      final rawHeaders = sheet.rows.first
+          .map((cell) => cell?.value?.toString().trim() ?? '')
+          .toList();
+      final headers = rawHeaders.map((h) => h.toLowerCase()).toList();
+
+      var columnMap = _mapColumns(headers);
+
+      final hasName = columnMap['name'] != null || columnMap['first_name'] != null;
+      final hasPhone = columnMap['phone'] != null;
+
+      if (!hasName && !hasPhone && sheet.rows.length > 1) {
+        columnMap = _detectColumnsByContent(sheet, rawHeaders);
+      }
+
+      final hasNameAfterDetection = columnMap['name'] != null || columnMap['first_name'] != null;
+      final hasPhoneAfterDetection = columnMap['phone'] != null;
+
+      if (!hasNameAfterDetection && !hasPhoneAfterDetection) {
+        continue;
+      }
+
+      for (var i = 1; i < sheet.rows.length; i++) {
+        final row = sheet.rows[i];
+        final lead = <String, dynamic>{};
+
+        for (final entry in columnMap.entries) {
+          if (entry.value != null && entry.value! < row.length) {
+            final cellValue = row[entry.value!]?.value?.toString().trim();
+            if (cellValue != null && cellValue.isNotEmpty) {
+              if (entry.key == 'phone') {
+                lead[entry.key] = _extractPhoneNumbers(cellValue);
+              } else {
+                lead[entry.key] = cellValue;
+              }
+            }
+          }
+        }
+
+        if (!lead.containsKey('name') || (lead['name'] as String? ?? '').isEmpty) {
+          final firstName = (lead.remove('first_name') as String?) ?? '';
+          final lastName = (lead.remove('last_name') as String?) ?? '';
+          final combined = '$firstName $lastName'.trim();
+          if (combined.isNotEmpty) {
+            lead['name'] = combined;
+          }
+        } else {
+          lead.remove('first_name');
+          lead.remove('last_name');
+        }
+
+        final hasNameRow = (lead['name'] as String? ?? '').isNotEmpty;
+        final phones = lead['phone'] as List<String>? ?? [];
+        final hasPhoneRow = phones.isNotEmpty;
+
+        if (hasNameRow && hasPhoneRow) {
+          leads.add(lead);
+        } else if (hasPhoneRow && !hasNameRow) {
+          lead['name'] = 'Unknown';
+          leads.add(lead);
+        }
+      }
+      break;
+    }
+    return leads;
+  }
+
+  static Map<String, int?> _mapColumns(List<String> headers) {
     final map = <String, int?>{
-      'name': null,
-      'first_name': null,
-      'last_name': null,
-      'phone': null,
-      'email': null,
-      'location': null,
-      'project_name': null,
-      'budget': null,
-      'source': null,
-      'notes': null,
+      'name': null, 'first_name': null, 'last_name': null, 'phone': null,
+      'email': null, 'location': null, 'project_name': null, 'budget': null,
+      'source': null, 'notes': null,
     };
 
     for (var i = 0; i < headers.length; i++) {
       final h = headers[i];
-
-      // Skip serial number columns
       if (_skipHeaders.contains(h)) continue;
 
-      // Use regex patterns for flexible matching
-      // Priority: Check specific patterns first, then general ones
-
-      // First name - must check before general "name"
       if (_matchesRegex(h, r'^(first[\s_-]?name|f[\s_-]?name|fname)$')) {
         map['first_name'] = i;
-      }
-      // Last name - must check before general "name"
-      else if (_matchesRegex(h, r'^(last[\s_-]?name|l[\s_-]?name|lname|surname|sur[\s_-]?name)$')) {
+      } else if (_matchesRegex(h, r'^(last[\s_-]?name|l[\s_-]?name|lname|surname|sur[\s_-]?name)$')) {
         map['last_name'] = i;
-      }
-      // Full name variations - check after first/last name
-      else if (_matchesRegex(h, r'^(name|full[\s_-]?name|client[\s_-]?name|customer[\s_-]?name|lead[\s_-]?name|contact[\s_-]?name|party[\s_-]?name|buyer[\s_-]?name|owner[\s_-]?name|client|customer|contact)$')) {
+      } else if (_matchesRegex(h, r'^(name|full[\s_-]?name|client[\s_-]?name|customer[\s_-]?name|lead[\s_-]?name|contact[\s_-]?name|party[\s_-]?name|buyer[\s_-]?name|owner[\s_-]?name|client|customer|contact)$')) {
         map['name'] = i;
-      }
-      // Phone variations - VERY FLEXIBLE to catch "no", "number", "contact no", etc.
-      else if (_matchesRegex(h, r'^(phone|mobile|cell|tel|telephone|mob|contact|whatsapp|ph|number|no)[\s_-]?(number|no|num)?\.?$')) {
+      } else if (_matchesRegex(h, r'^(phone|mobile|cell|tel|telephone|mob|contact|whatsapp|ph|number|no)[\s_-]?(number|no|num)?\.?$')) {
         map['phone'] = i;
-      }
-      // Email variations
-      else if (_matchesRegex(h, r'^(email|e[\s_-]?mail|mail)[\s_-]?(address|id)?$')) {
+      } else if (_matchesRegex(h, r'^(email|e[\s_-]?mail|mail)[\s_-]?(address|id)?$')) {
         map['email'] = i;
-      }
-      // Location variations
-      else if (_matchesRegex(h, r'^(location|city|area|address|region|locality|place|town|district|state|pincode|pin[\s_-]?code|zip|postal)$')) {
+      } else if (_matchesRegex(h, r'^(location|city|area|address|region|locality|place|town|district|state|pincode|pin[\s_-]?code|zip|postal)$')) {
         map['location'] = i;
-      }
-      // Project variations
-      else if (_matchesRegex(h, r'^(project|property|scheme|flat|plot|site|tower)[\s_-]?(name)?$')) {
+      } else if (_matchesRegex(h, r'^(project|property|scheme|flat|plot|site|tower)[\s_-]?(name)?$')) {
         map['project_name'] = i;
-      }
-      // Budget variations
-      else if (_matchesRegex(h, r'^(budget|amount|price|investment|range|cost|value)[\s_-]?(range)?$')) {
+      } else if (_matchesRegex(h, r'^(budget|amount|price|investment|range|cost|value)[\s_-]?(range)?$')) {
         map['budget'] = i;
-      }
-      // Source variations
-      else if (_matchesRegex(h, r'^(source|lead[\s_-]?source|channel|platform|origin|via|campaign|medium|portal)$')) {
+      } else if (_matchesRegex(h, r'^(source|lead[\s_-]?source|channel|platform|origin|via|campaign|medium|portal)$')) {
         map['source'] = i;
-      }
-      // Notes variations
-      else if (_matchesRegex(h, r'^(notes?|remarks?|comments?|description|observation|feedback|status|requirement)$')) {
+      } else if (_matchesRegex(h, r'^(notes?|remarks?|comments?|description|observation|feedback|status|requirement)$')) {
         map['notes'] = i;
       }
     }
-
     return map;
   }
 
-  /// Check if header matches a regex pattern
-  bool _matchesRegex(String header, String pattern) {
+  static bool _matchesRegex(String header, String pattern) {
     final regex = RegExp(pattern, caseSensitive: false);
     return regex.hasMatch(header);
   }
 
-  /// Clean and normalize phone numbers
-  String _cleanPhoneNumber(String phone) {
-    // Remove all whitespace
+  static String _cleanPhoneNumber(String phone) {
     String cleaned = phone.replaceAll(RegExp(r'\s+'), '');
-    
-    // Remove common phone number formatting characters
     cleaned = cleaned.replaceAll(RegExp(r'[()-.]'), '');
-    
-    // Keep only digits and leading +
     if (cleaned.startsWith('+')) {
       cleaned = '+' + cleaned.substring(1).replaceAll(RegExp(r'[^0-9]'), '');
     } else {
       cleaned = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
     }
-    
     return cleaned;
   }
 
-  /// Extract multiple phone numbers from a string
-  List<String> _extractPhoneNumbers(String value) {
+  static List<String> _extractPhoneNumbers(String value) {
     if (value.isEmpty) return [];
-    
-    // Split by common delimiters (comma, semicolon, slash, pipe)
     final parts = value.split(RegExp(r'[,;/|]'));
     final List<String> cleanedPhones = [];
-    
     for (var part in parts) {
       final cleaned = _cleanPhoneNumber(part.trim());
       if (cleaned.isNotEmpty && _isPhoneNumber(cleaned)) {
         cleanedPhones.add(cleaned);
       }
     }
-    
     return cleanedPhones;
   }
 
-  /// Intelligent content detection for Excel files without clear headers
-  Map<String, int?> _detectColumnsByContent(dynamic sheet, List<String> rawHeaders) {
-    final map = <String, int?>{
-      'name': null,
-      'phone': null,
-      'email': null,
-    };
-
-    // Analyze first 5 data rows (skip header row)
+  static Map<String, int?> _detectColumnsByContent(dynamic sheet, List<String> rawHeaders) {
+    final map = <String, int?>{'name': null, 'phone': null, 'email': null};
     final sampleSize = sheet.rows.length > 6 ? 6 : sheet.rows.length;
-    final columnScores = <int, Map<String, int>>{}; // column index -> {type: score}
-
-    // Initialize scores for each column
+    final columnScores = <int, Map<String, int>>{};
     for (var colIdx = 0; colIdx < rawHeaders.length; colIdx++) {
       columnScores[colIdx] = {'phone': 0, 'email': 0, 'name': 0};
     }
-
-    // Analyze sample rows (skip first row which might be headers)
     for (var rowIdx = 1; rowIdx < sampleSize; rowIdx++) {
       final row = sheet.rows[rowIdx];
-      
       for (var colIdx = 0; colIdx < row.length; colIdx++) {
         final cellValue = row[colIdx]?.value?.toString().trim() ?? '';
         if (cellValue.isEmpty) continue;
-
-        // Check if it's a phone number
         if (_isPhoneNumber(cellValue)) {
           columnScores[colIdx]!['phone'] = columnScores[colIdx]!['phone']! + 1;
-        }
-        // Check if it's an email
-        else if (_isEmail(cellValue)) {
+        } else if (_isEmail(cellValue)) {
           columnScores[colIdx]!['email'] = columnScores[colIdx]!['email']! + 1;
-        }
-        // Check if it's a name (alphabetic with possible spaces)
-        else if (_isName(cellValue)) {
+        } else if (_isName(cellValue)) {
           columnScores[colIdx]!['name'] = columnScores[colIdx]!['name']! + 1;
         }
       }
     }
-
-    // Assign columns based on highest scores
-    // Find phone column (highest phone score)
-    var maxPhoneScore = 0;
-    var phoneColIdx = -1;
+    var maxPhoneScore = 0; var phoneColIdx = -1;
     columnScores.forEach((colIdx, scores) {
-      if (scores['phone']! > maxPhoneScore) {
-        maxPhoneScore = scores['phone']!;
-        phoneColIdx = colIdx;
-      }
+      if (scores['phone']! > maxPhoneScore) { maxPhoneScore = scores['phone']!; phoneColIdx = colIdx; }
     });
-    if (phoneColIdx >= 0 && maxPhoneScore > 0) {
-      map['phone'] = phoneColIdx;
-      print('✅ Detected phone column at index $phoneColIdx (score: $maxPhoneScore)');
-    }
-
-    // Find email column (highest email score, excluding phone column)
-    var maxEmailScore = 0;
-    var emailColIdx = -1;
+    if (phoneColIdx >= 0 && maxPhoneScore > 0) map['phone'] = phoneColIdx;
+    var maxEmailScore = 0; var emailColIdx = -1;
     columnScores.forEach((colIdx, scores) {
-      if (colIdx != phoneColIdx && scores['email']! > maxEmailScore) {
-        maxEmailScore = scores['email']!;
-        emailColIdx = colIdx;
-      }
+      if (colIdx != phoneColIdx && scores['email']! > maxEmailScore) { maxEmailScore = scores['email']!; emailColIdx = colIdx; }
     });
-    if (emailColIdx >= 0 && maxEmailScore > 0) {
-      map['email'] = emailColIdx;
-      print('✅ Detected email column at index $emailColIdx (score: $maxEmailScore)');
-    }
-
-    // Find name column (highest name score, excluding phone and email)
-    var maxNameScore = 0;
-    var nameColIdx = -1;
+    if (emailColIdx >= 0 && maxEmailScore > 0) map['email'] = emailColIdx;
+    var maxNameScore = 0; var nameColIdx = -1;
     columnScores.forEach((colIdx, scores) {
-      if (colIdx != phoneColIdx && colIdx != emailColIdx && scores['name']! > maxNameScore) {
-        maxNameScore = scores['name']!;
-        nameColIdx = colIdx;
-      }
+      if (colIdx != phoneColIdx && colIdx != emailColIdx && scores['name']! > maxNameScore) { maxNameScore = scores['name']!; nameColIdx = colIdx; }
     });
-    if (nameColIdx >= 0 && maxNameScore > 0) {
-      map['name'] = nameColIdx;
-      print('✅ Detected name column at index $nameColIdx (score: $maxNameScore)');
-    }
-
+    if (nameColIdx >= 0 && maxNameScore > 0) map['name'] = nameColIdx;
     return map;
   }
 
-  /// Check if a string looks like a phone number
-  bool _isPhoneNumber(String value) {
+  static bool _isPhoneNumber(String value) {
     final cleaned = value.replaceAll(RegExp(r'[\s\-().]'), '');
-    
     if (cleaned.startsWith('+')) {
       final digits = cleaned.substring(1).replaceAll(RegExp(r'[^0-9]'), '');
       return digits.length >= 7 && digits.length <= 15;
     }
-    
     final digits = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
     return digits.length >= 7 && digits.length <= 15 && digits.length == cleaned.length;
   }
 
-  /// Check if a string looks like an email
-  bool _isEmail(String value) {
-    final emailRegex = RegExp(
-      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-      caseSensitive: false,
-    );
-    return emailRegex.hasMatch(value);
+  static bool _isEmail(String value) {
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', caseSensitive: false).hasMatch(value);
   }
 
-  /// Check if a string looks like a name
-  bool _isName(String value) {
+  static bool _isName(String value) {
     if (value.length < 2 || value.length > 100) return false;
-    
-    final nameRegex = RegExp(r"^[a-zA-Z\s.'\-]+$", caseSensitive: false);
-    if (!nameRegex.hasMatch(value)) return false;
-    
-    final letterCount = value.replaceAll(RegExp(r'[^a-zA-Z]'), '').length;
-    return letterCount >= 2;
+    if (!RegExp(r"^[a-zA-Z\s.'\-]+$", caseSensitive: false).hasMatch(value)) return false;
+    return value.replaceAll(RegExp(r'[^a-zA-Z]'), '').length >= 2;
   }
 }

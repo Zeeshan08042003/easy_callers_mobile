@@ -54,7 +54,7 @@ class ManagerSelectionView extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 color: AppColors.primary.withOpacity(0.08),
                 child: Text(
-                  '${controller.selectedManagerIds.length} of ${controller.allManagers.length} agencies selected',
+                  '${controller.selectedManagerIds.length} of ${controller.filteredManagers.length} selected',
                   style: TextStyle(
                     color: AppColors.primary.withOpacity(0.9),
                     fontSize: 13,
@@ -73,7 +73,8 @@ class ManagerSelectionView extends StatelessWidget {
                 );
               }
 
-              if (controller.allManagers.isEmpty) {
+              final filtered = controller.filteredManagers;
+              if (filtered.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -82,7 +83,7 @@ class ManagerSelectionView extends StatelessWidget {
                           color: Colors.white.withOpacity(0.1), size: 48),
                       const SizedBox(height: 12),
                       Text(
-                        'No managers found',
+                        'No items found',
                         style: TextStyle(
                             color: AppColors.textSecondary.withOpacity(0.6)),
                       ),
@@ -93,10 +94,10 @@ class ManagerSelectionView extends StatelessWidget {
 
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
-                itemCount: controller.allManagers.length,
+                itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  final manager = controller.allManagers[index];
+                  final manager = filtered[index];
                   return _buildManagerCard(manager, controller);
                 },
               );

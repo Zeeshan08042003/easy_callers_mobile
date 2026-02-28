@@ -31,7 +31,7 @@ class CreateProjectController extends GetxController {
   final RxList<ManagerModel> allManagers = <ManagerModel>[].obs;
   final RxSet<String> selectedManagerIds = <String>{}.obs;
   final RxBool isLoadingManagers = false.obs;
-  final RxString managerAssignment = 'all'.obs; // 'all' or 'selected'
+  final RxString managerAssignment = 'my_managers'.obs; // 'my_managers' or 'agencies'
 
   @override
   void onInit() {
@@ -59,11 +59,49 @@ class CreateProjectController extends GetxController {
       allManagers.assignAll(
         managers.where((m) => m.id != currentManagerId).toList()
       );
+
+      // Default auto-selection for SA
+      if (isSuperAdmin && managerAssignment.value == 'my_managers') {
+        setManagerAssignment('my_managers');
+      }
     } catch (e) {
       print('Error fetching managers: $e');
     } finally {
       isLoadingManagers.value = false;
     }
+  }
+
+  /// Set assignment mode and handle auto-selection
+  void setManagerAssignment(String mode) {
+    managerAssignment.value = mode;
+    final saId = _authService.currentSuperAdmin.value?.id;
+    
+    if (mode == 'my_managers') {
+      // Auto-select all SA's managers
+      final myIds = allManagers
+          .where((m) => m.createdBySuperAdminId == saId)
+          .map((m) => m.id)
+          .toSet();
+      selectedManagerIds.assignAll(myIds);
+    } else if (mode == 'agencies') {
+      // For agencies mode, if we want to allow fresh selection
+      // we could clear, or just leave it. User said "can select agencies".
+      // I'll leave existing for now but UI will filter.
+    } else if (mode == 'all') {
+      // Auto-select everything
+      selectedManagerIds.assignAll(allManagers.map((m) => m.id).toSet());
+    }
+  }
+
+  /// Get managers filtered by the current assignment mode
+  List<ManagerModel> get filteredManagers {
+    final saId = _authService.currentSuperAdmin.value?.id;
+    if (managerAssignment.value == 'my_managers') {
+      return allManagers.where((m) => m.createdBySuperAdminId == saId).toList();
+    } else if (managerAssignment.value == 'agencies') {
+      return allManagers.where((m) => m.createdBySuperAdminId == null).toList();
+    }
+    return allManagers;
   }
 
   /// Toggle selection of a manager
@@ -212,9 +250,20 @@ class CreateProjectController extends GetxController {
         );
 
         if (project != null) {
-          final targetManagers = managerAssignment.value == 'selected'
-              ? allManagers.where((m) => selectedManagerIds.contains(m.id)).toList()
-              : allManagers;
+          List<ManagerModel> targetManagers;
+          
+          // Use the selectedManagerIds filtered to the mode's scope
+          final saId = _authService.currentSuperAdmin.value?.id;
+          targetManagers = allManagers.where((m) {
+            if (!selectedManagerIds.contains(m.id)) return false;
+            
+            if (managerAssignment.value == 'my_managers') {
+              return m.createdBySuperAdminId == saId;
+            } else if (managerAssignment.value == 'agencies') {
+              return m.createdBySuperAdminId == null;
+            }
+            return true;
+          }).toList();
 
           for (final manager in targetManagers) {
             await _projectService.inviteManagerToProject(

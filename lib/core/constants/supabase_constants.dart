@@ -1,7 +1,6 @@
 class SupabaseConstants {
-  static const String supabaseUrl = 'https://nlabqohuthloefqtcdzt.supabase.co';
-  static const String supabaseAnonKey =
-      'sb_publishable_SzKr1K2YLyckX3CvWDJ2xA_pBsiYRRC';
+  // Credentials are now managed via FlavorConfig (lib/core/config/flavor_config.dart)
+  // See main_prod.dart and main_beta.dart for environment-specific URLs.
 
   // Role tables
   static const String superAdminsTable = 'super_admins';

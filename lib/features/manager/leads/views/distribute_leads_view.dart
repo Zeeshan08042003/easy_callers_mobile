@@ -72,15 +72,15 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'CURRENT BATCH',
+              Obx(() => Text(
+                controller.mesh.value != null ? 'CURRENT BATCH' : 'CURRENT PROJECT',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
-              ),
+              )),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -107,12 +107,16 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
           const SizedBox(height: 4),
           Row(
             children: [
-              Icon(Icons.description_outlined, color: AppColors.textSecondary, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                controller.mesh.value?.fileName ?? 'Sales_Data_Q3_Final.xlsx',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              Icon(
+                controller.mesh.value != null ? Icons.description_outlined : Icons.folder_open_outlined, 
+                color: AppColors.textSecondary, 
+                size: 14
               ),
+              const SizedBox(width: 4),
+              Obx(() => Text(
+                controller.projectName.value.isNotEmpty ? controller.projectName.value : 'No Name',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              )),
             ],
           ),
         ],

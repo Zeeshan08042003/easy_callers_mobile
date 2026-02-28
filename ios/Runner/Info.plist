@@ -5,11 +5,54 @@
 <key>LSApplicationQueriesSchemes</key>
 <array>
     <string>whatsapp</string>
+    <string>tel</string>
+    <string>mailto</string>
+    <string>sms</string>
 </array>
+
+	<!-- Phone Call Permission -->
+	<key>NSPhoneCallUsageDescription</key>
+	<string>Easy Callers needs access to make phone calls to leads assigned to you.</string>
+
+	<!-- Camera Permission (Profile Photos) -->
+	<key>NSCameraUsageDescription</key>
+	<string>Easy Callers needs camera access to take profile photos.</string>
+
+	<!-- Photo Library Permission (File Picker / Profile Photos) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Easy Callers needs photo library access to upload files and set profile photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Easy Callers needs permission to save photos to your library.</string>
+
+	<!-- Microphone Permission (Phone Calls) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Easy Callers needs microphone access for phone calls.</string>
+
+	<!-- Contacts Permission (Lead Management) -->
+	<key>NSContactsUsageDescription</key>
+	<string>Easy Callers needs contacts access to manage and call leads.</string>
+
+	<!-- Notifications -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Easy Callers sends notifications for lead assignments, follow-up reminders, and important updates.</string>
+
+	<!-- File Access (Excel Upload) -->
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Easy Callers needs access to documents to upload Excel lead files.</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Easy Callers Mobile</string>
+	<string>Easy Callers</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

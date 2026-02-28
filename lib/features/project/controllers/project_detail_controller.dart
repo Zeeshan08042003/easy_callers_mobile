@@ -9,6 +9,7 @@ import 'package:easy_callers_mobile/features/manager/models/employee_model.dart'
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
+import 'package:easy_callers_mobile/core/services/background_upload_manager.dart';
 import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:easy_callers_mobile/features/manager/leads/views/distribute_leads_view.dart';
@@ -158,45 +159,18 @@ class ProjectDetailController extends GetxController {
         return;
       }
 
-      Get.dialog(
-        const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-        barrierDismissible: false,
+      // For managers: always show the tabbed leads view 
+      // (filtered to their own employees' leads)
+      Get.to(
+        () => const BatchLeadsView(),
+        arguments: batch,
       );
-      
-      final leadService = Get.find<LeadService>();
-      final unassignedIds = await leadService.getUnassignedLeadsFromBatch(batch.id);
-      
-      if (Get.isDialogOpen ?? false) Get.back(); // close dialog
-      
-      if (unassignedIds.isNotEmpty) {
-        if (isManager) {
-          // Still has unassigned leads -> Distribute (Manager only)
-          await Get.to(
-            () => const DistributeLeadsView(),
-            arguments: batch,
-          );
-          // Refresh batch list to update counts if distribution occurred
-          _fetchBatches();
-        } else {
-          // Fallback: tabbed leads view
-          Get.to(
-            () => const BatchLeadsView(),
-            arguments: batch,
-          );
-        }
-      } else {
-        // Fully distributed -> show tabbed leads view
-        Get.to(
-          () => const BatchLeadsView(),
-          arguments: batch,
-        );
-      }
     } catch (e) {
-      if (Get.isDialogOpen ?? false) Get.back();
       print('Error checking batch status: $e');
       Get.snackbar('Error', 'Failed to open batch details');
     }
   }
+
 
   // ============================================
   // CALLER (EMPLOYEE) MANAGEMENT
@@ -205,12 +179,30 @@ class ProjectDetailController extends GetxController {
   Future<List<EmployeeModel>> _fetchProjectCallers() async {
     try {
       final data = await _projectService.getProjectCallers(projectId!);
-      final callers = data
+      var callers = data
           .where((d) => d['employee'] != null && d['employee'] is Map)
+          .toList();
+
+      // For managers, only show THEIR OWN callers
+      // Super admins see all callers (isSuperAdmin check)
+      final managerId = _authService.currentManager.value?.id;
+      if (managerId != null && !isSuperAdmin) {
+        callers = callers.where((d) {
+          // Check if this caller was added by the current manager
+          final addedBy = d['added_by_manager_id'] as String?;
+          if (addedBy == managerId) return true;
+
+          // Fallback: check if the employee belongs to this manager
+          final emp = d['employee'] as Map<String, dynamic>;
+          return emp['manager_id'] == managerId;
+        }).toList();
+      }
+
+      final callerModels = callers
           .map((d) => EmployeeModel.fromJson(d['employee'] as Map<String, dynamic>))
           .toList();
-      projectCallers.value = callers;
-      return callers;
+      projectCallers.value = callerModels;
+      return callerModels;
     } catch (e) {
       print('Error fetching project callers: $e');
       return [];
@@ -311,38 +303,38 @@ class ProjectDetailController extends GetxController {
       Get.snackbar('Permission Denied', 'You do not have permission to upload leads to this project.');
       return;
     }
-    
+
+    final managerId = _authService.currentManager.value?.id;
+    final superAdminId = _authService.currentSuperAdmin.value?.id;
+
+    if (managerId == null && superAdminId == null) {
+      Get.snackbar('Error', 'Profile not found');
+      return;
+    }
+
+    if (projectId == null) {
+      Get.snackbar('Error', 'No project selected');
+      return;
+    }
+
     try {
       isUploading.value = true;
-
-      final managerId = _authService.currentManager.value?.id;
-      final superAdminId = _authService.currentSuperAdmin.value?.id;
-
-      if (managerId == null && superAdminId == null) {
-        Get.snackbar('Error', 'Profile not found');
-        return;
-      }
-
-      if (projectId == null) {
-        Get.snackbar('Error', 'No project selected');
-        return;
-      }
-
-      final batch = await _leadService.pickAndUploadLeadsToProject(
+      
+      // Use background upload manager — file picker opens immediately,
+      // upload runs in background so the user can keep using the app.
+      final uploadManager = Get.find<BackgroundUploadManager>();
+      await uploadManager.startUpload(
         managerId: managerId,
         projectId: projectId!,
+        projectName: project.value?.name,
       );
 
-      if (batch != null) {
-        Get.snackbar(
-          'Success',
-          'Uploaded ${batch.totalLeads} leads to project!',
-          duration: const Duration(seconds: 3),
-        );
-        await fetchProjectDetails();
-      }
+      // Refresh project details after a short delay
+      Future.delayed(const Duration(seconds: 2), () {
+        fetchProjectDetails();
+      });
     } catch (e) {
-      Get.snackbar('Upload Failed', e.toString());
+      print('Error starting upload: $e');
     } finally {
       isUploading.value = false;
     }

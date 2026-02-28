@@ -124,27 +124,29 @@ class CreateProjectView extends StatelessWidget {
               textCapitalization: TextCapitalization.sentences,
             ),
 
-            // Manager/Agency Assignment Section
-            // const SizedBox(height: 24),
-            // const Text(
-            //   'Agency Assignment',
-            //   style: TextStyle(
-            //     color: Colors.white,
-            //     fontSize: 14,
-            //     fontWeight: FontWeight.w600,
-            //   ),
-            // ),
-            // const SizedBox(height: 4),
-            // Text(
-            //   'Choose which independent agencies or managers are part of this project',
-            //   style: TextStyle(
-            //     color: AppColors.textSecondary.withOpacity(0.5),
-            //     fontSize: 12,
-            //   ),
-            // ),
-            // const SizedBox(height: 12),
-            // _buildAgencyAssignmentSelector(controller),
-            // _buildAgencyPreview(controller),
+            // Manager/Agency Assignment Section (Super Admin only)
+            if (controller.isSuperAdmin) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'Agency Assignment',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose which independent agencies or managers are part of this project',
+                style: TextStyle(
+                  color: AppColors.textSecondary.withOpacity(0.5),
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildAgencyAssignmentSelector(controller),
+              _buildAgencyPreview(controller),
+            ],
 
             // Caller Assignment Section (Only for Managers)
             if (controller.isManager) ...[
@@ -216,19 +218,19 @@ class CreateProjectView extends StatelessWidget {
       children: [
         Expanded(
           child: _buildRoleCard(
-            label: 'All Agencies',
-            icon: Icons.apartment_rounded,
-            isSelected: controller.managerAssignment.value == 'all',
-            onTap: () => controller.managerAssignment.value = 'all',
+            label: 'My Managers',
+            icon: Icons.badge_outlined,
+            isSelected: controller.managerAssignment.value == 'my_managers',
+            onTap: () => controller.setManagerAssignment('my_managers'),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildRoleCard(
-            label: 'Select Agencies',
-            icon: Icons.person_search_rounded,
-            isSelected: controller.managerAssignment.value == 'selected',
-            onTap: () => controller.managerAssignment.value = 'selected',
+            label: 'Agencies',
+            icon: Icons.business_rounded,
+            isSelected: controller.managerAssignment.value == 'agencies',
+            onTap: () => controller.setManagerAssignment('agencies'),
           ),
         ),
       ],
@@ -300,30 +302,44 @@ class CreateProjectView extends StatelessWidget {
 
   Widget _buildAgencyPreview(CreateProjectController controller) {
     return Obx(() {
-      if (controller.managerAssignment.value == 'all') {
-        return _buildInfoBox('All available managers and agencies will be invited');
-      }
-
       if (controller.isLoadingManagers.value) {
         return _buildLoading();
       }
 
-      if (controller.allManagers.isEmpty) {
-        return _buildEmptyState('No agencies found', Icons.business_center_outlined);
+      final filtered = controller.filteredManagers;
+      if (filtered.isEmpty) {
+        final label = controller.managerAssignment.value == 'my_managers' ? 'managers' : 'agencies';
+        return _buildEmptyState('No $label found', Icons.business_center_outlined);
       }
 
-      final previewList = controller.allManagers.take(3).toList();
-      return _buildGeneralPreviewList(
-        items: previewList,
-        totalCount: controller.allManagers.length,
-        selectedCount: controller.selectedManagerIds.length,
-        onToggle: controller.toggleManager,
-        isSelected: (id) => controller.selectedManagerIds.contains(id),
-        onViewAll: () => Get.to(() => const ManagerSelectionView()),
-        viewAllLabel: 'View All Agencies',
+      String infoText = '';
+      if (controller.managerAssignment.value == 'my_managers') {
+        infoText = 'Pick which of your managers to invite (default: All)';
+      } else {
+        infoText = 'Select independent agencies to invite';
+      }
+
+      final previewList = filtered.take(3).toList();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoBox(infoText),
+          _buildGeneralPreviewList(
+            items: previewList,
+            totalCount: filtered.length,
+            selectedCount: controller.selectedManagerIds.length,
+            onToggle: controller.toggleManager,
+            isSelected: (id) => controller.selectedManagerIds.contains(id),
+            onViewAll: () => Get.to(() => const ManagerSelectionView()),
+            viewAllLabel: controller.managerAssignment.value == 'my_managers' 
+                ? 'View All My Managers' 
+                : 'View All Agencies',
+          ),
+        ],
       );
     });
   }
+
 
   Widget _buildCallerPreview(CreateProjectController controller) {
     return Obx(() {

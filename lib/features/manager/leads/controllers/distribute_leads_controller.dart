@@ -12,6 +12,9 @@ class DistributeLeadsController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
 
   final Rx<LeadBatchModel?> mesh = Rx<LeadBatchModel?>(null);
+  final RxString projectId = ''.obs;
+  final RxString projectName = ''.obs;
+  final RxString managerId = ''.obs;
   final RxList<EmployeeModel> employees = <EmployeeModel>[].obs;
   final RxMap<String, int> allocations = <String, int>{}.obs; // employeeId -> leadCount
   
@@ -22,34 +25,98 @@ class DistributeLeadsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // In a real flow, we'd pass the batch as an argument
-    if (Get.arguments != null && Get.arguments is LeadBatchModel) {
-      mesh.value = Get.arguments as LeadBatchModel;
-      totalBatchLeads.value = mesh.value!.totalLeads;
+    
+    if (Get.arguments != null) {
+      if (Get.arguments is LeadBatchModel) {
+        // Direct batch distribution
+        mesh.value = Get.arguments as LeadBatchModel;
+        projectId.value = mesh.value?.projectId ?? '';
+        projectName.value = mesh.value?.fileName ?? 'Lead Batch';
+        managerId.value = mesh.value?.uploadedBy ?? '';
+        // Don't set totalBatchLeads here, let _fetchUnassignedCount handle it
+      } else if (Get.arguments is Map) {
+        final args = Get.arguments as Map;
+        
+        if (args.containsKey('batch') && args['batch'] is LeadBatchModel) {
+          mesh.value = args['batch'] as LeadBatchModel;
+        }
+        
+        projectId.value = args['projectId'] ?? mesh.value?.projectId ?? '';
+        projectName.value = args['projectName'] ?? mesh.value?.fileName ?? 'Leads';
+        managerId.value = args['managerId'] ?? mesh.value?.uploadedBy ?? '';
+        
+        if (args.containsKey('totalUnassigned')) {
+          totalBatchLeads.value = args['totalUnassigned'] as int;
+          // If project-wide distribution is intended (passed from dashboard),
+          // we should NOT use the single batch logic during execution.
+          if (args.containsKey('totalUnassigned') && mesh.value != null) {
+             // If we have both, but this is a project-wide count, 
+             // we null out mesh for executeDistribution to use projectId instead.
+             if (totalBatchLeads.value != mesh.value!.totalLeads) {
+                // Actually, just let executeDistribution decide based on projectId.isNotEmpty
+             }
+          }
+        }
+      }
     }
+    
+    // Always fetch unassigned count if we don't have it or if we have a direct batch
+    if (totalBatchLeads.value == 0 || mesh.value != null) {
+      _fetchUnassignedCount();
+    }
+    
     fetchEmployees();
+  }
+
+  Future<void> _fetchUnassignedCount() async {
+    try {
+      if (mesh.value != null) {
+        final ids = await _leadService.getUnassignedLeadsFromBatch(mesh.value!.id);
+        totalBatchLeads.value = ids.length;
+      } else if (projectId.value.isNotEmpty) {
+        final ids = await _leadService.getUnassignedLeadsForProject(projectId.value);
+        totalBatchLeads.value = ids.length;
+      }
+      
+      // Re-calculate distribution if already loaded
+      if (employees.isNotEmpty) {
+        _calculateEqualDistribution();
+      }
+    } catch (e) {
+      print('Error fetching unassigned count: $e');
+    }
   }
 
   Future<void> fetchEmployees() async {
     try {
       isDistributing.value = true;
-      final managerId = _authService.currentManager.value?.id;
-      if (managerId == null) return;
+      
+      // Use passed managerId first (for SA oversight), fallback to current manager
+      final mId = managerId.value.isNotEmpty 
+          ? managerId.value 
+          : _authService.currentManager.value?.id;
+          
+      if (mId == null) {
+        print('❌ Error: No manager context for distribution');
+        isDistributing.value = false;
+        return;
+      }
 
-      final batchProjectId = mesh.value?.projectId;
+      final projectID = projectId.value.isNotEmpty ? projectId.value : mesh.value?.projectId;
+
+      print("Project Id : $projectID");
 
       List<EmployeeModel> result;
 
-      if (batchProjectId != null) {
-        // Project-based batch: only load callers assigned to this project
-        // by this manager (covers both manager-created and SA-created projects).
+      if (projectID != null && projectID.isNotEmpty) {
+        // Project-based: only load callers assigned to this project
         result = await _leadService.getProjectCallersByManager(
-          projectId: batchProjectId,
-          managerId: managerId,
+          projectId: projectID,
+          managerId: mId,
         );
       } else {
-        // Legacy non-project batch: load all active employees of the manager
-        result = await _leadService.getEmployeesByManager(managerId);
+        // Legacy/Generic: load all active employees
+        result = await _leadService.getEmployeesByManager(mId);
         result = result.where((emp) => emp.isActive).toList();
       }
 
@@ -58,7 +125,7 @@ class DistributeLeadsController extends GetxController {
       if (employees.isEmpty) {
         Get.snackbar(
           'No Active Callers',
-          batchProjectId != null
+          projectID != null && projectID.isNotEmpty
               ? 'No callers are assigned to this project. Add callers in the project settings first.'
               : 'You need at least one active caller to distribute leads',
           snackPosition: SnackPosition.BOTTOM,
@@ -111,9 +178,6 @@ class DistributeLeadsController extends GetxController {
   int get currentlyAllocated => allocations.values.fold<int>(0, (sum, count) => sum + count);
 
   Future<void> executeDistribution() async {
-    final batch = mesh.value;
-    if (batch == null) return;
-
     if (currentlyAllocated == 0) {
       Get.snackbar('Nothing to allocate', 'Please allocate at least one lead');
       return;
@@ -122,11 +186,21 @@ class DistributeLeadsController extends GetxController {
     try {
       isDistributing.value = true;
       
-      // 1. Get unassigned lead IDs from this batch
-      final leadIds = await _leadService.getUnassignedLeadsFromBatch(batch.id);
+      List<String> leadIds = [];
+      
+      // If we have a projectId AND we are NOT specifically trying to distribute a single batch,
+      // distribute ALL unassigned leads in the project.
+      if (projectId.value.isNotEmpty && mesh.value == null) {
+        leadIds = await _leadService.getUnassignedLeadsForProject(projectId.value);
+      } else if (mesh.value != null) {
+        leadIds = await _leadService.getUnassignedLeadsFromBatch(mesh.value!.id);
+      } else if (projectId.value.isNotEmpty) {
+        // Fallback for project distribution even if mesh exists (if opened from dashboard)
+        leadIds = await _leadService.getUnassignedLeadsForProject(projectId.value);
+      }
       
       if (leadIds.isEmpty) {
-        Get.snackbar('Conflict', 'All leads in this batch are already assigned');
+        Get.snackbar('Conflict', 'No unassigned leads found for this ${mesh.value != null ? 'batch' : 'project'}.');
         Get.back();
         return;
       }
