@@ -7,6 +7,8 @@ import 'package:easy_callers_mobile/feedback/feedback_screen.dart';
 import 'package:easy_callers_mobile/splash_screen/splash_screen.dart';
 import 'package:easy_callers_mobile/webservices/model/leadModel.dart';
 import 'package:easy_callers_mobile/webservices/webservices.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -15,10 +17,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'dashboard/dashboard_controller.dart';
 import 'dashboard/lead_list.dart';
+import 'notification/notification_controller.dart';
 import 'webservices/model/call_logs_model.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  await _requestNotificationPermission();
+  String? token = await FirebaseMessaging.instance.getToken();
+  print("🔔 FCM Device Token: $token");
   DependenciesInjection.init();
   runApp(const MyApp());
 
@@ -44,5 +51,18 @@ class MyApp extends StatelessWidget {
 class DependenciesInjection{
   static void init(){
     Get.put<GetConnect>(GetConnect());
+    Get.put<NotificationController>(NotificationController());
   }
+}
+
+Future<void> _requestNotificationPermission() async {
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  print('📌 User granted permission: ${settings.authorizationStatus}');
 }

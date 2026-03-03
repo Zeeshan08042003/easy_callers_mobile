@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "861409629825",
+    "project_id": "easy-callers",
+    "storage_bucket": "easy-callers.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:861409629825:android:32172aa2659b180f551f80",
+        "android_client_info": {
+          "package_name": "com.easy_callers.easy_callers"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCezjHM-bZj_N07pa3vaMZATdoxxuW-9c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
