@@ -277,9 +277,50 @@ class ProjectDetailController extends GetxController {
     }
   }
 
-  /// Remove a caller from the project
+  /// Remove a caller from the project.
+  /// Checks for assigned leads first and offers redistribution options.
   Future<void> removeCaller(String employeeId) async {
     try {
+      // First, check if this employee has any leads assigned in this project
+      final employeeLeads = await _leadService.getLeadsCountByEmployee(
+        employeeId,
+        projectId: projectId,
+      );
+
+      if (employeeLeads > 0) {
+        // Show redistribution dialog
+        final result = await _showLeadRedistributionDialog(
+          employeeId: employeeId,
+          leadCount: employeeLeads,
+        );
+        if (result == null) return; // User cancelled
+      } else {
+        // No leads — just confirm removal
+        final confirm = await Get.dialog<bool>(
+          AlertDialog(
+            backgroundColor: AppColors.cardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Remove Caller', style: TextStyle(color: Colors.white)),
+            content: const Text(
+              'Are you sure you want to remove this caller from the project?',
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+              ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: const Text('Remove', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) return;
+      }
+
+      // Proceed with removal
       final success = await _projectService.removeCallerFromProject(
         projectId: projectId!,
         employeeId: employeeId,
@@ -291,6 +332,246 @@ class ProjectDetailController extends GetxController {
       }
     } catch (e) {
       Get.snackbar('Error', 'Failed to remove caller');
+    }
+  }
+
+  /// Show a dialog for choosing what to do with leads when removing a caller.
+  /// Returns true if user confirms, null if cancelled.
+  Future<bool?> _showLeadRedistributionDialog({
+    required String employeeId,
+    required int leadCount,
+  }) async {
+    // Get the other callers in this project (excluding the one being removed)
+    final otherCallers = projectCallers
+        .where((c) => c.id != employeeId && c.isActive)
+        .toList();
+
+    return await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Leads Found',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                children: [
+                  const TextSpan(text: 'This caller has '),
+                  TextSpan(
+                    text: '$leadCount lead${leadCount != 1 ? 's' : ''}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const TextSpan(text: ' assigned in this project.'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'What would you like to do?',
+              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+
+            // Option 1: Redistribute equally
+            if (otherCallers.isNotEmpty) ...[
+              _buildRedistributeOption(
+                icon: Icons.share_rounded,
+                title: 'Redistribute to other callers',
+                subtitle: 'Split ${leadCount} lead${leadCount != 1 ? 's' : ''} among ${otherCallers.length} remaining caller${otherCallers.length != 1 ? 's' : ''}',
+                onTap: () async {
+                  Get.back(result: true);
+                  await _redistributeLeads(
+                    employeeId: employeeId,
+                    targetEmployees: otherCallers,
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            // Option 2: Leave unassigned
+            _buildRedistributeOption(
+              icon: Icons.person_remove_rounded,
+              title: 'Unassign leads & remove caller',
+              subtitle: 'Leads will become unassigned and can be distributed later',
+              onTap: () async {
+                Get.back(result: true);
+                await _unassignEmployeeLeads(
+                  employeeId: employeeId,
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Option 3: Keep as is (just remove from project)
+            _buildRedistributeOption(
+              icon: Icons.exit_to_app_rounded,
+              title: 'Remove without changing leads',
+              subtitle: 'Leads stay assigned to the caller even though they are removed',
+              onTap: () => Get.back(result: true),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: null),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRedistributeOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white.withOpacity(0.3),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Redistribute leads from removed employee to other callers in the project
+  Future<void> _redistributeLeads({
+    required String employeeId,
+    required List<EmployeeModel> targetEmployees,
+  }) async {
+    try {
+      isLoading.value = true;
+
+      // Get all leads assigned to this employee in this project
+      final leads = await _leadService.getLeadsByEmployee(
+        employeeId,
+        projectId: projectId,
+        page: 1,
+        pageSize: 10000, // Get all
+      );
+
+      if (leads.isEmpty || targetEmployees.isEmpty) return;
+
+      // Distribute equally among target employees
+      final leadIds = leads.map((l) => l.id).toList();
+      final targetIds = targetEmployees.map((e) => e.id).toList();
+
+      await _leadService.splitLeadsEqually(
+        leadIds: leadIds,
+        employeeIds: targetIds,
+      );
+
+      Get.snackbar(
+        'Redistributed',
+        '${leads.length} lead${leads.length != 1 ? 's' : ''} redistributed to ${targetEmployees.length} caller${targetEmployees.length != 1 ? 's' : ''}',
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to redistribute leads: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Unassign all leads for a specific employee in this project
+  Future<void> _unassignEmployeeLeads({
+    required String employeeId,
+  }) async {
+    try {
+      isLoading.value = true;
+
+      // Get all leads assigned to this employee in this project
+      final leads = await _leadService.getLeadsByEmployee(
+        employeeId,
+        projectId: projectId,
+        page: 1,
+        pageSize: 10000, // Get all
+      );
+
+      if (leads.isEmpty) return;
+
+      // Unassign all leads
+      final supabase = Get.find<SupabaseService>();
+      final leadIds = leads.map((l) => l.id).toList();
+
+      // Update in chunks to avoid URL length limits
+      const chunkSize = 50;
+      for (var i = 0; i < leadIds.length; i += chunkSize) {
+        final end = (i + chunkSize < leadIds.length) ? i + chunkSize : leadIds.length;
+        final chunk = leadIds.sublist(i, end);
+        await supabase.leadsTable
+            .update({
+              'assigned_to': null,
+              'status': 'new',
+            })
+            .inFilter('id', chunk);
+      }
+
+      Get.snackbar(
+        'Unassigned',
+        '${leads.length} lead${leads.length != 1 ? 's' : ''} are now unassigned and ready for redistribution',
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to unassign leads: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
@@ -472,6 +753,14 @@ class ProjectDetailController extends GetxController {
 
   Future<void> removeMember(String membershipId) async {
     try {
+      // Find the member being removed to get their managerId
+      final memberToRemove = members.firstWhereOrNull((m) => m.id == membershipId);
+      
+      if (memberToRemove != null && projectId != null) {
+        // Clean up leads and callers for this manager's employees in this project
+        await _cleanupManagerLeadsAndCallers(memberToRemove.managerId);
+      }
+
       final success = await _projectService.removeMember(membershipId);
       if (success) {
         Get.snackbar('Done', 'Member removed from project');
@@ -479,6 +768,57 @@ class ProjectDetailController extends GetxController {
       }
     } catch (e) {
       Get.snackbar('Error', 'Failed to remove member: $e');
+    }
+  }
+
+  /// When SA removes a manager from the project:
+  /// 1. Unassign all leads that were assigned to this manager's employees in this project
+  /// 2. Remove all project_callers entries for this manager's employees
+  Future<void> _cleanupManagerLeadsAndCallers(String managerId) async {
+    try {
+      final supabase = Get.find<SupabaseService>();
+
+      // 1. Get the manager's employees who are callers in this project
+      final callersResponse = await supabase.projectCallersTable
+          .select('employee_id')
+          .eq('project_id', projectId!)
+          .eq('added_by_manager_id', managerId);
+
+      final callerEmployeeIds = (callersResponse as List)
+          .map((c) => c['employee_id'] as String)
+          .toList();
+
+      if (callerEmployeeIds.isNotEmpty) {
+        // 2. Unassign all leads assigned to these employees in this project
+        //    Set them back to 'new' status so they can be redistributed
+        //    Process in chunks to avoid URL length issues
+        const chunkSize = 50;
+        for (var i = 0; i < callerEmployeeIds.length; i += chunkSize) {
+          final end = (i + chunkSize < callerEmployeeIds.length) 
+              ? i + chunkSize 
+              : callerEmployeeIds.length;
+          final chunk = callerEmployeeIds.sublist(i, end);
+          
+          await supabase.leadsTable
+              .update({
+                'assigned_to': null,
+                'status': 'new',
+              })
+              .eq('project_id', projectId!)
+              .inFilter('assigned_to', chunk);
+        }
+
+        // 3. Remove all project_callers for this manager
+        await supabase.projectCallersTable
+            .delete()
+            .eq('project_id', projectId!)
+            .eq('added_by_manager_id', managerId);
+
+        print('✅ Cleaned up ${callerEmployeeIds.length} callers and their leads for manager $managerId');
+      }
+    } catch (e) {
+      print('⚠️ Error cleaning up manager leads/callers: $e');
+      // Non-fatal: the member removal can still proceed
     }
   }
 

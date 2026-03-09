@@ -354,6 +354,10 @@ CREATE OR REPLACE FUNCTION public.get_my_member_project_ids() RETURNS SETOF UUID
   SELECT pm.project_id FROM public.project_members pm WHERE pm.manager_id = public.get_my_manager_id() AND pm.status = 'accepted';
 $$;
 
+CREATE OR REPLACE FUNCTION public.get_my_all_member_project_ids() RETURNS SETOF UUID LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT pm.project_id FROM public.project_members pm WHERE pm.manager_id = public.get_my_manager_id();
+$$;
+
 CREATE OR REPLACE FUNCTION public.get_my_created_project_ids() RETURNS SETOF UUID LANGUAGE sql SECURITY DEFINER STABLE AS $$
   SELECT id FROM public.projects WHERE created_by_manager_id = public.get_my_manager_id();
 $$;
@@ -544,7 +548,7 @@ CREATE POLICY "mgr_employees_delete" ON public.employees FOR DELETE
 
 -- Projects: see own + member projects
 CREATE POLICY "mgr_projects_select" ON public.projects FOR SELECT
-  USING (created_by_manager_id = public.get_my_manager_id() OR id IN (SELECT public.get_my_member_project_ids()));
+  USING (created_by_manager_id = public.get_my_manager_id() OR id IN (SELECT public.get_my_all_member_project_ids()));
 CREATE POLICY "mgr_projects_insert" ON public.projects FOR INSERT
   WITH CHECK (created_by_manager_id = public.get_my_manager_id());
 CREATE POLICY "mgr_projects_update" ON public.projects FOR UPDATE
@@ -717,6 +721,51 @@ GRANT EXECUTE ON FUNCTION public.get_employee_for_otp(TEXT) TO authenticated, an
 GRANT EXECUTE ON FUNCTION public.get_manager_for_otp(TEXT) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.activate_employee(TEXT, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.activate_manager(TEXT, UUID) TO authenticated;
+
+-- SECURITY DEFINER function for Super Admin to create Manager (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.sa_create_manager(
+  input_email TEXT,
+  input_first_name TEXT,
+  input_last_name TEXT,
+  input_phone TEXT DEFAULT NULL,
+  input_manager_type TEXT DEFAULT 'manager',
+  input_otp_code TEXT DEFAULT NULL,
+  input_otp_expires_at TIMESTAMPTZ DEFAULT NULL
+) RETURNS SETOF public.managers
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_super_admin_id UUID;
+  v_normalized_email TEXT;
+BEGIN
+  SELECT id INTO v_super_admin_id
+  FROM public.super_admins
+  WHERE auth_id = auth.uid();
+  
+  IF v_super_admin_id IS NULL THEN
+    RAISE EXCEPTION 'Only super admins can create managers';
+  END IF;
+
+  v_normalized_email := LOWER(TRIM(input_email));
+
+  IF EXISTS (SELECT 1 FROM public.managers WHERE LOWER(TRIM(email)) = v_normalized_email) THEN
+    RAISE EXCEPTION 'A manager with this email already exists';
+  END IF;
+
+  RETURN QUERY
+  INSERT INTO public.managers (
+    email, first_name, last_name, phone, is_active,
+    manager_type, created_by_super_admin_id, otp_code, otp_expires_at
+  ) VALUES (
+    v_normalized_email, input_first_name, input_last_name, input_phone, false,
+    input_manager_type, v_super_admin_id, input_otp_code, input_otp_expires_at
+  )
+  RETURNING *;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.sa_create_manager(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TIMESTAMPTZ) TO authenticated;
 
 ALTER TABLE public.notifications REPLICA IDENTITY FULL;
 

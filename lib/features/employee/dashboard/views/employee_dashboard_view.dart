@@ -727,7 +727,7 @@ class EmployeeDashboardView extends GetView<EmployeeDashboardController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    lead.phone.isNotEmpty ? lead.phone.first : 'No Phone',
+                    lead.phone.isNotEmpty ? lead.phone.first.toString() : 'No Phone',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,

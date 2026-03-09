@@ -407,6 +407,8 @@ class LeadService extends GetxService {
       final from = (page - 1) * pageSize;
       final to = from + pageSize - 1;
 
+      print('📋 getLeadsByEmployee: empId=$employeeId, page=$page, projectId=$projectId, status=${status?.value}');
+
       var query = _supabase.leadsTable
           .select()
           .eq('assigned_to', employeeId);
@@ -421,12 +423,16 @@ class LeadService extends GetxService {
           
       final response = await query.order('created_at', ascending: false).range(from, to);
 
-      print("getLeadsByEmployee: ${response.length}");
+      print("✅ getLeadsByEmployee: returned ${response.length} leads");
 
       return (response as List)
           .map((json) => LeadModel.fromJson(json))
           .toList();
     } catch (e) {
+      print('❌ getLeadsByEmployee ERROR: $e');
+      if (e is PostgrestException) {
+        print('   Postgrest: code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}');
+      }
       return [];
     }
   }
@@ -1535,9 +1541,6 @@ class LeadService extends GetxService {
   }) async {
     try {
       // Query project_callers table for this project
-      // We don't filter ONLY by added_by_manager_id because a caller might have been
-      // added by a Super Admin or another manager in a shared project context, 
-      // but they still belong to this manager's team.
       final response = await _supabase.client
           .from('project_callers')
           .select('''
@@ -1547,26 +1550,52 @@ class LeadService extends GetxService {
           .eq('project_id', projectId);
 
       final list = response as List;
+      print('📋 getProjectCallersByManager: Found ${list.length} project_callers rows for project $projectId');
+      
       final result = <EmployeeModel>[];
+      final skipped = <String>[];
+      
       for (final row in list) {
-        if (row['employee'] == null || row['employee'] is! Map) continue;
+        if (row['employee'] == null || row['employee'] is! Map) {
+          print('  ⚠️ Skipping row — employee data is null or invalid');
+          continue;
+        }
         
         final empJson = row['employee'] as Map<String, dynamic>;
         final emp = EmployeeModel.fromJson(empJson);
-        
-        // Include if:
-        // 1. the employee belongs to this manager (manager_id)
-        // 2. OR the employee was specifically added to this project by this manager
-        // AND the employee is active.
         final addedBy = row['added_by_manager_id'] as String?;
-        if ((emp.managerId == managerId || addedBy == managerId) && emp.isActive) {
+        
+        print('  👤 Caller: ${emp.fullName} (id=${emp.id}), '
+            'emp.managerId=${emp.managerId}, addedBy=$addedBy, '
+            'isActive=${emp.isActive}, lookingForManager=$managerId');
+        
+        // Include if employee is active AND belongs to this manager's context:
+        // 1. employee's manager_id matches the current manager
+        // 2. OR the employee was specifically added to this project by this manager
+        // 3. OR added_by_manager_id is null (added by SA — should still be visible 
+        //    to the manager who is a member of this project)
+        if (!emp.isActive) {
+          skipped.add('${emp.fullName} (inactive)');
+          continue;
+        }
+        
+        final belongsToManager = emp.managerId == managerId;
+        final addedByManager = addedBy == managerId;
+        final addedByOther = addedBy != null && addedBy != managerId;
+        
+        // Include if: belongs to manager, or was added by this manager,
+        // or was added by someone else (SA) but the employee is under this manager
+        if (belongsToManager || addedByManager || (!addedByOther && addedBy == null)) {
           result.add(emp);
+        } else {
+          skipped.add('${emp.fullName} (manager mismatch: emp.managerId=${emp.managerId}, addedBy=$addedBy)');
         }
       }
       
+      print('✅ Returning ${result.length} callers, skipped: $skipped');
       return result;
     } catch (e) {
-      print('Error fetching project callers by manager: $e');
+      print('❌ Error fetching project callers by manager: $e');
       return [];
     }
   }

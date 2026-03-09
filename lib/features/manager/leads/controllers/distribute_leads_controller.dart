@@ -20,7 +20,9 @@ class DistributeLeadsController extends GetxController {
   
   final Rx<DistributionMethod> method = DistributionMethod.equal.obs;
   final RxBool isDistributing = false.obs;
+  final RxBool isLoadingCallers = false.obs;
   final RxInt totalBatchLeads = 0.obs;
+  final RxString loadError = ''.obs;
 
   @override
   void onInit() {
@@ -87,18 +89,31 @@ class DistributeLeadsController extends GetxController {
     }
   }
 
+  /// Fetch active callers for this project/manager.
+  /// Exposed as public so the view can trigger a manual retry.
   Future<void> fetchEmployees() async {
     try {
-      isDistributing.value = true;
+      isLoadingCallers.value = true;
+      loadError.value = '';
       
       // Use passed managerId first (for SA oversight), fallback to current manager
-      final mId = managerId.value.isNotEmpty 
+      String? mId = managerId.value.isNotEmpty 
           ? managerId.value 
           : _authService.currentManager.value?.id;
+
+      print("manager Id : ${managerId.value} authService manager Id: ${_authService.currentManager.value?.id}");
+
+
+      // If still null, try a brief wait for session restore
+      if (mId == null) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        mId = _authService.currentManager.value?.id;
+      }
           
       if (mId == null) {
         print('❌ Error: No manager context for distribution');
-        isDistributing.value = false;
+        loadError.value = 'Unable to identify manager. Please go back and try again.';
+        isLoadingCallers.value = false;
         return;
       }
 
@@ -123,24 +138,29 @@ class DistributeLeadsController extends GetxController {
       employees.value = result;
 
       if (employees.isEmpty) {
-        Get.snackbar(
-          'No Active Callers',
-          projectID != null && projectID.isNotEmpty
-              ? 'No callers are assigned to this project. Add callers in the project settings first.'
-              : 'You need at least one active caller to distribute leads',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        isDistributing.value = false;
+        loadError.value = projectID != null && projectID.isNotEmpty
+            ? 'No callers are assigned to this project. Add callers in the project settings first.'
+            : 'You need at least one active caller to distribute leads.';
+        isLoadingCallers.value = false;
         return;
       }
 
       // Initialize equal distribution
       _calculateEqualDistribution();
     } catch (e) {
-      Get.snackbar('Error', 'Failed to fetch callers: $e');
+      loadError.value = 'Failed to fetch callers. Tap to retry.';
+      print('Error fetching employees: $e');
     } finally {
-      isDistributing.value = false;
+      isLoadingCallers.value = false;
     }
+  }
+
+  /// Full refresh — reloads both callers and unassigned lead count
+  Future<void> refreshAll() async {
+    await Future.wait([
+      fetchEmployees(),
+      _fetchUnassignedCount(),
+    ]);
   }
 
   void setMethod(DistributionMethod m) {

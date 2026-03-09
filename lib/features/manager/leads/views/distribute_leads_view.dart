@@ -7,10 +7,8 @@ import 'package:easy_callers_mobile/features/manager/models/employee_model.dart'
 class DistributeLeadsView extends GetView<DistributeLeadsController> {
   const DistributeLeadsView({super.key});
 
-
   @override
   Widget build(BuildContext context) {
-    Get.put(DistributeLeadsController());
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -25,30 +23,51 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
-          TextButton(
-            onPressed: () {},
-            child: const Text('History', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+          // Refresh button
+          Obx(() => controller.isLoadingCallers.value
+            ? const Padding(
+                padding: EdgeInsets.all(14),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 2,
+                  ),
+                ),
+              )
+            : IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                tooltip: 'Refresh callers',
+                onPressed: () => controller.refreshAll(),
+              ),
           ),
         ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 10),
-                  _buildBatchCard(),
-                  const SizedBox(height: 30),
-                  _buildDistributionMethodToggle(),
-                  const SizedBox(height: 30),
-                  _buildTeamAllocationHeader(),
-                  const SizedBox(height: 15),
-                  _buildEmployeeAllocationList(),
-                  const SizedBox(height: 100), // Bottom padding for fixed buttons
-                ],
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.cardBg,
+              onRefresh: controller.refreshAll,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    _buildBatchCard(),
+                    const SizedBox(height: 30),
+                    _buildDistributionMethodToggle(),
+                    const SizedBox(height: 30),
+                    _buildTeamAllocationHeader(),
+                    const SizedBox(height: 15),
+                    _buildEmployeeAllocationList(),
+                    const SizedBox(height: 100), // Bottom padding for fixed buttons
+                  ],
+                ),
               ),
             ),
           ),
@@ -193,15 +212,66 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
 
   Widget _buildEmployeeAllocationList() {
     return Obx(() {
-      if (controller.isDistributing.value && controller.employees.isEmpty) {
+      // Loading state
+      if (controller.isLoadingCallers.value) {
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(40.0),
-            child: CircularProgressIndicator(color: AppColors.primary),
+            child: Column(
+              children: [
+                CircularProgressIndicator(color: AppColors.primary),
+                SizedBox(height: 16),
+                Text(
+                  'Loading callers...',
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+              ],
+            ),
           ),
         );
       }
       
+      // Error state with retry
+      if (controller.loadError.value.isNotEmpty && controller.employees.isEmpty) {
+        return Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                size: 64,
+                color: AppColors.warning.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                controller.loadError.value,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: controller.refreshAll,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      
+      // Empty state (no error, just no employees)
       if (controller.employees.isEmpty) {
         return Container(
           padding: const EdgeInsets.all(40),
@@ -214,7 +284,7 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
               ),
               const SizedBox(height: 16),
               Text(
-                'No Active Employees',
+                'No Active Callers',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 16,
@@ -223,10 +293,25 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Activate employees to distribute leads',
+                'Add callers to this project first, then come back to distribute.',
                 style: TextStyle(
                   color: AppColors.textSecondary.withOpacity(0.6),
                   fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: controller.refreshAll,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary, width: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -259,9 +344,17 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
         children: [
           Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 20,
-                backgroundImage: NetworkImage('https://i.pravatar.cc/150'),
+                backgroundColor: AppColors.primary.withOpacity(0.15),
+                child: Text(
+                  _getInitials(employee.fullName),
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -273,7 +366,7 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      'Top Performer • 98% CR',
+                      employee.email,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
@@ -370,14 +463,21 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
             width: double.infinity,
             height: 56,
             child: Obx(() => ElevatedButton(
-              onPressed: controller.isDistributing.value ? null : controller.executeDistribution,
+              onPressed: controller.isDistributing.value || controller.employees.isEmpty
+                  ? null 
+                  : controller.executeDistribution,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.primary.withOpacity(0.3),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               child: controller.isDistributing.value 
-                ? const CircularProgressIndicator(color: Colors.white)
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  )
                 : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -391,5 +491,15 @@ class DistributeLeadsView extends GetView<DistributeLeadsController> {
         ],
       ),
     );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      return parts[0][0].toUpperCase();
+    }
+    return '?';
   }
 }

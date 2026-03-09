@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:easy_callers_mobile/features/manager/services/lead_service.dart';
 import 'package:easy_callers_mobile/core/services/storage_service.dart';
+import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/features/project/services/project_service.dart';
 import 'package:easy_callers_mobile/features/project/models/project_model.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
@@ -34,6 +36,11 @@ class ManagerDashboardController extends GetxController {
   
   void switchTab(int index) {
     currentTabIndex.value = index;
+    // Refresh project list when switching back to dashboard home
+    // to pick up any changes (e.g., SA removed manager from project)
+    if (index == 0) {
+      fetchProjects();
+    }
   }
 
   // ============================================
@@ -81,6 +88,9 @@ class ManagerDashboardController extends GetxController {
 
   // Permissions
 
+  // Real-time subscription for project membership changes
+  StreamSubscription? _membershipSubscription;
+
   @override
   void onInit() {
     super.onInit();
@@ -102,7 +112,36 @@ class ManagerDashboardController extends GetxController {
           fetchProjects();
         }
       });
+      // Start real-time listener for membership changes
+      _startMembershipListener();
     }
+  }
+
+  @override
+  void onClose() {
+    _membershipSubscription?.cancel();
+    super.onClose();
+  }
+
+  /// Listen for real-time changes to project_members for this manager.
+  /// When SA removes manager from a project, dashboard auto-refreshes.
+  void _startMembershipListener() {
+    final mgrId = currentManagerId;
+    if (mgrId == null) return;
+
+    _membershipSubscription?.cancel();
+    _membershipSubscription = Get.find<SupabaseService>()
+        .client
+        .from('project_members')
+        .stream(primaryKey: ['id'])
+        .eq('manager_id', mgrId)
+        .listen((List<Map<String, dynamic>> data) {
+          final acceptedCount = data.where((d) => d['status'] == 'accepted').length;
+          if (projects.isNotEmpty && acceptedCount != projects.length) {
+            print('🔄 Dashboard: real-time membership change detected, refreshing...');
+            fetchProjects();
+          }
+        });
   }
 
   // ============================================
@@ -134,6 +173,7 @@ class ManagerDashboardController extends GetxController {
         ProjectModel? toSelect;
 
         // 1. Try to keep current valid selection
+        //    (will be null if the selected project was removed from manager's access)
         if (selectedProject.value != null) {
           toSelect = result.firstWhereOrNull((p) => p.id == selectedProject.value!.id);
         }
@@ -151,6 +191,14 @@ class ManagerDashboardController extends GetxController {
 
         // 3. Fallback to first
         toSelect ??= result.first;
+
+        // If previously selected project is no longer accessible (removed by SA),
+        // clear stale saved project IDs so we don't try to reselect it next time
+        if (selectedProject.value != null && 
+            !result.any((p) => p.id == selectedProject.value!.id)) {
+          _storage.setString('last_project_id_$managerId', toSelect.id);
+          _storage.setString(StorageService.keyLastProjectID, toSelect.id);
+        }
 
         // Only update if selection changed or first load
         if (selectedProject.value?.id != toSelect.id) {

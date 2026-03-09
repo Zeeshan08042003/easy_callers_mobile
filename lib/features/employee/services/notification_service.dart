@@ -18,6 +18,7 @@ class NotificationService extends GetxService {
   final SupabaseService _supabase = Get.find<SupabaseService>();
   
   StreamSubscription? _notificationSubscription;
+  DateTime? _listeningSince; // Track when we started listening to avoid showing stale notifications
 
   Future<NotificationService> init() async {
     const androidSettings =
@@ -61,9 +62,14 @@ class NotificationService extends GetxService {
     }
   }
 
-  /// Start listening for real-time notifications from Supabase
+  /// Start listening for real-time notifications from Supabase.
+  /// Only shows notifications created AFTER the listener starts
+  /// to avoid flooding the user with old "lead assigned" notifications on login.
   void listenToNotifications(String userId, UserRole role) {
     stopListening(); // Clear existing if any
+
+    // Record the time we start listening — only show notifications newer than this
+    _listeningSince = DateTime.now().toUtc();
 
     String roleColumn = '';
     switch (role) {
@@ -84,21 +90,23 @@ class NotificationService extends GetxService {
         .stream(primaryKey: ['id'])
         .eq(roleColumn, userId)
         .listen((List<Map<String, dynamic>> data) {
-          if (data.isNotEmpty) {
-            // Get the latest notification (usually the first one in the stream results if ordered)
-            // But stream provides the whole list. We need to find "just now" created ones.
-            // A better way is to use a timestamp filter or just check for unread ones.
-            // For simplicity, we'll notify on all unread ones found in the initial/updated stream
+          if (data.isNotEmpty && _listeningSince != null) {
             for (var notification in data) {
               if (notification['is_read'] == false) {
-                // Check if we already showed this potentially
-                // In a production app, we'd track IDs
-                showNotification(
-                  id: notification['id'].hashCode,
-                  title: notification['title'],
-                  body: notification['body'],
-                  payload: notification['metadata']?.toString(),
+                // Only show notifications created AFTER we started listening
+                // This prevents stale "lead assigned" notifications from popping up
+                final createdAt = DateTime.tryParse(
+                  notification['created_at']?.toString() ?? '',
                 );
+                
+                if (createdAt != null && createdAt.isAfter(_listeningSince!)) {
+                  showNotification(
+                    id: notification['id'].hashCode,
+                    title: notification['title'],
+                    body: notification['body'],
+                    payload: notification['metadata']?.toString(),
+                  );
+                }
               }
             }
           }

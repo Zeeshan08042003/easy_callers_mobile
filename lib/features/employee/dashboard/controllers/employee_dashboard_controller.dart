@@ -83,11 +83,13 @@ class EmployeeDashboardController extends GetxController {
 
   Future<void> _loadProjects() async {
     final employeeId = _authService.currentEmployee.value?.id;
+    print('📂 _loadProjects: employeeId=$employeeId');
     if (employeeId == null) return;
 
     try {
       final fetchedProjects = await _projectService.getProjectsForEmployee(employeeId);
       projects.value = fetchedProjects;
+      print('📂 _loadProjects: found ${fetchedProjects.length} projects');
       
       if (projects.isNotEmpty) {
         // Load persist project ID
@@ -104,9 +106,12 @@ class EmployeeDashboardController extends GetxController {
         } else {
           selectedProject.value = projects.first;
         }
+        print('📂 _loadProjects: selectedProject=${selectedProject.value?.name} (id=${selectedProject.value?.id})');
+      } else {
+        print('📂 _loadProjects: NO projects found for this employee — leads will load without project filter');
       }
     } catch (e) {
-      print('Error fetching projects for employee: $e');
+      print('❌ Error fetching projects for employee: $e');
     }
   }
 
@@ -139,10 +144,16 @@ class EmployeeDashboardController extends GetxController {
       hasMoreLeads.value = true;
       
       final employeeId = _authService.currentEmployee.value?.id;
-      if (employeeId == null) return;
+      if (employeeId == null) {
+        print('❌ refreshData: employeeId is null!');
+        return;
+      }
 
       // Parallel fetch, passing selected project ID
       final pId = selectedProject.value?.id;
+      print('🔄 refreshData: employeeId=$employeeId, projectId=$pId');
+      
+      // Queue shows only unattempted leads (status = 'assigned')
       final results = await Future.wait([
         _leadService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize, projectId: pId, status: LeadStatus.assigned),
         _leadService.getTodayFollowUps(employeeId, projectId: pId),
@@ -151,11 +162,40 @@ class EmployeeDashboardController extends GetxController {
         _leadService.getLeadsCountByEmployee(employeeId, status: LeadStatus.assigned, projectId: pId),
       ]);
 
-      assignedLeads.value = results[0] as List<LeadModel>;
+      var fetchedLeads = results[0] as List<LeadModel>;
       pendingFollowups.value = results[1] as List<LeadModel>;
       todayStats.value = results[2] as Map<String, dynamic>;
       totalLeadsCount.value = results[3] as int;
       pendingLeadsCount.value = results[4] as int;
+      
+      print('✅ refreshData results: queue=${fetchedLeads.length}, followUps=${pendingFollowups.length}, total=$totalLeadsCount, pending(assigned)=$pendingLeadsCount');
+
+      // DIAGNOSTIC: if total > 0 but queue is empty, find out what status the leads have
+      if (fetchedLeads.isEmpty && totalLeadsCount.value > 0) {
+        print('⚠️ Total leads=$totalLeadsCount but queue is empty. Checking lead statuses...');
+        final allLeads = await _leadService.getLeadsByEmployee(
+          employeeId, page: 1, pageSize: 10, projectId: pId,
+        );
+        for (final lead in allLeads) {
+          print('   📄 Lead "${lead.name}" → status: ${lead.status}');
+        }
+        
+        // Also check without project filter if pId was set
+        if (pId != null) {
+          print('⚠️ Also checking without project filter...');
+          final noProjectLeads = await _leadService.getLeadsByEmployee(
+            employeeId, page: 1, pageSize: 10, status: LeadStatus.assigned,
+          );
+          print('   Found ${noProjectLeads.length} assigned leads without project filter');
+          if (noProjectLeads.isNotEmpty) {
+            fetchedLeads = noProjectLeads;
+            pendingLeadsCount.value = noProjectLeads.length;
+          }
+        }
+      }
+
+      // Enrich leads with project name and manager name
+      assignedLeads.value = _enrichLeads(fetchedLeads);
 
       if (assignedLeads.length < _pageSize) {
         hasMoreLeads.value = false;
@@ -164,10 +204,32 @@ class EmployeeDashboardController extends GetxController {
       // Update stats
       _updateStats();
     } catch (e) {
+      print('❌ refreshData ERROR: $e');
       Get.snackbar('Error', 'Failed to refresh dashboard: $e');
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Enrich leads with project title and manager name from locally available data
+  List<LeadModel> _enrichLeads(List<LeadModel> leads) {
+    // Build project name lookup from loaded projects
+    final projectMap = <String, String>{};
+    for (final p in projects) {
+      projectMap[p.id] = p.name;
+    }
+
+    // Get manager name from current employee's manager info
+    final employee = _authService.currentEmployee.value;
+    final managerName = employee?.managerName;
+
+    return leads.map((lead) {
+      final projName = lead.projectId != null ? projectMap[lead.projectId] : null;
+      return lead.copyWith(
+        projectTitle: projName ?? lead.projectTitle,
+        uploadedByName: lead.uploadedByName ?? managerName,
+      );
+    }).toList();
   }
 
   Future<void> loadMoreLeads() async {

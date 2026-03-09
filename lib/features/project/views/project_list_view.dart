@@ -54,33 +54,56 @@ class ProjectListView extends StatelessWidget {
           }),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(controller),
-          Expanded(
-            child: Obx(() {
-              if (controller.isLoading.value &&
-                  controller.projects.isEmpty) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                );
-              }
+      body: RefreshIndicator(
+        onRefresh: controller.fetchProjects,
+        color: AppColors.primary,
+        child: Column(
+          children: [
+            _buildSearchBar(controller),
+            Expanded(
+              child: Obx(() {
+                if (controller.isLoading.value &&
+                    controller.projects.isEmpty) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
 
-              // Show pending invitations banner for managers
-              if (controller.isManager &&
-                  controller.pendingInvitationCount.value > 0) {
-                return Column(
-                  children: [
-                    _buildInvitationsBanner(context, controller),
-                    Expanded(child: _buildProjectsList(controller)),
+                return CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // Show pending invitations banner for managers
+                    if (controller.isManager &&
+                        controller.pendingInvitationCount.value > 0)
+                      SliverToBoxAdapter(
+                        child: _buildInvitationsBanner(context, controller),
+                      ),
+
+                    // Show projects or empty state
+                    if (controller.filteredProjects.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _buildEmptyState(),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.all(20),
+                        sliver: SliverList.separated(
+                          itemCount: controller.filteredProjects.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 16),
+                          itemBuilder: (context, index) {
+                            return _buildProjectCard(
+                                controller.filteredProjects[index]);
+                          },
+                        ),
+                      ),
                   ],
                 );
-              }
-
-              return _buildProjectsList(controller);
-            }),
-          ),
-        ],
+              }),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'project_list_fab',
@@ -184,25 +207,8 @@ class ProjectListView extends StatelessWidget {
     );
   }
 
-  Widget _buildProjectsList(ProjectListController controller) {
-    return Obx(() {
-      if (controller.filteredProjects.isEmpty) {
-        return _buildEmptyState();
-      }
-      return RefreshIndicator(
-        onRefresh: controller.fetchProjects,
-        color: AppColors.primary,
-        child: ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: controller.filteredProjects.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            return _buildProjectCard(controller.filteredProjects[index]);
-          },
-        ),
-      );
-    });
-  }
+
+
 
   Widget _buildProjectCard(ProjectModel project) {
     return GestureDetector(

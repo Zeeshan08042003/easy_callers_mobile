@@ -473,24 +473,57 @@ class ProjectService extends GetxService {
     }
   }
 
-  /// Get pending invitations for a manager
+  /// Get pending invitations for a manager (via SECURITY DEFINER RPC)
   Future<List<ProjectMemberModel>> getPendingInvitations(String managerId) async {
     try {
-      final response = await _supabase.projectMembersTable
-          .select('''
-            *,
-            manager:manager_id(first_name, last_name, email),
-            project:project_id(name, subtitle),
-            inviter_super_admin:invited_by_super_admin_id(first_name, last_name),
-            inviter_manager:invited_by_manager_id(first_name, last_name)
-          ''')
-          .eq('manager_id', managerId)
-          .eq('status', 'pending')
-          .order('created_at', ascending: false);
+      print('=== Fetching Pending Invitations ===');
+      print('Manager ID: $managerId');
+      
+      final response = await _supabase.client.rpc(
+        'get_pending_invitations_for_manager',
+        params: {'input_manager_id': managerId},
+      );
 
-      return (response as List)
-          .map((json) => ProjectMemberModel.fromJson(json))
-          .toList();
+      if (response == null || (response is List && response.isEmpty)) {
+        print('No pending invitations found');
+        return [];
+      }
+
+      final results = (response as List);
+      print('Found ${results.length} pending invitation(s)');
+      
+      // Map RPC results to the format ProjectMemberModel expects
+      return results.map((row) {
+        final mapped = <String, dynamic>{
+          'id': row['id'],
+          'project_id': row['project_id'],
+          'manager_id': row['manager_id'],
+          'role': row['role'],
+          'status': row['status'],
+          'visible_to_super_admin': row['visible_to_super_admin'],
+          'can_upload': row['can_upload'],
+          'invited_by_super_admin_id': row['invited_by_super_admin_id'],
+          'invited_by_manager_id': row['invited_by_manager_id'],
+          'created_at': row['created_at'],
+          'updated_at': row['updated_at'],
+          // Reconstruct embedded format for ProjectMemberModel.fromJson
+          'project': row['project_name'] != null
+              ? {'name': row['project_name'], 'subtitle': row['project_subtitle']}
+              : null,
+          'manager': {
+            'first_name': row['manager_first_name'],
+            'last_name': row['manager_last_name'],
+            'email': row['manager_email'],
+          },
+          'inviter_super_admin': row['inviter_name'] != null && row['invited_by_super_admin_id'] != null
+              ? {'first_name': row['inviter_name']?.toString().split(' ').first ?? '', 'last_name': row['inviter_name']?.toString().split(' ').skip(1).join(' ') ?? ''}
+              : null,
+          'inviter_manager': row['inviter_name'] != null && row['invited_by_manager_id'] != null
+              ? {'first_name': row['inviter_name']?.toString().split(' ').first ?? '', 'last_name': row['inviter_name']?.toString().split(' ').skip(1).join(' ') ?? ''}
+              : null,
+        };
+        return ProjectMemberModel.fromJson(mapped);
+      }).toList();
     } catch (e) {
       print('Error fetching pending invitations: $e');
       return [];
@@ -760,6 +793,33 @@ class ProjectService extends GetxService {
       return true;
     } catch (e) {
       print('Error adding caller to project: $e');
+      return false;
+    }
+  }
+
+  /// Add multiple employees (callers) to a project at once
+  Future<bool> addCallersToProject({
+    required String projectId,
+    required List<String> employeeIds,
+    required String managerId,
+  }) async {
+    try {
+      if (employeeIds.isEmpty) return true;
+      
+      final rows = employeeIds.map((empId) => {
+        'project_id': projectId,
+        'employee_id': empId,
+        'added_by_manager_id': managerId,
+      }).toList();
+
+      // Use upsert to avoid errors if some callers are already in the project
+      await _supabase.projectCallersTable.upsert(
+        rows,
+        onConflict: 'project_id,employee_id',
+      );
+      return true;
+    } catch (e) {
+      print('Error adding callers to project: $e');
       return false;
     }
   }

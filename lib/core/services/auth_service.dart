@@ -260,6 +260,7 @@ class AuthService extends GetxService {
       }
 
       // STEP 3: Activate via SECURITY DEFINER function (bypasses RLS)
+      // This also confirms the email in auth.users
       print("Activating employee via RPC: auth_id=$authUserId");
       
       final activatedRecords = await _supabase.client.rpc(
@@ -273,6 +274,19 @@ class AuthService extends GetxService {
       if (activatedRecords == null || activatedRecords.isEmpty) {
         error.value = 'Failed to activate employee account.';
         return null;
+      }
+
+      // STEP 4: Explicitly confirm the email as a safety net
+      // (handles edge cases where activate_employee's WHERE clause didn't match)
+      try {
+        await _supabase.client.rpc(
+          'confirm_user_email',
+          params: {'input_auth_id': authUserId},
+        );
+        print("✅ Email confirmed for auth user: $authUserId");
+      } catch (e) {
+        // Non-fatal: the activate_employee function should have handled this
+        print("⚠️ Could not explicitly confirm email (non-fatal): $e");
       }
 
       final employee = EmployeeModel.fromJson(activatedRecords.first);
@@ -391,25 +405,31 @@ class AuthService extends GetxService {
       final otpExpiry = DateTime.now().add(const Duration(hours: 24));
       final normalizedEmail = email.toLowerCase().trim();
 
-      // 2. Insert into managers table
-      final insertData = <String, dynamic>{
-        'email': normalizedEmail,
-        'first_name': firstName,
-        'last_name': lastName,
-        'is_active': false,
-        'created_by_super_admin_id': currentSuperAdmin.value!.id,
-        'manager_type': 'manager',
-        'otp_code': otp,
-        'otp_expires_at': otpExpiry.toIso8601String(),
-      };
-      if (phone != null) insertData['phone'] = phone;
+      // 2. Create manager via SECURITY DEFINER RPC (bypasses RLS)
+      print('=== Creating Manager via RPC ===');
+      print('Email: $normalizedEmail');
+      
+      final result = await _supabase.client.rpc(
+        'sa_create_manager',
+        params: {
+          'input_email': normalizedEmail,
+          'input_first_name': firstName,
+          'input_last_name': lastName,
+          'input_phone': phone,
+          'input_manager_type': 'manager',
+          'input_otp_code': otp,
+          'input_otp_expires_at': otpExpiry.toIso8601String(),
+        },
+      );
 
-      final response = await _supabase.managersTable
-          .insert(insertData)
-          .select()
-          .single();
+      if (result == null || (result is List && result.isEmpty)) {
+        error.value = 'Failed to create manager. Please try again.';
+        return null;
+      }
 
-      final manager = ManagerModel.fromJson(response);
+      final managerData = result is List ? result.first : result;
+      final manager = ManagerModel.fromJson(managerData);
+      print('✅ Manager created: ${manager.fullName} (${manager.id})');
 
       // 3. Send OTP via email
       await _sendOTPEmail(
@@ -429,7 +449,15 @@ class AuthService extends GetxService {
 
       return (manager: manager, otp: otp);
     } catch (e) {
-      error.value = 'Error creating manager: $e';
+      print('❌ Error creating manager: $e');
+      final errorMsg = e.toString();
+      if (errorMsg.contains('already exists')) {
+        error.value = 'A manager with this email already exists.';
+      } else if (errorMsg.contains('Only super admins')) {
+        error.value = 'Only super admins can create managers.';
+      } else {
+        error.value = 'Error creating manager: $e';
+      }
       return null;
     } finally {
       isLoading.value = false;
@@ -545,6 +573,7 @@ class AuthService extends GetxService {
       }
 
       // 3. Activate via SECURITY DEFINER function (bypasses RLS)
+      // This also confirms the email in auth.users
       final activatedRecords = await _supabase.client.rpc(
         'activate_manager',
         params: {
@@ -556,6 +585,17 @@ class AuthService extends GetxService {
       if (activatedRecords == null || activatedRecords.isEmpty) {
         error.value = 'Failed to activate manager account.';
         return null;
+      }
+
+      // 4. Explicitly confirm the email as a safety net
+      try {
+        await _supabase.client.rpc(
+          'confirm_user_email',
+          params: {'input_auth_id': authUserId},
+        );
+        print("✅ Email confirmed for manager auth user: $authUserId");
+      } catch (e) {
+        print("⚠️ Could not explicitly confirm email (non-fatal): $e");
       }
 
       final manager = ManagerModel.fromJson(activatedRecords.first);

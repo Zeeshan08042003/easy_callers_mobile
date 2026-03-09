@@ -85,6 +85,17 @@ class LeadDetailView extends StatelessWidget {
         ? '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase()
         : lead.name.substring(0, 2).toUpperCase();
 
+    // Build subtitle with project name and manager name
+    final project = lead.projectTitle ?? lead.projectName;
+    final manager = lead.uploadedByName;
+    String subtitle = '';
+    if (project != null && project.isNotEmpty) {
+      subtitle = project;
+    }
+    if (manager != null && manager.isNotEmpty) {
+      subtitle += subtitle.isNotEmpty ? ' • $manager' : manager;
+    }
+
     return Column(
       children: [
         Stack(
@@ -140,12 +151,34 @@ class LeadDetailView extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
+        // Phone number
+        if (lead.phone.isNotEmpty)
+          Text(
+            lead.phone.first,
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
         Text(
-          lead.projectName ?? 'Senior Director • TechSolutions Inc.',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 14,
+          "Lead managed by : ",
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
