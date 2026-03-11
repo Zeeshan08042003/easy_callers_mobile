@@ -2049,10 +2049,11 @@ class LeadService extends GetxService {
   /// Get managers created by this Super Admin only (no agencies).
   Future<List<ManagerModel>> getAllManagers({String? currentSuperAdminId}) async {
     try {
-      var query = _supabase.managersTable.select().eq('is_active', true);
+      var query = _supabase.managersTable.select();
       
       if (currentSuperAdminId != null) {
         // Only managers created by this SA — agencies are separate
+        // No is_active filter: show both active and inactive managers
         query = query.eq('created_by_super_admin_id', currentSuperAdminId);
       }
 

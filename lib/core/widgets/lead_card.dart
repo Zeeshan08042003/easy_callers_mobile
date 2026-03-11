@@ -45,6 +45,8 @@ class LeadCard extends StatelessWidget {
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -54,6 +56,8 @@ class LeadCard extends StatelessWidget {
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -62,11 +66,15 @@ class LeadCard extends StatelessWidget {
                                size: 14, 
                                color: AppColors.textSecondary.withOpacity(0.5)),
                           const SizedBox(width: 4),
-                          Text(
-                            'Active: ${DateFormat('dd MMM, hh:mm a').format(lead.updatedAt)}',
-                            style: TextStyle(
-                              color: AppColors.textSecondary.withOpacity(0.5),
-                              fontSize: 12,
+                          Flexible(
+                            child: Text(
+                              'Active: ${DateFormat('dd MMM, hh:mm a').format(lead.updatedAt)}',
+                              style: TextStyle(
+                                color: AppColors.textSecondary.withOpacity(0.5),
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],

@@ -49,7 +49,7 @@ class ManagerModel {
 
   bool get isOTPExpired {
     if (otpExpiresAt == null) return true;
-    return otpExpiresAt!.isBefore(DateTime.now());
+    return otpExpiresAt!.toUtc().isBefore(DateTime.now().toUtc());
   }
 
   String get initials {

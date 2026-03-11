@@ -402,12 +402,13 @@ class AuthService extends GetxService {
 
       // 1. Generate OTP
       final otp = generateOTP();
-      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
+      final otpExpiry = DateTime.now().toUtc().add(const Duration(hours: 24));
       final normalizedEmail = email.toLowerCase().trim();
 
       // 2. Create manager via SECURITY DEFINER RPC (bypasses RLS)
       print('=== Creating Manager via RPC ===');
       print('Email: $normalizedEmail');
+      print('OTP Expiry (UTC): ${otpExpiry.toIso8601String()}');
       
       final result = await _supabase.client.rpc(
         'sa_create_manager',
@@ -882,7 +883,7 @@ class AuthService extends GetxService {
   Future<String?> resendManagerOTP(String managerEmail) async {
     try {
       final otp = generateOTP();
-      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
+      final otpExpiry = DateTime.now().toUtc().add(const Duration(hours: 24));
 
       final normalizedEmail = managerEmail.toLowerCase().trim();
       await _supabase.managersTable.update({

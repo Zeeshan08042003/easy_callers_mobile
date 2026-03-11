@@ -97,75 +97,106 @@ class ManagerListView extends GetView<ManagerListController> {
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
+          border: Border.all(
+            color: manager.isActive 
+                ? Colors.white.withOpacity(0.05) 
+                : Colors.redAccent.withOpacity(0.15),
+          ),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                image: manager.profileImageUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(manager.profileImageUrl!), 
-                        fit: BoxFit.cover
-                      )
-                    : null,
-              ),
-              child: manager.profileImageUrl == null
-                  ? Icon(
-                      manager.isAgency ? Icons.apartment_rounded : Icons.person_rounded, 
-                      color: AppColors.primary, 
-                      size: 28
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    manager.fullName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+            Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: manager.isActive
+                        ? AppColors.primary.withOpacity(0.1)
+                        : Colors.redAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    image: manager.profileImageUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(manager.profileImageUrl!), 
+                            fit: BoxFit.cover
+                          )
+                        : null,
                   ),
-                  Text(
-                    manager.agencyName ?? manager.email,
-                    style: TextStyle(
-                      color: AppColors.textSecondary.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
+                  child: manager.profileImageUrl == null
+                      ? Icon(
+                          manager.isAgency ? Icons.apartment_rounded : Icons.person_rounded, 
+                          color: manager.isActive ? AppColors.primary : Colors.redAccent, 
+                          size: 28
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSmallBadge(
-                        'ACTIVE', 
-                        manager.isActive ? AppColors.success : AppColors.textSecondary
-                      ),
-                      const SizedBox(width: 8),
-                      // New Role Badge
-                      _buildSmallBadge(
-                        manager.isAgency ? 'AGENCY' : 'MANAGER',
-                        manager.isAgency ? Colors.blueAccent : Colors.orangeAccent
-                      ),
-                      const SizedBox(width: 8),
                       Text(
-                        'Since ${manager.createdAt.year}',
-                        style: TextStyle(color: AppColors.textSecondary.withOpacity(0.4), fontSize: 10),
+                        manager.fullName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        manager.agencyName ?? manager.email,
+                        style: TextStyle(
+                          color: AppColors.textSecondary.withOpacity(0.7),
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          _buildSmallBadge(
+                            manager.isActive ? 'ACTIVE' : 'INACTIVE', 
+                            manager.isActive ? AppColors.success : Colors.redAccent,
+                          ),
+                          _buildSmallBadge(
+                            manager.isAgency ? 'AGENCY' : 'MANAGER',
+                            manager.isAgency ? Colors.blueAccent : Colors.orangeAccent,
+                          ),
+                          Text(
+                            'Since ${manager.createdAt.year}',
+                            style: TextStyle(color: AppColors.textSecondary.withOpacity(0.4), fontSize: 10),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textSecondary, size: 16),
+              ],
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textSecondary, size: 16),
+            // Show Resend OTP button for all inactive managers
+            if (!manager.isActive) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => controller.resendOTP(manager),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Resend OTP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orangeAccent,
+                    side: BorderSide(color: Colors.orangeAccent.withOpacity(0.3)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -150,6 +150,9 @@ class LeadDetailView extends StatelessWidget {
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),
         // Phone number
@@ -200,9 +203,8 @@ class LeadDetailView extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Visibility(
-          visible: lead.email != null,
-          child: Expanded(
+        if (lead.email != null)
+          Expanded(
             child: _buildActionButton(
               icon: Icons.email_rounded,
               label: 'EMAIL',
@@ -218,7 +220,6 @@ class LeadDetailView extends StatelessWidget {
               },
             ),
           ),
-        ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildActionButton(
@@ -674,14 +675,18 @@ class LeadDetailView extends StatelessWidget {
                     color: leadStatusStr == 'visiting' ? AppColors.success : const Color(0xFFFFB84D),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    leadStatusStr == 'visiting'
-                        ? 'Visit: ${DateFormat('dd MMM yyyy, hh:mm a').format(lastCall.followUpDate!)}'
-                        : 'Follow-up: ${DateFormat('dd MMM yyyy').format(lastCall.followUpDate!)}',
-                    style: TextStyle(
-                      color: leadStatusStr == 'visiting' ? AppColors.success : const Color(0xFFFFB84D),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      leadStatusStr == 'visiting'
+                          ? 'Visit: ${DateFormat('dd MMM yyyy, hh:mm a').format(lastCall.followUpDate!)}'
+                          : 'Follow-up: ${DateFormat('dd MMM yyyy').format(lastCall.followUpDate!)}',
+                      style: TextStyle(
+                        color: leadStatusStr == 'visiting' ? AppColors.success : const Color(0xFFFFB84D),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

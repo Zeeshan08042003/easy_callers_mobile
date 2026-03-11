@@ -112,27 +112,31 @@ class ManagerOversightView extends StatelessWidget {
             child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           ),
         ),
-        Column(
-          children: [
-            Text(
-              'AGENCY OVERSIGHT',
-              style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.6),
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
+        Expanded(
+          child: Column(
+            children: [
+              Text(
+                'AGENCY OVERSIGHT',
+                style: TextStyle(
+                  color: AppColors.textSecondary.withOpacity(0.6),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 4),
+              Text(
+                name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(width: 44), // Spacer to balance the back button
       ],

@@ -90,30 +90,37 @@ class SuperAdminDashboardView extends GetView<SuperAdminDashboardController> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Super Admin',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Super Admin',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'GLOBAL NETWORK CONTROL',
-              style: TextStyle(
-                color: AppColors.textSecondary.withOpacity(0.7),
-                fontSize: 13,
-                letterSpacing: 1.2,
-                fontWeight: FontWeight.w800,
+              const SizedBox(height: 4),
+              Text(
+                'GLOBAL NETWORK CONTROL',
+                style: TextStyle(
+                  color: AppColors.textSecondary.withOpacity(0.7),
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w800,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        const SizedBox(width: 12),
         Row(
           children: [
             Container(
