@@ -43,7 +43,7 @@ class AuthController extends GetxController {
   Rx<EmployeeModel?> get currentEmployee => _authService.currentEmployee;
   
   // For first-time activation
-  final Rx<UserRole?> detectedActivationRole = Rx<UserRole?>(null)
+  final Rx<UserRole?> detectedActivationRole = Rx<UserRole?>(null);
 
   // ============================================
   // LOGIN
