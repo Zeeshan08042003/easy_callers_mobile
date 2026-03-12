@@ -6,7 +6,7 @@ import 'package:easy_callers_mobile/features/project/services/project_service.da
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class SuperAdminDashboardController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final ProjectService _projectService = Get.find<ProjectService>();
   final AuthService _authService = Get.find<AuthService>();
   
@@ -69,8 +69,8 @@ class SuperAdminDashboardController extends GetxController {
     try {
       // Fetch stats, managers, and projects in parallel
       final results = await Future.wait([
-        _leadService.getGlobalStats(superAdminId: saId),
-        _leadService.getNetworkManagers(currentSuperAdminId: saId),
+        _webService.getGlobalStats(superAdminId: saId),
+        _webService.getNetworkManagers(currentSuperAdminId: saId),
         _projectService.getProjectsForSuperAdmin(saId),
       ]);
 

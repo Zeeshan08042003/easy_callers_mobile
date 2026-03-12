@@ -19,7 +19,7 @@ import '../../leads/views/distribute_leads_view.dart';
 import '../../models/lead_model.dart';
 
 class ManagerDashboardController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final ProjectService _projectService = Get.find<ProjectService>();
   final AuthService _authService = Get.find<AuthService>();
   final StorageService _storage = Get.find<StorageService>();
@@ -267,7 +267,7 @@ class ManagerDashboardController extends GetxController {
       Get.snackbar(
         'Permission Denied', 
         'The Super Admin has not granted you permission to upload leads to this project.',
-        backgroundColor: Get.theme.colorScheme.error.withOpacity(0.1),
+        backgroundColor: Get.theme.colorScheme.error.withValues(alpha: 0.1),
         colorText: Get.theme.colorScheme.error,
       );
       return;
@@ -319,9 +319,9 @@ class ManagerDashboardController extends GetxController {
         return;
       }
 
-      final employees = await _leadService.getEmployeesByManager(managerId);
+      final employeesStr = (await _webService.getEmployeesByManager(managerId)).payload ?? [];
 
-      if (employees.isEmpty) {
+      if (employeesStr.isEmpty) {
         isLoading.value = false;
         Get.snackbar(
           'No Employees Found',
@@ -404,23 +404,23 @@ class ManagerDashboardController extends GetxController {
         }
 
         // Fetch latest batch (for reference)
-        final batch = await _leadService.getLatestBatchWithUnassignedLeadsForProject(
+        final batchResult = (await _webService.getLatestBatchWithUnassignedLeadsForProject(
           managerId: oversightManagerId,
           projectId: projectId,
-        );
-        lastUploadedBatch.value = batch;
+        )).payload;
+        lastUploadedBatch.value = batchResult;
 
         // Count ALL unassigned leads across ALL batches in the project
-        final allUnassigned = await _leadService.getUnassignedLeadsForProject(projectId);
+        final allUnassigned = (await _webService.getUnassignedLeadsForProject(projectId)).payload ?? [];
         unassignedCount.value = allUnassigned.length;
 
         // Fetch dashboard stats FOR THIS PROJECT
-        final stats = await _leadService.getProjectDashboardStats(
+        final statsStr = (await _webService.getProjectDashboardStats(
           managerId: managerId, // Filter stats by manager
           projectId: projectId,
-        );
-        totalLeads.value = stats['totalLeads'] as int;
-        final assignedCount = stats['assignedLeads'] as int;
+        )).payload ?? {};
+        totalLeads.value = (statsStr['totalLeads'] as int?) ?? 0;
+        final assignedCount = (statsStr['assignedLeads'] as int?) ?? 0;
         if (totalLeads.value > 0) {
           leadsAssigned.value =
               ((assignedCount / totalLeads.value) * 100).toInt();
@@ -429,25 +429,25 @@ class ManagerDashboardController extends GetxController {
         }
 
         teamPerformance.value =
-            (stats['performance'] as num).toDouble().toPrecision(1);
+            ((statsStr['performance'] as num?) ?? 0.0).toDouble().toPrecision(1);
 
         // Fetch status counts
-        final statusCounts = await _leadService.getProjectStatusCounts(
+        final statusCountsStr = (await _webService.getProjectStatusCounts(
           projectId: projectId,
           managerId: managerId, // Filter counts by manager
           todayOnly: true,
-        );
-        dailyFollowUps.value = statusCounts['follow_up'] ?? 0;
-        dailyVisiting.value = statusCounts['visiting'] ?? 0;
-        visitCompleted.value = statusCounts['visit_completed'] ?? 0;
-        convertedCount.value = statusCounts['converted'] ?? 0;
-        allActivityCount.value = statusCounts['all'] ?? 0;
+        )).payload ?? {};
+        dailyFollowUps.value = statusCountsStr['follow_up'] ?? 0;
+        dailyVisiting.value = statusCountsStr['visiting'] ?? 0;
+        visitCompleted.value = statusCountsStr['visit_completed'] ?? 0;
+        convertedCount.value = statusCountsStr['converted'] ?? 0;
+        allActivityCount.value = statusCountsStr['all'] ?? 0;
 
         // Fetch leads for the current active tab
         await fetchDashboardLeads();
 
         // Team stats (still manager-wide, not project-filtered)
-        final team = await _leadService.getManagerTeamStats(managerId);
+        final team = (await _webService.getManagerTeamStats(managerId)).payload ?? [];
         if (team.isNotEmpty) {
           teamMembers.value = team;
         }
@@ -455,7 +455,7 @@ class ManagerDashboardController extends GetxController {
         // Last call activity
         try {
           final lastCall =
-              await _leadService.getLastCallByManager(managerId);
+              (await _webService.getLastCallByManager(managerId)).payload;
           lastCallLog.value = lastCall;
         } catch (e) {
           print('Error fetching last call: $e');
@@ -463,10 +463,9 @@ class ManagerDashboardController extends GetxController {
 
         // Weekly distribution
         try {
-          final weeklyData =
-              await _leadService.getWeeklyDistribution(managerId);
-          if (weeklyData.isNotEmpty) {
-            weeklyDistribution.value = weeklyData;
+          final weeklyDataStr = (await _webService.getWeeklyDistribution(managerId)).payload;
+          if (weeklyDataStr != null && weeklyDataStr.isNotEmpty) {
+            weeklyDistribution.value = weeklyDataStr;
           }
         } catch (e) {
           print('Error fetching weekly distribution: $e');
@@ -494,34 +493,34 @@ class ManagerDashboardController extends GetxController {
       List<LeadModel> result;
       switch (selectedLifecycleTab.value) {
         case 0: // Daily Follow-ups
-          result = await _leadService.getProjectLeadsByStatus(
+          result = (await _webService.getProjectLeadsByStatus(
             projectId: projectId, 
             status: 'follow_up',
             managerId: managerId,
             todayOnly: true,
-          );
+          )).payload ?? [];
           break;
         case 1: // Daily Visiting
-          result = await _leadService.getProjectLeadsByStatus(
+          result = (await _webService.getProjectLeadsByStatus(
             projectId: projectId, 
             status: 'visiting',
             managerId: managerId,
             todayOnly: true,
-          );
+          )).payload ?? [];
           break;
         case 2: // Visit Completed
-          result = await _leadService.getProjectLeadsByStatus(
+          result = (await _webService.getProjectLeadsByStatus(
             projectId: projectId, 
             status: 'visit_completed',
             managerId: managerId,
             todayOnly: true,
-          );
+          )).payload ?? [];
           break;
         case 3: // All Activity
-          result = await _leadService.getProjectLeads(
+          result = (await _webService.getProjectLeads(
             projectId,
             managerId: managerId,
-          );
+          )).payload ?? [];
           break;
         default:
           result = [];
@@ -537,7 +536,7 @@ class ManagerDashboardController extends GetxController {
 
   Future<void> updateLeadStatus(String leadId, LeadStatus newStatus) async {
     try {
-      await _leadService.updateLeadStatus(leadId, newStatus);
+      await _webService.updateLeadStatus(leadId, newStatus);
       
       // Remove from current dashboard list
       dashboardLeads.removeWhere((l) => l.id == leadId);
@@ -548,7 +547,7 @@ class ManagerDashboardController extends GetxController {
       Get.snackbar(
         'Success', 
         'Lead marked as ${newStatus.displayName}',
-        backgroundColor: AppColors.success.withOpacity(0.7),
+        backgroundColor: AppColors.success.withValues(alpha: 0.7),
         colorText: Colors.white,
       );
     } catch (e) {

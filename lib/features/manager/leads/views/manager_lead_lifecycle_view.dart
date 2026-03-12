@@ -7,7 +7,7 @@ import 'package:easy_callers_mobile/core/utils/enums.dart';
 import 'package:intl/intl.dart';
 
 class ManagerLeadLifecycleController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final String projectId;
   final String? managerId;
   final String status;
@@ -34,13 +34,13 @@ class ManagerLeadLifecycleController extends GetxController {
       isLoading.value = true;
       List<LeadModel> result;
       if (status == 'all') {
-        result = await _leadService.getProjectLeads(projectId, managerId: managerId);
+        result = (await _webService.getProjectLeads(projectId, managerId: managerId)).payload ?? [];
       } else {
-        result = await _leadService.getProjectLeadsByStatus(
+        result = (await _webService.getProjectLeadsByStatus(
           projectId: projectId,
           status: status,
           managerId: managerId,
-        );
+        )).payload ?? [];
       }
       leads.value = result;
     } catch (e) {
@@ -52,7 +52,7 @@ class ManagerLeadLifecycleController extends GetxController {
 
   Future<void> updateLeadStatus(String leadId, LeadStatus newStatus) async {
     try {
-      await _leadService.updateLeadStatus(leadId, newStatus);
+      await _webService.updateLeadStatus(leadId, newStatus);
       leads.removeWhere((l) => l.id == leadId);
       Get.snackbar('Success', 'Lead status updated to ${newStatus.displayName}');
     } catch (e) {

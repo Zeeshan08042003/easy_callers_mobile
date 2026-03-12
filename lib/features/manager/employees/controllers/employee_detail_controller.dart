@@ -9,7 +9,7 @@ import 'package:easy_callers_mobile/core/services/supabase_service.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 
 class EmployeeDetailController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final Rx<EmployeeModel?> employee = Rx<EmployeeModel?>(null);
@@ -51,10 +51,10 @@ class EmployeeDetailController extends GetxController {
 
       // Fetch in parallel: first page of leads + stats + other data
       final results = await Future.wait([
-        _leadService.getCallLogsByEmployee(empId, limit: 1),
-        _leadService.getLeadsByEmployee(empId, page: 1, pageSize: _pageSize),
-        _leadService.getEmployeeStats(empId),
-        if (managerId != null) _leadService.getUnattendedLeadsCount(managerId),
+        _webService.getCallLogsByEmployee(empId, limit: 1),
+        _webService.getLeadsByEmployee(empId, page: 1, pageSize: _pageSize),
+        _webService.getEmployeeStats(empId),
+        if (managerId != null) _webService.getUnattendedLeadsCount(managerId),
       ]);
 
       recentCalls.value = results[0] as List<CallLogModel>;
@@ -89,16 +89,16 @@ class EmployeeDetailController extends GetxController {
       isLoadingMore.value = true;
       _currentPage++;
 
-      final moreLeads = await _leadService.getLeadsByEmployee(
+      final moreLeadsStr = (await _webService.getLeadsByEmployee(
         employee.value!.id,
         page: _currentPage,
         pageSize: _pageSize,
-      );
+      )).payload ?? [];
 
-      assignedLeads.addAll(moreLeads);
+      assignedLeads.addAll(moreLeadsStr);
 
       // If we got fewer leads than the page size, there are no more to load
-      hasMoreLeads.value = moreLeads.length >= _pageSize;
+      hasMoreLeads.value = moreLeadsStr.length >= _pageSize;
     } catch (e) {
       _currentPage--; // Revert page on error
       Get.snackbar('Error', 'Failed to load more leads: $e');
@@ -129,10 +129,10 @@ class EmployeeDetailController extends GetxController {
     try {
       isReassigning.value = true;
 
-      final count = await _leadService.reassignUnattendedLeadsToEmployee(
+      final count = (await _webService.reassignUnattendedLeadsToEmployee(
         managerId: managerId,
         targetEmployeeId: employee.value!.id,
-      );
+      )).payload ?? 0;
 
       if (count > 0) {
         Get.snackbar(

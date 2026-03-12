@@ -7,7 +7,7 @@ import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 
 class ManagerListController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final RxList<ManagerModel> managers = <ManagerModel>[].obs;
@@ -27,9 +27,9 @@ class ManagerListController extends GetxController {
       if (saId == null) return;
 
       // Only fetch SA's own created managers (not network agencies)
-      final result = await _leadService.getAllManagers(currentSuperAdminId: saId);
-      managers.assignAll(result);
-      filteredManagers.assignAll(result);
+      final resultStr = (await _webService.getAllManagers(currentSuperAdminId: saId)).payload ?? [];
+      managers.assignAll(resultStr);
+      filteredManagers.assignAll(resultStr);
     } catch (e) {
       Get.snackbar('Error', 'Failed to load managers: $e');
     } finally {

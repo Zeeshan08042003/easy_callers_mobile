@@ -10,7 +10,7 @@ import 'package:easy_callers_mobile/features/employee/models/lead_status_model.d
 import 'package:uuid/uuid.dart';
 
 class CallFeedbackController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   late LeadModel lead;
@@ -52,12 +52,12 @@ class CallFeedbackController extends GetxController {
     try {
       isLoading.value = true;
       final managerId = _authService.currentEmployee.value?.managerId;
-      final statuses = await _leadService.getLeadStatuses(managerId);
+      final statusesList = (await _webService.getLeadStatuses(managerId)).payload ?? [];
       
       // Employee visible statuses: Follow-up, Not Interested, Visiting, Visit Completed
       final visibleMappings = ['follow_up', 'not_interested', 'visiting', 'visit_completed'];
       
-      final filteredStatuses = statuses.where((s) {
+      final filteredStatuses = statusesList.where((s) {
         final mapping = s.leadStatusMapping.toLowerCase();
         
         // Basic visibility
@@ -101,7 +101,7 @@ class CallFeedbackController extends GetxController {
         createdAt: DateTime.now(),
       );
 
-      await _leadService.addCallLog(callLog);
+      await _webService.addCallLog(callLog);
 
       Get.back();
       Get.snackbar('Success', 'Feedback submitted successfully');

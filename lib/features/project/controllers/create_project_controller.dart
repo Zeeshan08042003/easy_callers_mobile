@@ -12,7 +12,7 @@ import 'package:easy_callers_mobile/core/utils/enums.dart';
 /// Controller for creating a new project.
 class CreateProjectController extends GetxController {
   final ProjectService _projectService = Get.find<ProjectService>();
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final nameController = TextEditingController();
@@ -53,11 +53,11 @@ class CreateProjectController extends GetxController {
       
       // If SA: get their created managers + agencies
       // If Manager (Agency): get agencies
-      final managers = await _leadService.getAllManagersAndAgencies(currentSuperAdminId: saId);
+      final managersStr = (await _webService.getAllManagersAndAgencies(currentSuperAdminId: saId)).payload ?? [];
       
       // Filter out the current user themselves
       allManagers.assignAll(
-        managers.where((m) => m.id != currentManagerId).toList()
+        managersStr.where((m) => m.id != currentManagerId).toList()
       );
 
       // Default auto-selection for SA
@@ -120,8 +120,8 @@ class CreateProjectController extends GetxController {
       final mgrId = _authService.currentManager.value?.id;
       if (mgrId == null) return;
 
-      final employees = await _leadService.getEmployeesByManager(mgrId);
-      allEmployees.value = employees.where((e) => e.isActive).toList();
+      final employeesStr = (await _webService.getEmployeesByManager(mgrId)).payload ?? [];
+      allEmployees.value = employeesStr.where((e) => e.isActive).toList();
     } catch (e) {
       print('Error fetching employees: $e');
     } finally {

@@ -14,7 +14,7 @@ import 'package:easy_callers_mobile/features/employee/controllers/call_controlle
 import '../../../../core/utils/enums.dart';
 
 class EmployeeDashboardController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
   final ProjectService _projectService = Get.find<ProjectService>();
 
@@ -155,27 +155,27 @@ class EmployeeDashboardController extends GetxController {
       
       // Queue shows only unattempted leads (status = 'assigned')
       final results = await Future.wait([
-        _leadService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize, projectId: pId, status: LeadStatus.assigned),
-        _leadService.getTodayFollowUps(employeeId, projectId: pId),
+        _webService.getLeadsByEmployee(employeeId, page: _currentPage, pageSize: _pageSize, projectId: pId, status: LeadStatus.assigned),
+        _webService.getTodayFollowUps(employeeId, projectId: pId),
         _getEmployeeStats(employeeId, pId),
-        _leadService.getLeadsCountByEmployee(employeeId, projectId: pId),
-        _leadService.getLeadsCountByEmployee(employeeId, status: LeadStatus.assigned, projectId: pId),
+        _webService.getLeadsCountByEmployee(employeeId, projectId: pId),
+        _webService.getLeadsCountByEmployee(employeeId, status: LeadStatus.assigned, projectId: pId),
       ]);
 
-      var fetchedLeads = results[0] as List<LeadModel>;
-      pendingFollowups.value = results[1] as List<LeadModel>;
+      var fetchedLeads = (results[0] as WebResponse<List<LeadModel>>).payload ?? [];
+      pendingFollowups.value = (results[1] as WebResponse<List<LeadModel>>).payload ?? [];
       todayStats.value = results[2] as Map<String, dynamic>;
-      totalLeadsCount.value = results[3] as int;
-      pendingLeadsCount.value = results[4] as int;
+      totalLeadsCount.value = (results[3] as WebResponse<int>).payload ?? 0;
+      pendingLeadsCount.value = (results[4] as WebResponse<int>).payload ?? 0;
       
       print('✅ refreshData results: queue=${fetchedLeads.length}, followUps=${pendingFollowups.length}, total=$totalLeadsCount, pending(assigned)=$pendingLeadsCount');
 
       // DIAGNOSTIC: if total > 0 but queue is empty, find out what status the leads have
       if (fetchedLeads.isEmpty && totalLeadsCount.value > 0) {
         print('⚠️ Total leads=$totalLeadsCount but queue is empty. Checking lead statuses...');
-        final allLeads = await _leadService.getLeadsByEmployee(
+        final allLeads = (await _webService.getLeadsByEmployee(
           employeeId, page: 1, pageSize: 10, projectId: pId,
-        );
+        )).payload ?? [];
         for (final lead in allLeads) {
           print('   📄 Lead "${lead.name}" → status: ${lead.status}');
         }
@@ -183,9 +183,9 @@ class EmployeeDashboardController extends GetxController {
         // Also check without project filter if pId was set
         if (pId != null) {
           print('⚠️ Also checking without project filter...');
-          final noProjectLeads = await _leadService.getLeadsByEmployee(
-            employeeId, page: 1, pageSize: 10, status: LeadStatus.assigned,
-          );
+        final noProjectLeads = (await _webService.getLeadsByEmployee(
+          employeeId, page: 1, pageSize: 10, status: LeadStatus.assigned,
+        )).payload ?? [];
           print('   Found ${noProjectLeads.length} assigned leads without project filter');
           if (noProjectLeads.isNotEmpty) {
             fetchedLeads = noProjectLeads;
@@ -242,19 +242,19 @@ class EmployeeDashboardController extends GetxController {
 
       final pId = selectedProject.value?.id;
       _currentPage++;
-      final moreLeads = await _leadService.getLeadsByEmployee(
+      final moreLeadsStr = (await _webService.getLeadsByEmployee(
         employeeId, 
         page: _currentPage, 
         pageSize: _pageSize,
         projectId: pId,
         status: LeadStatus.assigned,
-      );
+      )).payload ?? [];
 
-      if (moreLeads.isEmpty) {
+      if (moreLeadsStr.isEmpty) {
         hasMoreLeads.value = false;
       } else {
-        assignedLeads.addAll(moreLeads);
-        if (moreLeads.length < _pageSize) {
+        assignedLeads.addAll(moreLeadsStr);
+        if (moreLeadsStr.length < _pageSize) {
           hasMoreLeads.value = false;
         }
       }
@@ -272,28 +272,28 @@ class EmployeeDashboardController extends GetxController {
       final todayStart = DateTime(now.year, now.month, now.day);
       final todayEnd = todayStart.add(const Duration(days: 1));
 
-      final callLogs = await _leadService.getCallLogsForDateRange(
+      final callLogsStr = (await _webService.getCallLogsForDateRange(
         employeeId: employeeId,
         startDate: todayStart,
         endDate: todayEnd,
         projectId: projectId,
-      );
+      )).payload ?? [];
 
-      final totalCalls = callLogs.length;
+      final totalCalls = callLogsStr.length;
       
       // Count unique leads that have been attended (contacted)
       // 1 lead = 1 count, even if called multiple times
       final uniqueContactedLeadIds = <String>{};
-      for (final log in callLogs) {
+      for (final log in callLogsStr) {
         uniqueContactedLeadIds.add(log.leadId);
       }
       final contactedCount = uniqueContactedLeadIds.length;
       
-      final connectedCalls = callLogs.where((log) {
+      final connectedCalls = callLogsStr.where((log) {
         final status = log.callStatus?.toLowerCase() ?? '';
         return status.contains('completed') || status.contains('connected');
       }).length;
-      final interestedLeads = callLogs.where((log) {
+      final interestedLeads = callLogsStr.where((log) {
         if (log.leadStatus == null) return false;
         final statusStr = log.leadStatus.toString();
         return statusStr == 'interested';

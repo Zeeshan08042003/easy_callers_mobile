@@ -16,7 +16,7 @@ import '../models/call_session_model.dart';
 class LeadDetailController extends GetxController {
   // static const platform = MethodChannel('com.easy_callers/call');
   final LeadModel lead;
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
   final Rx<CallSession?> lastCallSession = Rx<CallSession?>(null);
   LeadDetailController({required this.lead});
@@ -49,12 +49,12 @@ class LeadDetailController extends GetxController {
   Future<void> fetchLeadStatuses() async {
     try {
       final managerId = _authService.currentEmployee.value?.managerId;
-      final statuses = await _leadService.getLeadStatuses(managerId);
+      final statusesStr = (await _webService.getLeadStatuses(managerId)).payload ?? [];
       
       // Employee visible statuses: Follow-up, Not Interested, Visiting, Visit Completed
       final visibleMappings = ['follow_up', 'not_interested', 'visiting', 'visit_completed'];
       
-      final filteredStatuses = statuses.where((s) {
+      final filteredStatuses = statusesStr.where((s) {
         final mapping = s.leadStatusMapping.toLowerCase();
         
         // Basic visibility
@@ -84,10 +84,10 @@ class LeadDetailController extends GetxController {
   Future<void> fetchLastCallLog() async {
     try {
       isLoadingLastCall.value = true;
-      final logs = await _leadService.getCallLogsByLead(lead.id);
-      if (logs.isNotEmpty) {
-        lastCallLog.value = logs.first; // newest first (ordered DESC)
-        print('LeadDetail: Last call for lead ${lead.id}: status=${logs.first.callStatus}, leadStatus=${logs.first.leadStatus}');
+      final logsStr = (await _webService.getCallLogsByLead(lead.id)).payload ?? [];
+      if (logsStr.isNotEmpty) {
+        lastCallLog.value = logsStr.first; // newest first (ordered DESC)
+        print('LeadDetail: Last call for lead ${lead.id}: status=${logsStr.first.callStatus}, leadStatus=${logsStr.first.leadStatus}');
       } else {
         lastCallLog.value = null;
         print('LeadDetail: No previous calls for lead ${lead.id}');
@@ -220,7 +220,7 @@ class LeadDetailController extends GetxController {
       print('SaveUpdate: Saving call log for lead ${lead.id}, status: ${selectedStatus.value}');
 
       // Save call log
-      final savedLog = await _leadService.addCallLog(callLog);
+      final savedLog = await _webService.addCallLog(callLog);
 
       if (savedLog != null) {
         print('SaveUpdate: Call log saved successfully');

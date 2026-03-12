@@ -21,7 +21,7 @@ import 'package:easy_callers_mobile/features/manager/dashboard/controllers/manag
 /// Controller for the project detail view.
 class ProjectDetailController extends GetxController {
   final ProjectService _projectService = Get.find<ProjectService>();
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final Rx<ProjectModel?> project = Rx<ProjectModel?>(null);
@@ -282,10 +282,10 @@ class ProjectDetailController extends GetxController {
   Future<void> removeCaller(String employeeId) async {
     try {
       // First, check if this employee has any leads assigned in this project
-      final employeeLeads = await _leadService.getLeadsCountByEmployee(
+      final employeeLeads = (await _webService.getLeadsCountByEmployee(
         employeeId,
         projectId: projectId,
-      );
+      )).payload ?? 0;
 
       if (employeeLeads > 0) {
         // Show redistribution dialog
@@ -501,27 +501,27 @@ class ProjectDetailController extends GetxController {
       isLoading.value = true;
 
       // Get all leads assigned to this employee in this project
-      final leads = await _leadService.getLeadsByEmployee(
+      final leadsList = (await _webService.getLeadsByEmployee(
         employeeId,
         projectId: projectId,
         page: 1,
         pageSize: 10000, // Get all
-      );
+      )).payload ?? [];
 
-      if (leads.isEmpty || targetEmployees.isEmpty) return;
+      if (leadsList.isEmpty || targetEmployees.isEmpty) return;
 
       // Distribute equally among target employees
-      final leadIds = leads.map((l) => l.id).toList();
+      final leadIds = leadsList.map((l) => l.id).toList();
       final targetIds = targetEmployees.map((e) => e.id).toList();
 
-      await _leadService.splitLeadsEqually(
+      await _webService.splitLeadsEqually(
         leadIds: leadIds,
         employeeIds: targetIds,
       );
 
       Get.snackbar(
         'Redistributed',
-        '${leads.length} lead${leads.length != 1 ? 's' : ''} redistributed to ${targetEmployees.length} caller${targetEmployees.length != 1 ? 's' : ''}',
+        '${leadsList.length} lead${leadsList.length != 1 ? 's' : ''} redistributed to ${targetEmployees.length} caller${targetEmployees.length != 1 ? 's' : ''}',
       );
     } catch (e) {
       Get.snackbar('Error', 'Failed to redistribute leads: $e');
@@ -538,18 +538,18 @@ class ProjectDetailController extends GetxController {
       isLoading.value = true;
 
       // Get all leads assigned to this employee in this project
-      final leads = await _leadService.getLeadsByEmployee(
+      final leadsList = (await _webService.getLeadsByEmployee(
         employeeId,
         projectId: projectId,
         page: 1,
         pageSize: 10000, // Get all
-      );
+      )).payload ?? [];
 
-      if (leads.isEmpty) return;
+      if (leadsList.isEmpty) return;
 
       // Unassign all leads
       final supabase = Get.find<SupabaseService>();
-      final leadIds = leads.map((l) => l.id).toList();
+      final leadIds = leadsList.map((l) => l.id).toList();
 
       // Update in chunks to avoid URL length limits
       const chunkSize = 50;
@@ -566,7 +566,7 @@ class ProjectDetailController extends GetxController {
 
       Get.snackbar(
         'Unassigned',
-        '${leads.length} lead${leads.length != 1 ? 's' : ''} are now unassigned and ready for redistribution',
+        '${leadsList.length} lead${leadsList.length != 1 ? 's' : ''} are now unassigned and ready for redistribution',
       );
     } catch (e) {
       Get.snackbar('Error', 'Failed to unassign leads: $e');
@@ -623,7 +623,7 @@ class ProjectDetailController extends GetxController {
 
   Future<void> deleteBatch(String batchId) async {
     try {
-      final success = await _leadService.deleteLeadBatch(batchId);
+      final success = (await _webService.deleteLeadBatch(batchId)).payload ?? false;
       if (success) {
         _showSnack('Success', 'Excel sheet and associated leads deleted');
         await fetchProjectDetails();

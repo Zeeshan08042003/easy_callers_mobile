@@ -46,7 +46,7 @@ bootstrapApp() async {
   Get.put(ProjectService());
 
   // Register Lead Services (Dependencies for BackgroundUploadManager)
-  Get.put(LeadService());
+  Get.put(WebService());
   Get.put(LeadUploadService());
   
   // Register BackgroundUploadManager

@@ -66,10 +66,9 @@ class BatchLeadsController extends GetxController
       // or assigned to the current manager's own employees
       final managerId = _authService.currentManager.value?.id;
       if (managerId != null) {
-        // Get this manager's employee IDs
-        final leadService = Get.find<LeadService>();
+        final webService = Get.find<WebService>();
         final myEmployees =
-            await leadService.getEmployeesByManager(managerId);
+            (await webService.getEmployeesByManager(managerId)).payload ?? [];
         final myEmployeeIds = myEmployees.map((e) => e.id).toSet();
 
         leads = leads.where((lead) {
@@ -99,9 +98,9 @@ class BatchLeadsController extends GetxController
       final managerId = _authService.currentManager.value?.id;
       Set<String>? myEmployeeIds;
       if (managerId != null) {
-        final leadService = Get.find<LeadService>();
+        final webService = Get.find<WebService>();
         final myEmployees =
-            await leadService.getEmployeesByManager(managerId);
+            (await webService.getEmployeesByManager(managerId)).payload ?? [];
         myEmployeeIds = myEmployees.map((e) => e.id).toSet();
 
         leadEntries = leadEntries.where((l) {

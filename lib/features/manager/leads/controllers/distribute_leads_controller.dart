@@ -8,7 +8,7 @@ import 'package:easy_callers_mobile/core/services/auth_service.dart';
 enum DistributionMethod { equal, custom }
 
 class DistributeLeadsController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final Rx<LeadBatchModel?> mesh = Rx<LeadBatchModel?>(null);
@@ -73,11 +73,11 @@ class DistributeLeadsController extends GetxController {
   Future<void> _fetchUnassignedCount() async {
     try {
       if (mesh.value != null) {
-        final ids = await _leadService.getUnassignedLeadsFromBatch(mesh.value!.id);
-        totalBatchLeads.value = ids.length;
+        final idsStr = (await _webService.getUnassignedLeadsFromBatch(mesh.value!.id)).payload ?? [];
+        totalBatchLeads.value = idsStr.length;
       } else if (projectId.value.isNotEmpty) {
-        final ids = await _leadService.getUnassignedLeadsForProject(projectId.value);
-        totalBatchLeads.value = ids.length;
+        final idsStr = (await _webService.getUnassignedLeadsForProject(projectId.value)).payload ?? [];
+        totalBatchLeads.value = idsStr.length;
       }
       
       // Re-calculate distribution if already loaded
@@ -125,13 +125,13 @@ class DistributeLeadsController extends GetxController {
 
       if (projectID != null && projectID.isNotEmpty) {
         // Project-based: only load callers assigned to this project
-        result = await _leadService.getProjectCallersByManager(
+        result = (await _webService.getProjectCallersByManager(
           projectId: projectID,
           managerId: mId,
-        );
+        )).payload ?? [];
       } else {
         // Legacy/Generic: load all active employees
-        result = await _leadService.getEmployeesByManager(mId);
+        result = (await _webService.getEmployeesByManager(mId)).payload ?? [];
         result = result.where((emp) => emp.isActive).toList();
       }
 
@@ -211,12 +211,12 @@ class DistributeLeadsController extends GetxController {
       // If we have a projectId AND we are NOT specifically trying to distribute a single batch,
       // distribute ALL unassigned leads in the project.
       if (projectId.value.isNotEmpty && mesh.value == null) {
-        leadIds = await _leadService.getUnassignedLeadsForProject(projectId.value);
+        leadIds = (await _webService.getUnassignedLeadsForProject(projectId.value)).payload ?? [];
       } else if (mesh.value != null) {
-        leadIds = await _leadService.getUnassignedLeadsFromBatch(mesh.value!.id);
+        leadIds = (await _webService.getUnassignedLeadsFromBatch(mesh.value!.id)).payload ?? [];
       } else if (projectId.value.isNotEmpty) {
         // Fallback for project distribution even if mesh exists (if opened from dashboard)
-        leadIds = await _leadService.getUnassignedLeadsForProject(projectId.value);
+        leadIds = (await _webService.getUnassignedLeadsForProject(projectId.value)).payload ?? [];
       }
       
       if (leadIds.isEmpty) {
@@ -230,10 +230,10 @@ class DistributeLeadsController extends GetxController {
         ..removeWhere((key, value) => value == 0);
 
       // 3. Execute split
-      final success = await _leadService.splitLeadsCustom(
+      final success = (await _webService.splitLeadsCustom(
         leadIds: leadIds,
         employeeLeadCounts: activeAllocations,
-      );
+      )).payload ?? false;
 
       if (success) {
         Get.back();

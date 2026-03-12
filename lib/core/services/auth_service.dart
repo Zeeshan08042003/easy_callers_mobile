@@ -1,23 +1,17 @@
-import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/super_admin_model.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/manager_model.dart';
 import 'package:easy_callers_mobile/features/manager/models/employee_model.dart';
 import 'package:easy_callers_mobile/features/employee/services/notification_service.dart';
-import 'package:easy_callers_mobile/core/services/supabase_service.dart';
+import 'package:easy_callers_mobile/core/services/web_service.dart';
 import 'package:easy_callers_mobile/core/services/storage_service.dart';
 import 'package:easy_callers_mobile/core/utils/enums.dart';
-import 'package:easy_callers_mobile/core/constants/supabase_constants.dart';
-import 'dart:convert';
 
-/// Handles all authentication logic with separate role tables:
-/// - Super Admin & Manager: email/password login
-/// - Employee: OTP-based first activation, then employee/password
-/// - Session management
+/// Handles auth via Laravel Backend APIs (replaces Supabase auth)
 class AuthService extends GetxService {
-  final SupabaseService _supabase = Get.find<SupabaseService>();
+  final WebService _webService = Get.find<WebService>();
   final NotificationService _notificationService = Get.find<NotificationService>();
   final StorageService _storage = Get.find<StorageService>();
 
@@ -75,54 +69,43 @@ class AuthService extends GetxService {
       isLoading.value = true;
       error.value = '';
 
-      // 1. Authenticate with Supabase Auth
-      final normalizedEmail = email.toLowerCase().trim();
-      final response = await _supabase.client.auth.signInWithPassword(
-        email: normalizedEmail,
-        password: password,
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['auth', 'login'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'password': password,
+        },
       );
 
-      if (response.user == null) {
-        error.value = 'Login failed. Please check your credentials.';
-        return null;
-      }
+      if (response.status == API_STATUS.SUCCESS) {
+        final data = jsonDecode(response.stringData!);
+        final token = data['token'];
+        final roleStr = data['role'];
+        final userData = data['user'];
 
-      // 2. Detect which role table this user belongs to
-      final result = await _supabase.detectCurrentUser();
-      if (result == null) {
-        error.value = 'User profile not found. Contact your administrator.';
-        await _supabase.client.auth.signOut();
-        return null;
-      }
+        // Save token immediately so subsequent helpers pass it correctly
+        await _storage.setString('token', token);
 
-      // 3. Set current user based on role
-      _setCurrentUser(result.role, result.profile);
+        // Convert string role to enum
+        UserRole? role;
+        if (roleStr == 'super_admin') role = UserRole.superAdmin;
+        else if (roleStr == 'manager') role = UserRole.manager;
+        else if (roleStr == 'agency') role = UserRole.agency;
+        else if (roleStr == 'employee') role = UserRole.employee;
 
-      // 4. Check if user is active
-      if (result.role == UserRole.employee) {
-        final emp = result.profile as EmployeeModel;
-        if (!emp.isActive) {
-          error.value =
-              'Your account is not active. Please verify with OTP first.';
-          await _supabase.client.auth.signOut();
-          _clearCurrentUser();
+        if (role != null) {
+          _setCurrentUser(role, _parseProfile(role, userData));
+          return role;
+        } else {
+          error.value = "Unknown role returned by server.";
+          await logout();
           return null;
         }
-      } else if (result.role == UserRole.manager || result.role == UserRole.agency) {
-        final mgr = result.profile as ManagerModel;
-        if (!mgr.isActive) {
-          error.value =
-              'Your account is not active. Please verify with OTP first.';
-          await _supabase.client.auth.signOut();
-          _clearCurrentUser();
-          return null;
-        }
+      } else {
+        error.value = _extractErrorMessage(response);
+        return null;
       }
-
-      return result.role;
-    } on AuthException catch (e) {
-      error.value = _handleAuthError(e);
-      return null;
     } catch (e) {
       error.value = 'An unexpected error occurred: $e';
       return null;
@@ -132,194 +115,13 @@ class AuthService extends GetxService {
   }
 
   // ============================================
-  // EMPLOYEE OTP ACTIVATION
-  // ============================================
-
-  /// Verify OTP for employee first-time activation
-  Future<bool> verifyEmployeeOTP({
-    required String email,
-    required String otpCode,
-  }) async {
-    try {
-      isLoading.value = true;
-      error.value = '';
-
-      final result = await _supabase.client.rpc(
-        'get_employee_for_otp',
-        params: {
-          'input_email': email.trim().toLowerCase(),
-        },
-      );
-
-      if (result == null || result.isEmpty) {
-        error.value = 'No employee account found with this email.';
-        return false;
-      }
-
-      final employee = EmployeeModel.fromJson(result.first);
-
-      if (employee.otpCode != otpCode) {
-        error.value = 'Invalid OTP. Please try again.';
-        return false;
-      }
-
-      if (employee.isOTPExpired) {
-        error.value = 'OTP has expired. Please request a new one.';
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      error.value = 'Unexpected error: $e';
-      print('error : $e');
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Complete employee activation: set password and activate account
-  Future<EmployeeModel?> activateEmployee({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      isLoading.value = true;
-      error.value = '';
-
-      final normalizedEmail = email.toLowerCase().trim();
-
-      // STEP 1: Check employee exists via SECURITY DEFINER function (bypasses RLS)
-      print("=== Employee Activation ===");
-      print("Checking if employee exists: '$normalizedEmail'");
-      
-      final existingRecords = await _supabase.client.rpc(
-        'get_employee_for_otp',
-        params: {'input_email': normalizedEmail},
-      );
-      
-      if (existingRecords == null || existingRecords.isEmpty) {
-        error.value = 
-            'No employee account found with email: $normalizedEmail\n\n'
-            'This email was not created by a manager.\n'
-            'Please ask your manager to create your employee account first.';
-        return null;
-      }
-
-      print("✅ Employee found in database");
-
-
-      // STEP 2: Create or get auth account
-      String? authUserId;
-      
-      try {
-        final authResponse = await _supabase.client.auth.signUp(
-          email: normalizedEmail,
-          password: password,
-        );
-
-        if (authResponse.user != null) {
-          authUserId = authResponse.user!.id;
-          print("✅ Auth account created: $authUserId");
-        } else {
-          error.value = 'Failed to create account. Please try again.';
-          return null;
-        }
-      } on AuthException catch (e) {
-        // If user already exists, try to sign in to get the auth ID
-        if (e.message.contains('already registered') || 
-            e.message.contains('User already registered')) {
-          print("⚠️ Auth account already exists, signing in...");
-          
-          try {
-            final signInResponse = await _supabase.client.auth.signInWithPassword(
-              email: normalizedEmail,
-              password: password,
-            );
-            
-            if (signInResponse.user != null) {
-              authUserId = signInResponse.user!.id;
-              print("✅ Signed in with existing account: $authUserId");
-            } else {
-              error.value = 'Account exists but password is incorrect.';
-              return null;
-            }
-          } catch (signInError) {
-            error.value = 'Account exists but password is incorrect.';
-            print("❌ Sign in failed: $signInError");
-            return null;
-          }
-        } else {
-          throw e;
-        }
-      }
-
-      if (authUserId == null) {
-        error.value = 'Failed to create or access account.';
-        return null;
-      }
-
-      // STEP 3: Activate via SECURITY DEFINER function (bypasses RLS)
-      // This also confirms the email in auth.users
-      print("Activating employee via RPC: auth_id=$authUserId");
-      
-      final activatedRecords = await _supabase.client.rpc(
-        'activate_employee',
-        params: {
-          'input_email': normalizedEmail,
-          'input_auth_id': authUserId,
-        },
-      );
-
-      if (activatedRecords == null || activatedRecords.isEmpty) {
-        error.value = 'Failed to activate employee account.';
-        return null;
-      }
-
-      // STEP 4: Explicitly confirm the email as a safety net
-      // (handles edge cases where activate_employee's WHERE clause didn't match)
-      try {
-        await _supabase.client.rpc(
-          'confirm_user_email',
-          params: {'input_auth_id': authUserId},
-        );
-        print("✅ Email confirmed for auth user: $authUserId");
-      } catch (e) {
-        // Non-fatal: the activate_employee function should have handled this
-        print("⚠️ Could not explicitly confirm email (non-fatal): $e");
-      }
-
-      final employee = EmployeeModel.fromJson(activatedRecords.first);
-      _setCurrentUser(UserRole.employee, employee);
-      print("✅ Employee activated and logged in as: ${employee.fullName}");
-      
-      return employee;
-
-    } on AuthException catch (e) {
-      print("❌ Auth error: ${e.message}");
-      error.value = _handleAuthError(e);
-      return null;
-    } catch (e, stackTrace) {
-      print("❌ Error activating employee: $e");
-      print("Stack trace: $stackTrace");
-      error.value = 'Error activating employee: $e';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  // ============================================
   // MANAGER: CREATE EMPLOYEE
   // ============================================
-
-  /// Generate a 6-digit OTP
-  String generateOTP() {
-    final random = Random.secure();
-    return (100000 + random.nextInt(900000)).toString();
-  }
-
-  /// Create a new employee (called by Manager)
+  
+  // Note: Creating an employee is handled via ManagerController in Laravel, 
+  // so we'll likely move this out of AuthService eventually, but for now
+  // we use the current web service method structure.
+  
   Future<({EmployeeModel? employee, String? otp})> createEmployee({
     required String email,
     required String firstName,
@@ -330,48 +132,29 @@ class AuthService extends GetxService {
       isLoading.value = true;
       error.value = '';
 
-      final managerId = currentManager.value?.id;
-      if (managerId == null && currentSuperAdmin.value == null) {
-        error.value = 'Only managers can create employees.';
-        return (employee: null, otp: null);
-      }
-
-      // Generate OTP
-      final otp = generateOTP();
-
-
-
-      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
-
-      // Insert into employees table
-      final normalizedEmail = email.toLowerCase().trim();
-      final insertData = {
-        'email': normalizedEmail,
-        'first_name': firstName,
-        'last_name': lastName,
-        'is_active': false,
-        'manager_id': managerId,
-        'otp_code': otp,
-        'otp_expires_at': otpExpiry.toIso8601String(),
-      };
-      if (phone != null) insertData['phone'] = phone;
-
-      final response = await _supabase.employeesTable
-          .insert(insertData)
-          .select()
-          .single();
-
-      final employee = EmployeeModel.fromJson(response);
-
-      // Send OTP via email
-      await _sendOTPEmail(
-        email: normalizedEmail,
-        name: '$firstName $lastName'.trim(),
-        otp: otp,
-        role: 'employee',
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['manager', 'employees'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'first_name': firstName,
+          'last_name': lastName,
+          if (phone != null) 'phone': phone,
+        },
       );
 
-      return (employee: employee, otp: otp);
+      if (response.status == API_STATUS.SUCCESS) {
+        final data = jsonDecode(response.stringData!);
+        // API returns { "success": true, "data": employee_object }
+        final empMap = data['data'];
+        final employee = EmployeeModel.fromJson(empMap);
+        
+        // Laravel handles sending the OTP behind the scenes (we don't receive it raw anymore)
+        return (employee: employee, otp: "Sent via Email");
+      } else {
+        error.value = _extractErrorMessage(response);
+        return (employee: null, otp: null);
+      }
     } catch (e) {
       error.value = 'Error creating employee: $e';
       return (employee: null, otp: null);
@@ -384,7 +167,6 @@ class AuthService extends GetxService {
   // SUPER ADMIN: CREATE MANAGER
   // ============================================
 
-  /// Create a new manager (called by Super Admin)
   Future<({ManagerModel? manager, String? otp})?> createManager({
     required String email,
     required String firstName,
@@ -395,70 +177,30 @@ class AuthService extends GetxService {
       isLoading.value = true;
       error.value = '';
 
-      if (currentSuperAdmin.value == null) {
-        error.value = 'Only super admins can create managers.';
-        return null;
-      }
-
-      // 1. Generate OTP
-      final otp = generateOTP();
-      final otpExpiry = DateTime.now().toUtc().add(const Duration(hours: 24));
-      final normalizedEmail = email.toLowerCase().trim();
-
-      // 2. Create manager via SECURITY DEFINER RPC (bypasses RLS)
-      print('=== Creating Manager via RPC ===');
-      print('Email: $normalizedEmail');
-      print('OTP Expiry (UTC): ${otpExpiry.toIso8601String()}');
-      
-      final result = await _supabase.client.rpc(
-        'sa_create_manager',
-        params: {
-          'input_email': normalizedEmail,
-          'input_first_name': firstName,
-          'input_last_name': lastName,
-          'input_phone': phone,
-          'input_manager_type': 'manager',
-          'input_otp_code': otp,
-          'input_otp_expires_at': otpExpiry.toIso8601String(),
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['sa', 'managers'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'first_name': firstName,
+          'last_name': lastName,
+          'manager_type': 'manager',
+          if (phone != null) 'phone': phone,
         },
       );
 
-      if (result == null || (result is List && result.isEmpty)) {
-        error.value = 'Failed to create manager. Please try again.';
+      if (response.status == API_STATUS.SUCCESS) {
+        final data = jsonDecode(response.stringData!);
+        final managerMap = data['data'];
+        final manager = ManagerModel.fromJson(managerMap);
+        
+        return (manager: manager, otp: "Sent via Email");
+      } else {
+        error.value = _extractErrorMessage(response);
         return null;
       }
-
-      final managerData = result is List ? result.first : result;
-      final manager = ManagerModel.fromJson(managerData);
-      print('✅ Manager created: ${manager.fullName} (${manager.id})');
-
-      // 3. Send OTP via email
-      await _sendOTPEmail(
-        email: normalizedEmail,
-        name: '$firstName $lastName'.trim(),
-        otp: otp,
-        role: 'manager',
-      );
-
-      // 4. Log the action
-      await _logActivity(
-        action: 'create_manager',
-        targetType: 'manager',
-        targetId: manager.id,
-        details: {'manager_email': email},
-      );
-
-      return (manager: manager, otp: otp);
     } catch (e) {
-      print('❌ Error creating manager: $e');
-      final errorMsg = e.toString();
-      if (errorMsg.contains('already exists')) {
-        error.value = 'A manager with this email already exists.';
-      } else if (errorMsg.contains('Only super admins')) {
-        error.value = 'Only super admins can create managers.';
-      } else {
-        error.value = 'Error creating manager: $e';
-      }
+      error.value = 'Error creating manager: $e';
       return null;
     } finally {
       isLoading.value = false;
@@ -469,7 +211,6 @@ class AuthService extends GetxService {
   // MANAGER OTP ACTIVATION
   // ============================================
 
-  /// Verify OTP for manager first-time activation
   Future<bool> verifyManagerOTP({
     required String email,
     required String otpCode,
@@ -478,32 +219,22 @@ class AuthService extends GetxService {
       isLoading.value = true;
       error.value = '';
 
-      final normalizedEmail = email.toLowerCase().trim();
-      
-      final result = await _supabase.client.rpc(
-        'get_manager_for_otp',
-        params: {'input_email': normalizedEmail},
+      // Verify OTP via standard API Route
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['auth', 'manager', 'verify-otp'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'otp_code': otpCode,
+        },
       );
 
-      if (result == null || (result is List && result.isEmpty)) {
-        error.value = 'No manager account found with this email.';
+      if (response.status == API_STATUS.SUCCESS) {
+        return true;
+      } else {
+        error.value = _extractErrorMessage(response);
         return false;
       }
-
-      final managerData = result is List ? result.first : result;
-      final manager = ManagerModel.fromJson(managerData);
-
-      if (manager.otpCode != otpCode) {
-        error.value = 'Invalid OTP code. Please try again.';
-        return false;
-      }
-
-      if (manager.isOTPExpired) {
-        error.value = 'OTP has expired. Please request a new one.';
-        return false;
-      }
-
-      return true;
     } catch (e) {
       error.value = 'Error verifying OTP: $e';
       return false;
@@ -512,7 +243,6 @@ class AuthService extends GetxService {
     }
   }
 
-  /// Complete manager activation: set password and activate account
   Future<ManagerModel?> activateManager({
     required String email,
     required String password,
@@ -521,92 +251,28 @@ class AuthService extends GetxService {
       isLoading.value = true;
       error.value = '';
 
-      final normalizedEmail = email.toLowerCase().trim();
-      String? authUserId;
-
-      // 1. Create or get auth account
-      try {
-        final authResponse = await _supabase.client.auth.signUp(
-          email: normalizedEmail,
-          password: password,
-        );
-
-        if (authResponse.user != null) {
-          authUserId = authResponse.user!.id;
-        } else {
-          error.value = 'Failed to create account.';
-          return null;
-        }
-      } on AuthException catch (e) {
-        if (e.message.contains('already registered')) {
-          try {
-            final signInResponse = await _supabase.client.auth.signInWithPassword(
-              email: normalizedEmail,
-              password: password,
-            );
-            if (signInResponse.user != null) {
-              authUserId = signInResponse.user!.id;
-            } else {
-              error.value = 'Account exists but password setup failed.';
-              return null;
-            }
-          } catch (signInError) {
-            error.value = 'Account exists but password setup failed.';
-            return null;
-          }
-        } else {
-          error.value = _handleAuthError(e);
-          return null;
-        }
-      }
-
-      if (authUserId == null) return null;
-
-      // 2. Find manager via SECURITY DEFINER function (bypasses RLS)
-      final managerRecords = await _supabase.client.rpc(
-        'get_manager_for_otp',
-        params: {'input_email': normalizedEmail},
-      );
-
-      if (managerRecords == null || managerRecords.isEmpty) {
-        error.value = 'No manager record found.';
-        return null;
-      }
-
-      // 3. Activate via SECURITY DEFINER function (bypasses RLS)
-      // This also confirms the email in auth.users
-      final activatedRecords = await _supabase.client.rpc(
-        'activate_manager',
-        params: {
-          'input_email': normalizedEmail,
-          'input_auth_id': authUserId,
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['auth', 'manager', 'activate'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'password': password,
         },
       );
 
-      if (activatedRecords == null || activatedRecords.isEmpty) {
-        error.value = 'Failed to activate manager account.';
+      if (response.status == API_STATUS.SUCCESS) {
+        final data = jsonDecode(response.stringData!);
+        final token = data['token'];
+        final userData = data['manager'] ?? data['data'];
+        
+        await _storage.setString('token', token);
+        final manager = ManagerModel.fromJson(userData);
+        _setCurrentUser(manager.isAgency ? UserRole.agency : UserRole.manager, manager);
+        return manager;
+      } else {
+        error.value = _extractErrorMessage(response);
         return null;
       }
-
-      // 4. Explicitly confirm the email as a safety net
-      try {
-        await _supabase.client.rpc(
-          'confirm_user_email',
-          params: {'input_auth_id': authUserId},
-        );
-        print("✅ Email confirmed for manager auth user: $authUserId");
-      } catch (e) {
-        print("⚠️ Could not explicitly confirm email (non-fatal): $e");
-      }
-
-      final manager = ManagerModel.fromJson(activatedRecords.first);
-      _setCurrentUser(
-        manager.isAgency ? UserRole.agency : UserRole.manager,
-        manager,
-      );
-      
-      return manager;
-
     } catch (e) {
       error.value = 'Error activating manager: $e';
       return null;
@@ -618,8 +284,7 @@ class AuthService extends GetxService {
   // ============================================
   // MANAGER: SELF REGISTRATION
   // ============================================
-  
-  /// Register a new manager (self-registration)
+
   Future<ManagerModel?> registerManager({
     required String email,
     required String password,
@@ -631,62 +296,141 @@ class AuthService extends GetxService {
       isLoading.value = true;
       error.value = '';
 
-      // 1. Create auth account
-      final normalizedEmail = email.toLowerCase().trim();
-      final authResponse = await _supabase.client.auth.signUp(
-        email: normalizedEmail,
-        password: password,
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['auth', 'manager', 'register'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'password': password,
+          'first_name': firstName,
+          'last_name': lastName,
+          'manager_type': 'agency',
+          if (phone != null) 'phone': phone,
+        },
       );
 
-      if (authResponse.user == null) {
-        error.value = 'Failed to create auth account.';
+      if (response.status == API_STATUS.SUCCESS) {
+        final data = jsonDecode(response.stringData!);
+        final token = data['token'];
+        final userData = data['manager'] ?? data['data'];
+
+        await _storage.setString('token', token);
+        final manager = ManagerModel.fromJson(userData);
+        _setCurrentUser(UserRole.agency, manager);
+        return manager;
+      } else {
+        error.value = _extractErrorMessage(response);
         return null;
       }
-
-      final authId = authResponse.user!.id;
-
-      // 2. Insert into managers table
-      // Default max_employees to 10 for new self-registered managers
-      final insertData = <String, dynamic>{
-        'auth_id': authId,
-        'email': normalizedEmail,
-        'first_name': firstName,
-        'last_name': lastName,
-        'is_active': true,
-        'max_employees': 10,
-        'manager_type': 'agency',
-      };
-      if (phone != null) insertData['phone'] = phone;
-
-      final response = await _supabase.managersTable
-          .insert(insertData)
-          .select()
-          .single();
-
-      final manager = ManagerModel.fromJson(response);
-      
-      // 3. Set current user session
-      _setCurrentUser(UserRole.agency, manager);
-      
-      // 4. Log initial activity
-      await _logActivity(
-        action: 'manager_self_registration',
-        targetType: 'manager',
-        targetId: manager.id,
-        details: {'email': normalizedEmail},
-      );
-
-      return manager;
-    } on AuthException catch (e) {
-      error.value = _handleAuthError(e);
-      return null;
     } catch (e) {
       error.value = 'Registration error: $e';
-      print("Registration error: $e ");
       return null;
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // ============================================
+  // EMPLOYEE OTP ACTIVATION
+  // ============================================
+
+  Future<bool> verifyEmployeeOTP({
+    required String email,
+    required String otpCode,
+  }) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['auth', 'employee', 'verify-otp'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'otp_code': otpCode,
+        },
+      );
+
+      if (response.status == API_STATUS.SUCCESS) {
+        return true;
+      } else {
+        error.value = _extractErrorMessage(response);
+        return false;
+      }
+    } catch (e) {
+      error.value = 'Unexpected error: $e';
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<EmployeeModel?> activateEmployee({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['auth', 'employee', 'activate'],
+        body: {
+          'email': email.trim().toLowerCase(),
+          'password': password,
+        },
+      );
+
+      if (response.status == API_STATUS.SUCCESS) {
+        final data = jsonDecode(response.stringData!);
+        final token = data['token'];
+        final userData = data['employee'] ?? data['data'];
+
+        await _storage.setString('token', token);
+        final employee = EmployeeModel.fromJson(userData);
+        _setCurrentUser(UserRole.employee, employee);
+        return employee;
+      } else {
+        error.value = _extractErrorMessage(response);
+        return null;
+      }
+    } catch (e) {
+      error.value = 'Error activating employee: $e';
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Resend OTP for an employee
+  Future<String?> resendEmployeeOTP(String employeeEmail) async {
+      try {
+        final response = await _webService.callApi(
+          method: HTTP_METHODS.POST,
+          path: ['manager', 'employees', 'resend-otp'],
+          body: {
+            'email': employeeEmail.trim().toLowerCase(),
+          },
+        );
+        if (response.status == API_STATUS.SUCCESS) return "Sent";
+        return null;
+      } catch (e) { return null; }
+  }
+
+  /// Resend OTP for a manager
+  Future<String?> resendManagerOTP(String managerEmail) async {
+    try {
+        final response = await _webService.callApi(
+          method: HTTP_METHODS.POST,
+          path: ['sa', 'managers', 'resend-otp'],
+          body: {
+            'email': managerEmail.trim().toLowerCase(),
+          },
+        );
+        if (response.status == API_STATUS.SUCCESS) return "Sent";
+        return null;
+      } catch (e) { return null; }
   }
 
   // ============================================
@@ -699,22 +443,30 @@ class AuthService extends GetxService {
       // 1. Check local storage first
       final cachedRoleStr = _storage.getString(StorageService.keyUserRole);
       final cachedProfile = _storage.getJson(StorageService.keyUserProfile);
+      final token = await _storage.getString('token');
 
-      if (cachedRoleStr != null && cachedProfile != null) {
-        final role = UserRole.fromString(cachedRoleStr);
-        final profile = _parseProfile(role, cachedProfile);
-        
-        // Populate reactive variables
-        _setCurrentUser(role, profile, saveToStorage: false);
-        return role;
-      }
+      if (cachedRoleStr != null && cachedProfile != null && token != null) {
+        // We have a local token. Ideally we'd test it via an `/auth/me` endpoint.
+        final response = await _webService.callApi(
+          method: HTTP_METHODS.GET,
+          path: ['auth', 'me'],
+        );
 
-      // 2. If nothing in storage, check Supabase
-      if (_supabase.isLoggedIn) {
-        final result = await _supabase.detectCurrentUser();
-        if (result != null) {
-          _setCurrentUser(result.role, result.profile);
-          return result.role;
+        if (response.status == API_STATUS.SUCCESS) {
+           final data = jsonDecode(response.stringData!);
+           final roleStr = data['role'];
+           final userData = data['user'];
+
+           UserRole? role;
+           if (roleStr == 'super_admin') role = UserRole.superAdmin;
+           else if (roleStr == 'manager') role = UserRole.manager;
+           else if (roleStr == 'agency') role = UserRole.agency;
+           else if (roleStr == 'employee') role = UserRole.employee;
+
+           if (role != null) {
+              _setCurrentUser(role, _parseProfile(role, userData));
+              return role;
+           }
         }
       }
       
@@ -741,7 +493,13 @@ class AuthService extends GetxService {
   Future<void> logout() async {
     try {
       _notificationService.stopListening();
-      await _supabase.client.auth.signOut();
+      
+      // Attempt backend logout (invalidates token)
+      await _webService.callApi(
+        method: HTTP_METHODS.POST,
+        path: ['auth', 'logout'],
+      );
+
       await _storage.clear();
       _clearCurrentUser();
     } catch (e) {
@@ -782,7 +540,6 @@ class AuthService extends GetxService {
         break;
     }
 
-    // Save to local storage for persistence
     if (saveToStorage) {
       _storage.setString(StorageService.keyUserRole, role.value);
       if (profileJson != null) {
@@ -791,8 +548,8 @@ class AuthService extends GetxService {
       _storage.setBool(StorageService.keyIsLoggedIn, true);
     }
 
-    // Start listening for notifications if we have a userId
     if (userId != null) {
+      // Uses generic backend sockets in future updates
       _notificationService.listenToNotifications(userId, role);
     }
   }
@@ -804,181 +561,13 @@ class AuthService extends GetxService {
     currentEmployee.value = null;
   }
 
-  /// Log an activity
-  Future<void> _logActivity({
-    required String action,
-    String? targetType,
-    String? targetId,
-    Map<String, dynamic>? details,
-  }) async {
+  String _extractErrorMessage(ApiResponse response) {
+    if (response.stringData == null) return "Unknown error occurred.";
     try {
-      final role = currentRole.value;
-      final userId = currentUserId;
-      if (role == null || userId == null) return;
-
-      final insertData = <String, dynamic>{
-        'action': action,
-        'target_type': targetType,
-        'target_id': targetId,
-        'details': details ?? {},
-      };
-
-      // Set the correct performer column based on current role
-      switch (role) {
-        case UserRole.superAdmin:
-          insertData['performer_super_admin_id'] = userId;
-          break;
-        case UserRole.manager:
-        case UserRole.agency:
-          insertData['performer_manager_id'] = userId;
-          break;
-        case UserRole.employee:
-          insertData['performer_employee_id'] = userId;
-          break;
-      }
-
-      await _supabase.activityLogTable.insert(insertData);
-    } catch (e) {
-      print('Error logging activity: $e');
+      final decoded = jsonDecode(response.stringData!);
+      return decoded['message'] ?? decoded['error'] ?? "Request failed with status ${response.exception_message}";
+    } catch (_) {
+      return "Something went wrong.";
     }
-  }
-
-  /// Resend OTP for an employee
-  Future<String?> resendEmployeeOTP(String employeeEmail) async {
-    try {
-      final otp = generateOTP();
-      final otpExpiry = DateTime.now().add(const Duration(hours: 24));
-
-      final normalizedEmail = employeeEmail.toLowerCase().trim();
-      await _supabase.employeesTable.update({
-        'otp_code': otp,
-        'otp_expires_at': otpExpiry.toIso8601String(),
-      }).ilike('email', normalizedEmail);
-
-      // Fetch employee name for the email
-      final empData = await _supabase.employeesTable
-          .select('first_name, last_name')
-          .ilike('email', normalizedEmail)
-          .maybeSingle();
-      final name = empData != null
-          ? '${empData['first_name'] ?? ''} ${empData['last_name'] ?? ''}'.trim()
-          : '';
-
-      // Send OTP via email
-      await _sendOTPEmail(
-        email: normalizedEmail,
-        name: name,
-        otp: otp,
-        role: 'employee',
-      );
-
-      return otp;
-    } catch (e) {
-      print('Error resending OTP: $e');
-      return null;
-    }
-  }
-
-  /// Resend OTP for a manager
-  Future<String?> resendManagerOTP(String managerEmail) async {
-    try {
-      final otp = generateOTP();
-      final otpExpiry = DateTime.now().toUtc().add(const Duration(hours: 24));
-
-      final normalizedEmail = managerEmail.toLowerCase().trim();
-      await _supabase.managersTable.update({
-        'otp_code': otp,
-        'otp_expires_at': otpExpiry.toIso8601String(),
-      }).ilike('email', normalizedEmail);
-
-      // Fetch manager name for the email
-      final mgrData = await _supabase.managersTable
-          .select('first_name, last_name')
-          .ilike('email', normalizedEmail)
-          .maybeSingle();
-      final name = mgrData != null
-          ? '${mgrData['first_name'] ?? ''} ${mgrData['last_name'] ?? ''}'.trim()
-          : '';
-
-      // Send OTP via email
-      await _sendOTPEmail(
-        email: normalizedEmail,
-        name: name,
-        otp: otp,
-        role: 'manager',
-      );
-
-      return otp;
-    } catch (e) {
-      print('Error resending manager OTP: $e');
-      return null;
-    }
-  }
-
-  // ============================================
-  // EMAIL HELPERS
-  // ============================================
-
-  /// Send OTP email via Supabase Edge Function
-  Future<void> _sendOTPEmail({
-    required String email,
-    required String name,
-    required String otp,
-    required String role,
-  }) async {
-    try {
-      await _supabase.client.functions.invoke(
-        'send-otp-email',
-        body: {
-          'email': email,
-          'name': name,
-          'otp': otp,
-          'role': role,
-        },
-      );
-      print('✅ OTP email sent to $email');
-    } catch (e) {
-      // Log but don't fail the whole operation if email fails
-      print('⚠️ Failed to send OTP email to $email: $e');
-    }
-  }
-
-  /// Centralized Auth Error Handling
-  String _handleAuthError(AuthException e) {
-    print('Auth Error Code: ${e.statusCode}');
-    print('Auth Error Message: ${e.message}');
-
-    final message = e.message.toLowerCase();
-
-    if (e.statusCode == '525' || message.contains('525')) {
-      return 'Connection error (525). Please check if your Supabase project is "Active" (not paused) or if your internet/ISP is blocking Supabase.';
-    }
-
-    if (message.contains('rate limit') || message.contains('too many requests')) {
-      return 'Too many attempts. Please wait a few minutes before trying again.';
-    }
-    
-    if (message.contains('invalid login credentials') || message.contains('invalid credentials')) {
-      return 'Invalid email or password. Please check and try again.';
-    }
-
-    if (message.contains('user not found')) {
-      return 'No account found with this email address.';
-    }
-
-    if (message.contains('email not confirmed')) {
-      return 'Your email address has not been verified yet.';
-    }
-
-    if (message.contains('invalid format') || message.contains('bad email')) {
-      return 'Please enter a valid email address.';
-    }
-
-    if (message.contains('signup is disabled')) {
-      return 'Account creation is currently disabled. Please contact your administrator.';
-    }
-
-    // Default Supabase message if no custom match
-    return e.message;
   }
 }

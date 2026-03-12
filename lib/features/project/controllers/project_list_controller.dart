@@ -203,8 +203,8 @@ class ProjectListController extends GetxController {
     required String managerId,
   }) async {
     // Fetch all employees under this manager
-    final leadService = Get.find<LeadService>();
-    final allEmployees = await leadService.getEmployeesByManager(managerId);
+    final webService = Get.find<WebService>();
+    final allEmployees = (await webService.getEmployeesByManager(managerId)).payload ?? [];
     final activeEmployees = allEmployees.where((e) => e.isActive).toList();
 
     if (activeEmployees.isEmpty) {
@@ -458,8 +458,8 @@ class ProjectListController extends GetxController {
   /// Check if the project has unassigned leads and prompt for redistribution
   Future<void> _checkAndPromptRedistribution(String projectId, String? projectName) async {
     try {
-      final leadService = Get.find<LeadService>();
-      final unassignedLeads = await leadService.getUnassignedLeadsForProject(projectId);
+      final webService = Get.find<WebService>();
+      final unassignedLeads = (await webService.getUnassignedLeadsForProject(projectId)).payload ?? [];
       
       if (unassignedLeads.isNotEmpty) {
         // Wait a moment so the previous snackbar is visible

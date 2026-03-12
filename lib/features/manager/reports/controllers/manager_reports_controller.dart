@@ -5,7 +5,7 @@ import 'package:easy_callers_mobile/features/super_admin/models/manager_model.da
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class ManagerReportsController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final RxMap teamPerformance = <String, dynamic>{}.obs;
@@ -43,13 +43,13 @@ class ManagerReportsController extends GetxController {
 
       // Run in parallel
       final results = await Future.wait([
-        _leadService.getTeamPerformanceOverview(
+        _webService.getTeamPerformanceOverview(
           managerId,
           startDate: selectedDateRange.value.start,
           endDate: selectedDateRange.value.end,
         ),
-        _leadService.getTeamLeadFunnel(managerId),
-        _leadService.getTeamActivityStats(managerId),
+        _webService.getTeamLeadFunnel(managerId),
+        _webService.getTeamActivityStats(managerId),
       ]);
 
       teamPerformance.value = results[0] as Map<String, dynamic>;

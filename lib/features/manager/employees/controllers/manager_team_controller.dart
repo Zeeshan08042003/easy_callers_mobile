@@ -8,7 +8,7 @@ import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:easy_callers_mobile/core/theme/app_colors.dart';
 
 class ManagerTeamController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final RxList<EmployeeModel> employees = <EmployeeModel>[].obs;
@@ -48,7 +48,7 @@ class ManagerTeamController extends GetxController {
       final managerId = oversightManagerId ?? _authService.currentManager.value?.id;
       if (managerId == null) return;
 
-      final result = await _leadService.getEmployeesByManager(managerId);
+      final result = (await _webService.getEmployeesByManager(managerId)).payload ?? [];
       employees.value = result;
     } catch (e) {
       Get.snackbar('Error', 'Failed to fetch team: $e');

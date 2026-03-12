@@ -9,7 +9,7 @@ import '../../../../core/utils/enums.dart';
 
 class DistributionDetailsController extends GetxController {
   final SupabaseService _supabase = Get.find<SupabaseService>();
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   late final LeadBatchModel batch;
@@ -35,9 +35,9 @@ class DistributionDetailsController extends GetxController {
 
       List<EmployeeModel> employees;
       if (isSuperAdmin && batch.projectId != null) {
-        employees = await _leadService.getEmployeesByProject(batch.projectId!);
+        employees = (await _webService.getEmployeesByProject(batch.projectId!)).payload ?? [];
       } else if (managerId != null) {
-        employees = await _leadService.getEmployeesByManager(managerId);
+        employees = (await _webService.getEmployeesByManager(managerId)).payload ?? [];
       } else {
         isLoading.value = false;
         return;

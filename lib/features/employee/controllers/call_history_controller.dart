@@ -8,7 +8,7 @@ import 'package:easy_callers_mobile/core/services/auth_service.dart';
 import 'package:intl/intl.dart';
 
 class CallHistoryController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   /// All raw call logs from the server
@@ -55,15 +55,15 @@ class CallHistoryController extends GetxController {
       print('CallHistory: Loading call logs for employee: $employeeId');
 
       // Fetch all call logs
-      final logs = await _leadService.getCallLogsByEmployee(employeeId, limit: 200);
-      print('CallHistory: Fetched ${logs.length} call logs');
-      callLogs.value = logs;
+      final logsStr = (await _webService.getCallLogsByEmployee(employeeId, limit: 200)).payload ?? [];
+      print('CallHistory: Fetched ${logsStr.length} call logs');
+      callLogs.value = logsStr;
 
       // Group by lead
-      _groupByLead(logs);
+      _groupByLead(logsStr);
 
       // Calculate weekly stats
-      _calculateWeeklyStats(logs);
+      _calculateWeeklyStats(logsStr);
 
       // Apply filters
       _applyFilters();
@@ -239,7 +239,7 @@ class CallHistoryController extends GetxController {
       Get.back();
 
       // Fetch the full lead model
-      final lead = await _leadService.getLeadById(leadId);
+      final lead = (await _webService.getLeadById(leadId)).payload;
       if (lead != null) {
         Get.to(() => LeadDetailView(lead: lead));
       } else {

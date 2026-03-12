@@ -5,7 +5,7 @@ import 'package:easy_callers_mobile/features/project/models/project_model.dart';
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class SystemReportsController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final ProjectService _projectService = Get.find<ProjectService>();
   final AuthService _authService = Get.find<AuthService>();
 
@@ -49,8 +49,8 @@ class SystemReportsController extends GetxController {
       final projectId = selectedProject.value?.id;
       final saId = _authService.currentSuperAdmin.value?.id;
       final results = await Future.wait([
-        _leadService.getGlobalStats(projectId: projectId, superAdminId: saId),
-        _leadService.getRegionalPerformance(
+        _webService.getGlobalStats(projectId: projectId, superAdminId: saId),
+        _webService.getRegionalPerformance(
           projectId: projectId,
           currentSuperAdminId: saId,
         ),

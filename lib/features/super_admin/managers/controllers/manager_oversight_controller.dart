@@ -4,7 +4,7 @@ import 'package:easy_callers_mobile/features/manager/services/lead_service.dart'
 import 'package:easy_callers_mobile/core/services/auth_service.dart';
 
 class ManagerOversightController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   late ManagerModel manager;
@@ -37,12 +37,12 @@ class ManagerOversightController extends GetxController {
     try {
       isLoading.value = true;
       final saId = _authService.currentSuperAdmin.value?.id;
-      final result = await _leadService.getManagerAnalytics(
+      final resultStr = (await _webService.getManagerAnalytics(
         managerId: manager.id,
         period: selectedPeriod.value,
         currentSuperAdminId: saId,
-      );
-      analytics.value = result;
+      )).payload ?? {};
+      analytics.value = resultStr;
     } catch (e) {
       Get.snackbar('Error', 'Failed to load manager analytics: $e');
     } finally {

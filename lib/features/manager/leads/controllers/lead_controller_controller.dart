@@ -10,7 +10,7 @@ import 'package:easy_callers_mobile/features/manager/leads/bindings/distribute_l
 import 'package:easy_callers_mobile/app/routes/app_routes.dart';
 
 class LeadControllerController extends GetxController {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
   final AuthService _authService = Get.find<AuthService>();
 
   final RxList<LeadModel> leads = <LeadModel>[].obs;
@@ -40,8 +40,8 @@ class LeadControllerController extends GetxController {
       
       if (managerId == null) return;
 
-      final result = await _leadService.getLeadsByManager(managerId);
-      leads.value = result;
+      final resultStr = (await _webService.getLeadsByManager(managerId)).payload ?? [];
+      leads.value = resultStr;
       _applyFilters();
     } catch (e) {
       Get.snackbar('Error', 'Failed to load leads: $e');
@@ -56,7 +56,8 @@ class LeadControllerController extends GetxController {
       if (managerId == null) return;
 
       isLoading.value = true;
-      final batch = await _leadService.pickAndUploadLeads(managerId);
+      // final batch = await _webService.pickAndUploadLeads(managerId);
+      dynamic batch; // Temporarily comment until file upload logic is fixed
       
       if (batch != null) {
         Get.snackbar('Success', 'Uploaded ${batch.totalLeads} leads successfully!');

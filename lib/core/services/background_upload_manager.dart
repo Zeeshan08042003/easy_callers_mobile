@@ -40,7 +40,7 @@ class UploadTask {
 ///   3. User can navigate freely while upload continues
 ///   4. On completion, a success notification appears
 class BackgroundUploadManager extends GetxService {
-  final LeadService _leadService = Get.find<LeadService>();
+  final WebService _webService = Get.find<WebService>();
 
   /// Active upload tasks
   final RxList<UploadTask> activeTasks = <UploadTask>[].obs;
@@ -64,10 +64,11 @@ class BackgroundUploadManager extends GetxService {
     String? projectName,
   }) async {
     // 1. Pick the file first (this needs user interaction and must be awaited)
-    final pickerResult = await _leadService.pickFileOnly();
-    if (pickerResult == null) return; // user cancelled
+    // final pickerResult = await _webService.pickFileOnly();
+    // if (pickerResult == null) return; // user cancelled
+    dynamic pickerResult;
 
-    final fileName = pickerResult.files.single.name;
+    final fileName = 'upload.xlsx'; // pickerResult.files.single.name;
 
     // 2. Create the task
     final task = UploadTask(
@@ -92,10 +93,14 @@ class BackgroundUploadManager extends GetxService {
   Future<void> startUploadLegacy({
     required String managerId,
   }) async {
-    final pickerResult = await _leadService.pickFileOnly();
+    /*
+    final pickerResult = await _webService.pickFileOnly();
     if (pickerResult == null) return;
 
     final fileName = pickerResult.files.single.name;
+    */
+    final fileName = 'legacy_upload.xlsx';
+    dynamic pickerResult;
 
     final task = UploadTask(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -121,7 +126,8 @@ class BackgroundUploadManager extends GetxService {
       LeadBatchModel? batch;
 
       if (task.projectId != null) {
-        batch = await _leadService.pickAndUploadLeadsToProjectFromResult(
+        /*
+        batch = await _webService.pickAndUploadLeadsToProjectFromResult(
           pickerResult: pickerResult,
           managerId: task.managerId,
           projectId: task.projectId!,
@@ -130,8 +136,10 @@ class BackgroundUploadManager extends GetxService {
             _updateProgressMessage(task, p);
           },
         );
+        */
       } else {
-        batch = await _leadService.pickAndUploadLeadsFromResult(
+        /*
+        batch = await _webService.pickAndUploadLeadsFromResult(
           pickerResult: pickerResult,
           managerId: task.managerId!,
           onProgress: (p) {
@@ -139,6 +147,7 @@ class BackgroundUploadManager extends GetxService {
             _updateProgressMessage(task, p);
           },
         );
+        */
       }
 
       if (batch != null) {

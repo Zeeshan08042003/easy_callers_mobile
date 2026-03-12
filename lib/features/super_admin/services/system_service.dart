@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:easy_callers_mobile/features/super_admin/models/system_settings_model.dart';
-import 'package:easy_callers_mobile/core/services/supabase_service.dart';
+import 'package:easy_callers_mobile/core/services/web_service.dart';
 
 class SystemService extends GetxService {
-  final SupabaseService _supabase = Get.find<SupabaseService>();
+  final WebService _webService = Get.find<WebService>();
   
   final Rx<SystemSettingsModel?> settings = Rx<SystemSettingsModel?>(null);
   final RxBool isLoading = false.obs;
@@ -16,14 +17,17 @@ class SystemService extends GetxService {
   Future<void> fetchSettings() async {
     try {
       isLoading.value = true;
-      final response = await _supabase.client
-          .from('system_settings')
-          .select()
-          .limit(1)
-          .maybeSingle();
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.GET,
+        path: ['sa', 'settings'],
+      );
 
-      if (response != null) {
-        settings.value = SystemSettingsModel.fromJson(response);
+      if (response.status == API_STATUS.SUCCESS) {
+        final data = jsonDecode(response.stringData!);
+        final settingsData = data['data'];
+        if (settingsData != null) {
+          settings.value = SystemSettingsModel.fromJson(settingsData);
+        }
       }
     } catch (e) {
       print('Error fetching system settings: $e');
@@ -35,17 +39,23 @@ class SystemService extends GetxService {
   Future<bool> updateSettings(SystemSettingsModel newSettings, String adminId) async {
     try {
       isLoading.value = true;
-      final updateData = newSettings.toJson();
-      updateData['updated_by'] = adminId;
-      updateData['updated_at'] = DateTime.now().toIso8601String();
+      
+      final response = await _webService.callApi(
+        method: HTTP_METHODS.PUT,
+        path: ['sa', 'settings'],
+        body: newSettings.toJson(),
+      );
 
-      await _supabase.client
-          .from('system_settings')
-          .update(updateData)
-          .eq('id', newSettings.id);
-
-      settings.value = newSettings;
-      return true;
+      if (response.status == API_STATUS.SUCCESS) {
+        // Backend returns the updated row 
+        final data = jsonDecode(response.stringData!);
+        final updatedData = data['data'];
+        
+        settings.value = SystemSettingsModel.fromJson(updatedData);
+        return true;
+      }
+      
+      return false;
     } catch (e) {
       print('Error updating system settings: $e');
       return false;
