@@ -35,7 +35,7 @@ class AuthController extends GetxController {
   // State
   RxBool get isLoading => _authService.isLoading;
   RxString get error => _authService.error;
-  
+
   // Role-specific current users
   Rx<UserRole?> get currentRole => _authService.currentRole;
   Rx<SuperAdminModel?> get currentSuperAdmin => _authService.currentSuperAdmin;
@@ -43,7 +43,7 @@ class AuthController extends GetxController {
   Rx<EmployeeModel?> get currentEmployee => _authService.currentEmployee;
   
   // For first-time activation
-  final Rx<UserRole?> detectedActivationRole = Rx<UserRole?>(null);
+  final Rx<UserRole?> detectedActivationRole = Rx<UserRole?>(null)
 
   // ============================================
   // LOGIN
